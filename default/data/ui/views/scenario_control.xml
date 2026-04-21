@@ -1,0 +1,44 @@
+<form version="1.1" theme="light">
+  <label>Scenario Control</label>
+  <description>Enable sets &lt;scenario&gt;_activated to the current epoch time; disable sets it to 0 in local/ai_lab_scenarios.conf. Choose values below, then click Submit to run the command once.</description>
+  <row>
+    <panel>
+      <html>
+        <p style="margin:0 0 0.5em 0"><strong>Fault Start</strong> (minutes): Minutes after scenario activation (the saved &lt;scenario&gt;_activated epoch) before the simulated fault begins. Stored as &lt;scenario&gt;_fault_start in local/ai_lab_scenarios.conf. Use 0 to start the fault window at activation time.</p>
+        <p style="margin:0"><strong>Fault Duration</strong> (minutes): How long the fault window stays active after it starts. Stored as &lt;scenario&gt;_fault_duration. Use 0 to keep the fault in effect until the scenario is deactivated (lab default behavior).</p>
+      </html>
+    </panel>
+  </row>
+  <fieldset submitButton="true">
+    <!-- Token names must omit the `form.` prefix so Submit defers searches until click. -->
+    <input type="dropdown" token="scenario">
+      <label>Scenario</label>
+      <choice value="scenario_1">scenario_1</choice>
+      <default>scenario_1</default>
+    </input>
+    <input type="dropdown" token="active">
+      <label>Activation</label>
+      <choice value="1">Enable (set epoch)</choice>
+      <choice value="0">Disable (set 0)</choice>
+      <default>1</default>
+    </input>
+    <input type="text" token="fault_start">
+      <label>Fault Start (minutes)</label>
+      <default>0</default>
+    </input>
+    <input type="text" token="fault_duration">
+      <label>Fault Duration (minutes)</label>
+      <default>0</default>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <table>
+        <search>
+          <query>| scenariocontrol scenario="$form.scenario$" active="$form.active$" fault_start="$form.fault_start$" fault_duration="$form.fault_duration$"</query>
+        </search>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+</form>

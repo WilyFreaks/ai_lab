@@ -59,9 +59,35 @@ then add `random.gauss(0, noise_stdev)`
 
 Two separate scripts (not one):
 
-**`bin/backfill.py`** — runs once at app start, generates `(app_start_time - backfill_days)` to `app_start_time`, sends to Splunk HEC with historical timestamps.
+**`bin/backfill_log.py`** — runs once at app start, generates `(app_start_time - backfill_days)` to `app_start_time`, sends to Splunk HEC with historical timestamps.
 
-**`bin/live.py`** — runs continuously, generates real-time events from `app_start_time` onward, listens for scenario trigger to switch to fault values.
+**`bin/live_log.py`** — runs continuously, generates real-time events from `app_start_time` onward, listens for scenario trigger to switch to fault values.
+
+## Scenario Control Stanza (`[scenarios]`)
+
+Scenario runtime control values are stored in `[scenarios]`:
+
+```ini
+[scenarios]
+scenario_1_activated = 0
+scenario_1_fault_start = 0
+scenario_1_fault_duration = 0
+```
+
+- `scenario_1_activated`:
+  - `0` means inactive
+  - non-zero means activation epoch time (seconds)
+- `scenario_1_fault_start`: minutes after `scenario_1_activated` when fault begins
+- `scenario_1_fault_duration`: minutes the fault state remains active
+
+`scenario_1_recovery_duration` is not used in the current design to keep implementation simpler.
+
+## Scenario Override Policy
+
+- Keep `[baseline]` as the single source of truth for normal-state values.
+- In `[scenario_*]`, define only values that must change during the fault.
+- If a key is not defined in `[scenario_*]`, generator behavior falls back to baseline.
+- For Scenario 1 specifically, ThousandEyes metrics can remain unchanged while telemetry/TWAMP/CNC path data carry the fault signal.
 
 ## Sample Directory Structure
 
