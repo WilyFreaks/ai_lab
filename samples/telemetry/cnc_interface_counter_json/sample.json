@@ -1,0 +1,374 @@
+{
+    "devices": [
+        {
+            "host_name": "R2-NCS5504",
+            "uuid": "5231a1d7-54b0-435e-8b70-cdafc2bdd258",
+            "interfaces": {
+                "HundredGigE0/0/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R2_HundredGigE0_0_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R2_HundredGigE0_0_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/0/2": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R2_HundredGigE0_0_0_2_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R2_HundredGigE0_0_0_2_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R3-NCS5504",
+            "uuid": "9724277d-ab96-40ce-b9de-3a2bc8ad24fb",
+            "interfaces": {
+                "HundredGigE0/0/0/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R3_HundredGigE0_0_0_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R3_HundredGigE0_0_0_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/0/2": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R3_HundredGigE0_0_0_2_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R3_HundredGigE0_0_0_2_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R4-NCS55A2",
+            "uuid": "8a2d329a-e810-4b4f-bac5-e78f2f2c17b8",
+            "interfaces": {
+                "HundredGigE0/0/1/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_1_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_1_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "Bundle-Ether145": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_Bundle_Ether145_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_Bundle_Ether145_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/2/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_2_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_2_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/2/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_2_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R4_HundredGigE0_0_2_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R5-NCS55A2",
+            "uuid": "58ffd840-9788-46df-9b0c-e8c096b452a8",
+            "interfaces": {
+                "HundredGigE0/0/1/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_1_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_1_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "Bundle-Ether145": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_Bundle_Ether145_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_Bundle_Ether145_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/2/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_2_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_2_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/2/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_2_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R5_HundredGigE0_0_2_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R6-NCS560",
+            "uuid": "fb560b3c-1a53-45b1-9f46-a0010cf406ea",
+            "interfaces": {
+                "HundredGigE0/0/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_0_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_0_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/0/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_0_0_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_0_0_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/1/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_1_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R6_HundredGigE0_1_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R7-NCS560",
+            "uuid": "99f0bf7b-ef76-48ce-83c3-de87c4a9763b",
+            "interfaces": {
+                "HundredGigE0/0/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_0_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_0_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/0/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_0_0_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_0_0_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/1/0/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_1_0_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R7_HundredGigE0_1_0_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R8-NCS540",
+            "uuid": "a74156f1-d035-436a-ab60-9512784ce6dd",
+            "interfaces": {
+                "FortyGigE0/0/0/28": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_FortyGigE0_0_0_28_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_FortyGigE0_0_0_28_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "FortyGigE0/0/1/1": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_FortyGigE0_0_1_1_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_FortyGigE0_0_1_1_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/1/0": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_HundredGigE0_0_1_0_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R8_HundredGigE0_0_1_0_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "host_name": "R9-NCS540",
+            "uuid": "e39bbae1-8d82-4b01-a39f-3e91885e6168",
+            "interfaces": {
+                "FortyGigE0/0/0/28": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R9_FortyGigE0_0_0_28_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R9_FortyGigE0_0_0_28_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                },
+                "HundredGigE0/0/0/29": {
+                    "ifInPktsRate": {
+                        "latest_data": {
+                            "value": {{R9_HundredGigE0_0_0_29_ifInPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    },
+                    "ifOutPktsRate": {
+                        "latest_data": {
+                            "value": {{R9_HundredGigE0_0_0_29_ifOutPktsRate}},
+                            "timestamp": "{{timestamp}}"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,25 @@
+# cisco:thousandeyes:metric
+
+HTTP test metrics from a ThousandEyes Cloud & Enterprise Agent behind R9-NCS540 (Shepparton) to google.com, running every minute.
+
+## Placeholder Convention
+
+| Placeholder | Description | Example |
+|-------------|-------------|---------|
+| `{{timestamp}}` | ISO 8601 UTC timestamp of the test run | `2026-04-21T10:00:00Z` |
+| `{{sequence}}` | Incrementing integer, unique per event | `1001` |
+| `{{response_time_ms}}` | HTTP response time in seconds (float) | `0.187` |
+| `{{throughput_kbps}}` | HTTP throughput in kbps (float) | `2345.6` |
+| `{{availability}}` | Availability percentage (0 or 100) | `100` |
+| `{{network_latency_ms}}` | Network latency in milliseconds (float) | `12.4` |
+| `{{network_jitter_ms}}` | Network jitter in milliseconds (float) | `1.2` |
+| `{{network_loss_pct}}` | Packet loss percentage (float) | `0.0` |
+| `{{http_status_code}}` | HTTP response status code | `200` |
+
+## Notes
+
+- `thousandeyes.source.agent.name` is always `R9-NCS540` for this scenario
+- `thousandeyes.test.name` is `R9-to-Google-HTTP`
+- `thousandeyes.test.type` is `http-server`
+- `server.address` is always `google.com`
+- `DATETIME_CONFIG = CURRENT` — timestamp is set at ingest time, not from the event
