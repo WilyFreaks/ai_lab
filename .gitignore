@@ -1,0 +1,2 @@
+# Splunk per-instance overrides (not shared in git)
+local/
