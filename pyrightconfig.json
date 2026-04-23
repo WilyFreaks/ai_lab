@@ -1,0 +1,6 @@
+{
+  "include": ["bin"],
+  "stubPath": "typings",
+  "extraPaths": ["typings"],
+  "reportMissingImports": true
+}

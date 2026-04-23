@@ -19,12 +19,16 @@ bin/
 
 **Responsibilities:**
 1. Read `local/ai_lab_scenarios.conf` `[baseline]` stanza
-2. If `backfill_start_time` is set to 0, or not set,
+2. Enforce generation gate before spawning workers:
+   - `region` must be set to one of `au|jp`
+   - `baseline_generation_enabled = true`
+   - if gate is closed, exit safely (no worker spawn)
+3. If gate is open and `backfill_start_time` is set to 0, or not set,
    - Set `backfill_start_time` to the current epoch time
    - Set `backfill_completed = false`
    - Write to `local/ai_lab_scenarios.conf`
-3. Spawn `backfill_log.py` as a subprocess
-4. Spawn `live_log.py` as a subprocess
+4. Spawn `backfill_log.py` as a subprocess
+5. Spawn `live_log.py` as a subprocess
 
 ---
 
@@ -39,7 +43,10 @@ bin/
 2. If `backfill_completed = true`, exit immediately (already done)
 3. Generate synthetic events at configured intervals for the window:
    `(backfill_start_time - backfill_days)` → `backfill_start_time`
-4. Send events to Splunk HEC with historical timestamps
+4. Write generated events in bulk NDJSON files under app spool paths:
+   - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`
+   - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`
+5. Splunk file monitor stanzas in `default/inputs.conf` assign index/sourcetype on ingest
 5. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
 
 **Restart behavior:** 
@@ -57,7 +64,7 @@ This is mandatory to avoid duplicate or missing data.
 
 **Responsibilities:**
 1. Read `backfill_start_time` from conf as the real-time anchor
-2. Generate synthetic events at configured intervals, sending to Splunk HEC with current timestamps
+2. Generate synthetic events at configured intervals and write to spool files for monitor ingestion
 3. Read scenario runtime controls from `[scenarios]` in `local/ai_lab_scenarios.conf`
 4. Treat `<scenario>_activated` as activation epoch (`0` means inactive)
 5. Apply scenario overrides only during fault window:
@@ -78,23 +85,64 @@ This is mandatory to avoid missing data.
 - Do not introduce abrupt step changes at boundary hours (especially Sunday 22:00-23:59).
 - Apply interpolation windows around Fri→Sat and Sun→Mon transitions so chart behavior stays realistic.
 
+## Region Timezone Alignment (peak_rate_*)
+
+`peak_rate_00` ... `peak_rate_23` must be evaluated using the local hour of the region selected in `workshop_introduction` (stored in `local/ai_lab_scenarios.conf` `[baseline] region`), not server-local time.
+
+Scope:
+
+- Applies to both `backfill_log.py` and `live_log.py`.
+- Applies to all metrics that use hourly `peak_rate_*` curves.
+
+Behavior:
+
+- Same UTC timestamp may map to different `peak_rate_*` keys depending on selected region.
+- Hour lookup for `peak_rate_<HH>` must use region-local wall-clock hour (`HH` in `00..23`).
+- Region timezone mapping must be deterministic and shared by backfill/live logic.
+
+Design intent:
+
+- Workshop host selects region once in `workshop_introduction`.
+- Synthetic daily seasonality then follows that region’s local business/overnight rhythm consistently in both historical and live generation.
+
+---
+
+## Ingestion Routing (inputs.conf monitors)
+
+Scripted input launches `launcher.py` only. Event ingestion is file-based via monitor stanzas:
+
+- `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`  
+  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:metric`
+- `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_alerts/`  
+  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alerts`
+- `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
+  → `index=telemetry`, `sourcetype=cnc_interface_counter_json`
+
 ---
 
 ## State in local/ai_lab_scenarios.conf
 
 ```ini
-[baseline]
-backfill_start_time = 0
-backfill_completed  = false
-
-[scenarios]
-scenario_1_activated = 0
-scenario_1_fault_start = 0
-scenario_1_fault_duration = 0
 ```
 
-- Written by `launcher.py` (initial set) and `backfill_log.py` (completion flag)
-- Never written to `default/ai_lab_scenarios.conf` — runtime state only
+- `local/ai_lab_scenarios.conf` is test-owned during workshop validation.
+- Do not pre-populate or auto-mutate `local/` files from setup/migration steps.
+- Initial local state should be blank (or keys absent) before workshop host actions.
+- No python script to change `default/ai_lab_scenarios.conf`. Runtime change must be written in the local file.
+
+## Required Runtime Scenarios
+
+All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command scripts that write runtime state) must correctly handle both cases below:
+
+1. **Workshop start with blank local config**
+   - `local/ai_lab_scenarios.conf` may be empty or missing expected sections/options.
+   - Scripts must create only the required local runtime keys when needed.
+   - Missing values must be treated via fallback logic (no assumptions that keys already exist).
+
+2. **Splunk restart after workshop has started**
+   - Scripts must resume from local runtime state without data loss or duplicate generation.
+   - `backfill_start_time` and completion markers must be reused to maintain timeline continuity.
+   - If restart occurs mid-backfill or during live generation, scripts must reconcile with existing event timestamps before producing new events.
 
 ## Scenario Activation Path
 

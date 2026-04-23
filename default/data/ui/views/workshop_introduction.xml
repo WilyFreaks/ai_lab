@@ -1,0 +1,58 @@
+<form version="1.1" theme="light">
+  <label>Workshop Introduction</label>
+  <description>Select a region and click Save Region &amp; Start. The region and generation gate are persisted to local/ai_lab_scenarios.conf under [baseline].</description>
+  <search id="load_region">
+    <query>| workshopregion action="status"</query>
+    <done>
+      <set token="region_token">$result.region$</set>
+      <set token="region">$result.region$</set>
+      <set token="form.region">$result.region$</set>
+      <set token="status_region">$result.region$</set>
+      <set token="status_region_ready">$result.region_ready$</set>
+      <set token="status_enabled">$result.baseline_generation_enabled$</set>
+      <set token="status_backfill_start">$result.backfill_start_time$</set>
+      <set token="status_backfill_completed">$result.backfill_completed$</set>
+    </done>
+  </search>
+  <fieldset submitButton="true" autoRun="false">
+    <input type="dropdown" token="region">
+      <label>Region</label>
+      <choice value="au">au</choice>
+      <choice value="jp">jp</choice>
+      <default>$region_token$</default>
+      <initialValue>au</initialValue>
+    </input>
+  </fieldset>
+  <row>
+    <panel>
+      <title>Data Sources</title>
+      <html>
+        <div style="padding: 4px 0;">
+          <img src="/static/app/ai_lab/data_sources.jpg" alt="Workshop data sources" style="max-width:100%; height:auto; border:1px solid #d9d9d9;" />
+        </div>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Generation Readiness</title>
+      <html>
+        <p style="margin:0 0 0.5em 0"><strong>Region:</strong> $status_region$ (ready=$status_region_ready$)</p>
+        <p style="margin:0 0 0.5em 0"><strong>Generation enabled:</strong> $status_enabled$</p>
+        <p style="margin:0 0 0.5em 0"><strong>Backfill start time:</strong> $status_backfill_start$</p>
+        <p style="margin:0"><strong>Backfill completed:</strong> $status_backfill_completed$</p>
+      </html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Save Region &amp; Start Result</title>
+      <table>
+        <search>
+          <query>| workshopregion action="set" region="$form.region$"</query>
+        </search>
+        <option name="count">1</option>
+      </table>
+    </panel>
+  </row>
+</form>

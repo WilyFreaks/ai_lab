@@ -1,26 +1,8 @@
-import glob
 import os
 import sys
 import time
 from configparser import ConfigParser
-
-# splunklib is not shipped under etc/apps/search/bin on all installs; add known bundle paths.
-SPLUNK_HOME = os.environ.get("SPLUNK_HOME", "/Applications/Splunk")
-_APP_BIN = os.path.dirname(os.path.abspath(__file__))
-for _d in (
-    _APP_BIN,
-    os.path.join(SPLUNK_HOME, "etc", "apps", "search", "bin"),
-    os.path.join(SPLUNK_HOME, "etc", "apps", "Splunk_MCP_Server", "bin"),
-    os.path.join(SPLUNK_HOME, "etc", "apps", "splunk_secure_gateway", "lib"),
-) + tuple(
-    sorted(glob.glob(os.path.join(SPLUNK_HOME, "etc", "apps", "Splunk_SA_Scientific_Python_*", "lib")))
-):
-    if _d and os.path.isfile(os.path.join(_d, "splunklib", "__init__.py")):
-        if _d not in sys.path:
-            sys.path.insert(0, _d)
-        break
-
-from splunklib.searchcommands import Configuration, GeneratingCommand, Option, dispatch
+import splunk.Intersplunk as isp
 
 
 APP_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -29,7 +11,9 @@ LOCAL_CONF = os.path.join(APP_ROOT, "local", "ai_lab_scenarios.conf")
 
 
 def load_config():
-    cfg = ConfigParser()
+    # ai_lab keys include ":" inside option names (e.g. cisco:thousandeyes);
+    # force "=" as the only delimiter to avoid parser collisions.
+    cfg = ConfigParser(interpolation=None, delimiters=("=",), strict=False)
     if os.path.exists(LOCAL_CONF):
         cfg.read(LOCAL_CONF)
     else:
@@ -43,45 +27,69 @@ def save_config(cfg):
         cfg.write(f)
 
 
-@Configuration()
-class ScenarioControlCommand(GeneratingCommand):
-    scenario = Option(require=True)
-    active = Option(require=True)
-    fault_start = Option(require=False)
-    fault_duration = Option(require=False)
+def parse_args(argv):
+    args = {}
+    for token in argv[1:]:
+        if "=" not in token:
+            continue
+        key, value = token.split("=", 1)
+        args[key.strip().lower()] = value.strip().strip("\"'")
+    return args
 
-    def generate(self):
-        scenario = self.scenario.strip()
+
+def main():
+    try:
+        args = parse_args(sys.argv)
+        scenario = args.get("scenario", "").strip()
+        active = args.get("active")
+        fault_start = args.get("fault_start")
+        fault_duration = args.get("fault_duration")
+
         if not scenario:
-            yield {"status": "error", "message": "scenario is required"}
+            isp.outputResults([{"status": "error", "message": "scenario is required"}])
             return
 
-        if self.active not in ("0", "1"):
-            yield {"status": "error", "message": "active must be 0 or 1"}
+        if active not in ("0", "1"):
+            isp.outputResults([{"status": "error", "message": "active must be 0 or 1"}])
             return
 
         cfg = load_config()
         if not cfg.has_section("scenarios"):
             cfg.add_section("scenarios")
 
-        activated = str(int(time.time())) if self.active == "1" else "0"
+        activated = str(int(time.time())) if active == "1" else "0"
         cfg.set("scenarios", f"{scenario}_activated", activated)
 
-        if self.fault_start is not None and self.fault_start != "":
-            cfg.set("scenarios", f"{scenario}_fault_start", str(int(float(self.fault_start))))
-        if self.fault_duration is not None and self.fault_duration != "":
-            cfg.set("scenarios", f"{scenario}_fault_duration", str(int(float(self.fault_duration))))
+        if fault_start is not None and fault_start != "":
+            cfg.set("scenarios", f"{scenario}_fault_start", str(int(float(fault_start))))
+        if fault_duration is not None and fault_duration != "":
+            cfg.set(
+                "scenarios",
+                f"{scenario}_fault_duration",
+                str(int(float(fault_duration))),
+            )
         save_config(cfg)
 
-        yield {
-            "status": "ok",
-            "scenario": scenario,
-            "active": self.active,
-            "activated": activated,
-            "fault_start": cfg.get("scenarios", f"{scenario}_fault_start", fallback=""),
-            "fault_duration": cfg.get("scenarios", f"{scenario}_fault_duration", fallback=""),
-            "config_path": LOCAL_CONF,
-        }
+        isp.outputResults(
+            [
+                {
+                    "status": "ok",
+                    "scenario": scenario,
+                    "active": active,
+                    "activated": activated,
+                    "fault_start": cfg.get(
+                        "scenarios", f"{scenario}_fault_start", fallback=""
+                    ),
+                    "fault_duration": cfg.get(
+                        "scenarios", f"{scenario}_fault_duration", fallback=""
+                    ),
+                    "config_path": LOCAL_CONF,
+                }
+            ]
+        )
+    except Exception as e:
+        isp.outputResults([{"status": "error", "message": str(e)}])
 
 
-dispatch(ScenarioControlCommand, module_name=__name__)
+if __name__ == "__main__":
+    main()

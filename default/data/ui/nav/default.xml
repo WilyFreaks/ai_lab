@@ -1,5 +1,6 @@
 <nav search_view="search">
   <view name="scenario_control" default="true"/>
+  <view name="workshop_introduction" />
   <view name="search" />
   <view name="analytics_workspace" />
   <view name="datasets" />
