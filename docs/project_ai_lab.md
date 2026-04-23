@@ -64,6 +64,18 @@ Routing uses **SR-TE (Segment Routing - Traffic Engineering)**, not ECMP. Path c
 **TE sourcetypes used:** `cisco:thousandeyes:metric`, `cisco:thousandeyes:alerts` (path-vis excluded — CNC routers don't respond to ICMP).
 **TWAMP agents:** Only on R2 and R9 (budget constraint — not on intermediate routers).
 
+## Splunk storage model (workshop)
+
+Indexes are defined in `default/indexes.conf`. Current intent:
+
+- **Raw/ingest indexes** (populated from workshop generators and monitor inputs)
+  - `thousandeyes`, `twamp`, `ran`, `fwa`, `syslog`, `telemetry`
+- **Derived `alerts` index**
+  - `alerts` is reserved for *scheduled-search output* (workshop “alerting” signals).
+  - It is expected to be empty until those scheduled searches run, and it does not require `samples/...` templates.
+
+**Naming note:** “CNC” still appears in field names, sourcetypes, and paths (for example `cnc_interface_counter_json` and `cnc_srte_path_json`) because that is the domain data model, but the old duplicate Splunk index named `cnc` is intentionally removed in favor of `telemetry` for interface telemetry and `alerts` for scheduled alert outputs.
+
 ---
 
 ## Real Lab Data Observations
@@ -74,3 +86,24 @@ Data collected from Cisco internal lab (synthetic traffic, not production):
 - Upload/download jitter (ul_lostperc, dl_lostperc): very low in normal operation
 
 **Note:** Lab uses a small-scale network (not a real carrier-scale WDM). Latency values reflect lab topology, not real production. For the workshop, use insight-based realistic values (50-80ms for network latency) rather than copying lab values directly.
+
+---
+
+## Operational Guardrails
+
+Key project behavior that must remain stable across changes:
+
+- Runtime mutable state is written to `local/ai_lab_scenarios.conf` (not `default/` files).
+- Workshop generation is host-gated via region selection and baseline enablement before launch.
+- Historical and live generation must preserve timeline continuity across Splunk restarts.
+- Canonical verification entrypoint is:
+  - `bash tests/smoke/test_smoke.sh`
+- Environment reset for repeatable workshops/tests is handled by:
+  - `scripts/reset_workshop_state.sh`
+
+---
+
+## Local Splunk Credential (Workshop Environment)
+
+- Username: `admin`
+- Password: `p4ssw0rd`

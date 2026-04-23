@@ -46,8 +46,14 @@ bin/
 4. Write generated events in bulk NDJSON files under app spool paths:
    - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`
    - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`
+5. Ensure generated events include required metadata fields:
+   - `index`
+   - `sourcetype`
+   - `source`
+   - `host`
+   - `timestamp`
 5. Splunk file monitor stanzas in `default/inputs.conf` assign index/sourcetype on ingest
-5. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
+6. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
 
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
@@ -118,6 +124,8 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
 - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
   → `index=telemetry`, `sourcetype=cnc_interface_counter_json`
 
+**Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. The `alerts` index is populated by scheduled saved searches (workshop “alerting” materialization) rather than the NDJSON spool pipeline.
+
 ---
 
 ## State in local/ai_lab_scenarios.conf
@@ -143,6 +151,12 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
    - Scripts must resume from local runtime state without data loss or duplicate generation.
    - `backfill_start_time` and completion markers must be reused to maintain timeline continuity.
    - If restart occurs mid-backfill or during live generation, scripts must reconcile with existing event timestamps before producing new events.
+
+## Splunk Home Path Convention
+
+- Scripts should use `SPLUNK_HOME` when provided.
+- Default path convention for this project is Linux-style: `/opt/splunk`.
+- Do not hardcode macOS-only paths such as `/Applications/Splunk` in project scripts.
 
 ## Scenario Activation Path
 
