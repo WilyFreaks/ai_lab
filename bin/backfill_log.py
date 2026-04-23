@@ -130,11 +130,19 @@ def metric_value(cfg, section, prefix, local_dt):
     return value
 
 
-def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence):
+def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, stream):
     if placeholder == "timestamp":
         return local_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if placeholder == "sequence":
         return sequence
+    if placeholder == "sourcetype":
+        return stream["sourcetype"]
+    if placeholder == "index":
+        return stream["index"]
+    if placeholder == "source":
+        return "ai_lab:backfill"
+    if placeholder == "host":
+        return "ai_lab"
 
     value = metric_value(cfg, section, prefix, local_dt)
     if value is None:
@@ -155,8 +163,7 @@ def render_template(template_text, replacements):
 
     rendered = PLACEHOLDER_RE.sub(_sub, template_text)
     # Ensure each line is valid JSON before writing.
-    obj = json.loads(rendered)
-    return json.dumps(obj, separators=(",", ":"))
+    return json.loads(rendered)
 
 
 def generate_stream(cfg, stream, start_ts, end_ts, tzinfo):
@@ -185,9 +192,19 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo):
             for ph in placeholders:
                 prefix = f"{prefix_base}{ph}"
                 replacements[ph] = coerce_placeholder(
-                    cfg, section, prefix, ph, local_dt, sequence
+                    cfg, section, prefix, ph, local_dt, sequence, stream
                 )
-            out.write(render_template(template_text, replacements))
+            event_obj = render_template(template_text, replacements)
+            # Add metadata fields for downstream validation and timestamp extraction.
+            event_obj.setdefault("index", stream["index"])
+            event_obj.setdefault("sourcetype", stream["sourcetype"])
+            event_obj.setdefault("source", "ai_lab:backfill")
+            event_obj.setdefault("host", "ai_lab")
+            event_obj.setdefault(
+                "timestamp",
+                local_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            )
+            out.write(json.dumps(event_obj, separators=(",", ":")))
             out.write("\n")
             sequence += 1
             count += 1
@@ -227,7 +244,7 @@ def main():
     tzinfo, region = get_region_tz(cfg)
     print(
         f"backfill_log: starting backfill window start={start_ts} end={end_ts} "
-        f"region={region} tz={tzinfo.key}",
+        f"days={backfill_days} region={region} tz={tzinfo.key}",
         flush=True,
     )
 

@@ -105,15 +105,17 @@ def main():
 
         if action in ("get", "status"):
             cfg = load_effective_config()
+            configured_region = normalized_region(cfg.get("baseline", "region", fallback=""))
+            region_ready = configured_region in VALID_REGIONS
             isp.outputResults([
                 {
                     "status": "ok",
                     "action": action,
-                    "region": effective_region(cfg),
-                    "region_ready": str(
-                        normalized_region(cfg.get("baseline", "region", fallback=""))
-                        in VALID_REGIONS
-                    ).lower(),
+                    # region is the explicitly configured value (can be blank).
+                    "region": configured_region if region_ready else "",
+                    # effective_region is runtime fallback-safe value for generators.
+                    "effective_region": effective_region(cfg),
+                    "region_ready": str(region_ready).lower(),
                     "baseline_generation_enabled": str(is_generation_enabled(cfg)).lower(),
                     "backfill_start_time": cfg.get(
                         "baseline", "backfill_start_time", fallback=""

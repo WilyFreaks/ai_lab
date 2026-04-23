@@ -23,8 +23,8 @@ Defined in `default/data/ui/nav/default.xml`.
 
 Current dashboard entries include:
 
-- `scenario_control`
 - `workshop_introduction`
+- `scenario_control`
 
 `search` remains the search view target for ad-hoc SPL.
 
@@ -48,6 +48,7 @@ View file: `default/data/ui/views/workshop_introduction.xml`
 - Dropdown input:
   - token: `region`
   - choices: `au`, `jp`
+  - initial/default UI value: blank (no preselected region)
 - Image panel:
   - `/static/app/ai_lab/data_sources.jpg`
 - Save result panel:
@@ -66,12 +67,17 @@ At load, dashboard runs:
 Returned fields are mapped into dashboard tokens:
 
 - `region`
+- `effective_region`
 - `region_ready`
 - `baseline_generation_enabled`
 - `backfill_start_time`
 - `backfill_completed`
 
-`region` is used as dropdown default.
+Dashboard token behavior:
+
+- region selector is visible by default on initial render (`region_unlocked=true`).
+- if `region_ready=true`, region selector is locked and current region is shown as read-only text.
+- if `region_ready` is not true, region selector is shown and editable.
 
 Fallback behavior:
 
@@ -138,7 +144,7 @@ Supported actions:
 - `action=get`
   - returns current effective region
 - `action=status`
-  - returns effective region + readiness/generation state
+  - returns explicit configured region (`region`, may be blank), fallback-safe runtime value (`effective_region`), and readiness/generation state
 - `action=set region=<au|jp>`
   - writes region to local conf, sets generation gate to true, and triggers launcher
 

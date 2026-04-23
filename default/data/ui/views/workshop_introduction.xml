@@ -1,6 +1,10 @@
 <form version="1.1" theme="light">
   <label>Workshop Introduction</label>
   <description>Select a region and click Save Region &amp; Start. The region and generation gate are persisted to local/ai_lab_scenarios.conf under [baseline].</description>
+  <init>
+    <!-- Keep selector visible by default if status search fails or returns no rows. -->
+    <set token="region_unlocked">true</set>
+  </init>
   <search id="load_region">
     <query>| workshopregion action="status"</query>
     <done>
@@ -12,17 +16,33 @@
       <set token="status_enabled">$result.baseline_generation_enabled$</set>
       <set token="status_backfill_start">$result.backfill_start_time$</set>
       <set token="status_backfill_completed">$result.backfill_completed$</set>
+      <condition match="$result.region_ready$=&quot;true&quot;">
+        <set token="region_locked">true</set>
+        <unset token="region_unlocked"/>
+      </condition>
+      <condition>
+        <unset token="region_locked"/>
+        <set token="region_unlocked">true</set>
+      </condition>
     </done>
   </search>
   <fieldset submitButton="true" autoRun="false">
-    <input type="dropdown" token="region">
+    <input type="dropdown" token="region" depends="$region_unlocked$">
       <label>Region</label>
       <choice value="au">au</choice>
       <choice value="jp">jp</choice>
-      <default>$region_token$</default>
-      <initialValue>au</initialValue>
+      <default></default>
+      <initialValue></initialValue>
     </input>
   </fieldset>
+  <row depends="$region_locked$">
+    <panel>
+      <html>
+        <p style="margin:0 0 0.5em 0;"><strong>Selected region:</strong> <code>$status_region$</code></p>
+        <p style="margin:0;"><strong>Region is already set.</strong> To change it, clear <code>[baseline] region</code> in <code>local/ai_lab_scenarios.conf</code> and reload this dashboard.</p>
+      </html>
+    </panel>
+  </row>
   <row>
     <panel>
       <title>Data Sources</title>

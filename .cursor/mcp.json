@@ -1,0 +1,26 @@
+{
+    "mcpServers": {
+        "fetch": {
+            "command": "uvx",
+            "args": ["mcp-server-fetch"]
+        },
+        "dashboard": {
+            "command": "npx",
+            "args": ["-y", "mcp-dashboards", "--stdio"]
+        },
+        "splunk-mcp-server": {
+          "command": "npx",
+          "args": [
+              "-y",
+              "mcp-remote",
+              "https://localhost:8089/services/mcp/",
+              "--header",
+              "Authorization: Bearer ${AUTH_TOKEN}"
+          ],
+          "env": {
+              "AUTH_TOKEN": "eyJraWQiOiJzcGx1bmsuc2VjcmV0IiwiYWxnIjoiSFM1MTIiLCJ2ZXIiOiJ2MiIsInR0eXAiOiJzdGF0aWMifQ.eyJpc3MiOiJhZG1pbiBmcm9tIFRBVE1VUkFULU0tSFk5TiIsInN1YiI6ImFkbWluIiwiYXVkIjoibWNwIiwiaWRwIjoiU3BsdW5rIiwianRpIjoiOTc2YmFlN2ViZDM4YTEyNzY1MDAzMTRhMmQ2Zjg5MmRkMThlMDkwZmZiNzIyNGFlMDllMTZiYjZjYWZmOWVmNyIsImlhdCI6MTc2MjI4MzI1NywiZXhwIjoxNzkzODE5MjU3LCJuYnIiOjE3NjIyODMyNTd9.Lz9nRnatCE6UC-mMzSKeWGNd3SB4enTS6zfINuusfW7MrtY83RdRHu9edN83iZPZXxC3lUpCrzX65I25r4fAIw",
+              "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+          }
+      }
+    }
+}
