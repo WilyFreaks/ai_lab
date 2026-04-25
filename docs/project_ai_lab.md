@@ -69,10 +69,14 @@ Routing uses **SR-TE (Segment Routing - Traffic Engineering)**, not ECMP. Path c
 Indexes are defined in `default/indexes.conf`. Current intent:
 
 - **Raw/ingest indexes** (populated from workshop generators and monitor inputs)
-  - `thousandeyes`, `twamp`, `ran`, `fwa`, `syslog`, `telemetry`
+  - `thousandeyes`, `twamp`, `ran`, `fwa`, `syslog`, `telemetry`, `ios`
 - **Derived `alerts` index**
   - `alerts` is reserved for *scheduled-search output* (workshop “alerting” signals).
   - It is expected to be empty until those scheduled searches run, and it does not require `samples/...` templates.
+- **Derived `episode` index**
+  - `episode` is reserved for a higher-level rollup of `alerts` (for example “episodes” as aggregated windows).
+  - The materialization schedule and SPL will be defined later (not shipped in `default/` yet).
+  - Like `alerts`, it is not expected to have a `samples/...` file-ingest path.
 
 **Naming note:** “CNC” still appears in field names, sourcetypes, and paths (for example `cnc_interface_counter_json` and `cnc_srte_path_json`) because that is the domain data model, but the old duplicate Splunk index named `cnc` is intentionally removed in favor of `telemetry` for interface telemetry and `alerts` for scheduled alert outputs.
 
@@ -100,6 +104,15 @@ Key project behavior that must remain stable across changes:
   - `bash tests/smoke/test_smoke.sh`
 - Environment reset for repeatable workshops/tests is handled by:
   - `scripts/reset_workshop_state.sh`
+
+### Handoff: operators and the next implementer
+
+- **Splunk install path:** scripts default to `SPLUNK_HOME=/opt/splunk`. On **macOS** (developer installs), set `SPLUNK_HOME` explicitly, e.g. `export SPLUNK_HOME=/Applications/Splunk`, when running the reset script or any doc examples that call `$SPLUNK_HOME/bin/splunk`.
+- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops Splunk, deletes per-index data under `$SPLUNK_DB`, removes `etc/apps/ai_lab/var/spool/ai_lab`, removes `local/ai_lab_scenarios.conf`, restarts, then (if set) verifies all `default/indexes.conf` app indexes are empty. **Requires** `SPLUNK_AUTH` (same credentials as the workshop admin user) for the post-start SPL verification. See `docs/project_test_design.md` for the full contract.
+- **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
+- **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.json` — do not add JSON keys the README does not authorize; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
+- **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
+- **Credentials for CLI/tests** (workshop): same as below; do not commit real production secrets. Tests expect `SPLUNK_AUTH=admin:password` in the environment.
 
 ---
 

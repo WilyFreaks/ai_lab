@@ -132,17 +132,13 @@ def metric_value(cfg, section, prefix, local_dt):
 
 def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, stream):
     if placeholder == "timestamp":
-        return local_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Sample templates use {{timestamp}} as a domain timestamp string; it must reflect
+        # the selected workshop region's local wall time (not UTC).
+        return local_dt.strftime("%Y-%m-%dT%H:%M:%S")
     if placeholder == "sequence":
         return sequence
     if placeholder == "sourcetype":
         return stream["sourcetype"]
-    if placeholder == "index":
-        return stream["index"]
-    if placeholder == "source":
-        return "ai_lab:backfill"
-    if placeholder == "host":
-        return "ai_lab"
 
     value = metric_value(cfg, section, prefix, local_dt)
     if value is None:
@@ -179,7 +175,7 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo):
     os.makedirs(stream["spool_dir"], exist_ok=True)
     output_path = os.path.join(
         stream["spool_dir"],
-        f"backfill_{int(time.time())}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}.json",
+        f"backfill_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}.json",
     )
 
     sequence = 1
@@ -195,15 +191,6 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo):
                     cfg, section, prefix, ph, local_dt, sequence, stream
                 )
             event_obj = render_template(template_text, replacements)
-            # Add metadata fields for downstream validation and timestamp extraction.
-            event_obj.setdefault("index", stream["index"])
-            event_obj.setdefault("sourcetype", stream["sourcetype"])
-            event_obj.setdefault("source", "ai_lab:backfill")
-            event_obj.setdefault("host", "ai_lab")
-            event_obj.setdefault(
-                "timestamp",
-                local_dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            )
             out.write(json.dumps(event_obj, separators=(",", ":")))
             out.write("\n")
             sequence += 1

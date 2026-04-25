@@ -18,7 +18,7 @@ export SPLUNK_AUTH="admin:p4ssw0rd"
 
 Optional:
 
-- `SPLUNK_HOME` (defaults to `/opt/splunk`)
+- `SPLUNK_HOME` (defaults to `/opt/splunk`). Use your real install path on macOS, e.g. `export SPLUNK_HOME=/Applications/Splunk`, for `scripts/reset_workshop_state.sh` and any CLI that assumes `$SPLUNK_HOME`.
 - `SPLUNK_APP` (defaults to `ai_lab`)
 - `TIME_WINDOW` for SPL checks (defaults to `24h`)
 - `SPLUNK_PYTHON` to override the interpreter used for py_compile
@@ -33,6 +33,7 @@ Optional:
 
 - all app indexes from `default/indexes.conf` are empty (hard precondition)
 - if `alerts` exists, it is included in the empty-index precondition (it may be empty in a clean workshop)
+- if `episode` exists, it is included in the empty-index precondition (it may be empty in a clean workshop)
 - parser/JSON errors are zero in `_internal` for relevant ingest paths
 
 ## Documentation ownership

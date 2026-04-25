@@ -59,9 +59,27 @@ then add `random.gauss(0, noise_stdev)`
 
 Two separate scripts (not one):
 
-**`bin/backfill_log.py`** — runs once at app start, generates `(app_start_time - backfill_days)` to `app_start_time`, sends to Splunk HEC with historical timestamps.
+**`bin/backfill_log.py`** — runs once at app start (when gated by `launcher.py`); writes NDJSON lines for the backfill window to **app spool paths** under `var/spool/ai_lab/...` for `monitor://` inputs to pick up. Timestamps in payloads follow the `{{timestamp}}` / sample template rules (region-local wall time where applicable). **Ingestion is file-based, not HEC** for the shipped streams.
 
-**`bin/live_log.py`** — runs continuously, generates real-time events from `app_start_time` onward, listens for scenario trigger to switch to fault values.
+**`bin/live_log.py`** — runs continuously, writes real-time events to the same spool/monitor model from `app_start_time` onward, and applies scenario fault windows when implemented.
+
+## File monitor inputs: CRC, `crcSalt`, and spool files
+
+**Problem:** The forwarder’s initial CRC is derived from the **first 256 bytes** of a file. Templated NDJSON with identical leading bytes can **collide** across different filenames, so the tailer may skip a file (see `_internal` TailReader / initcrc errors).
+
+**Approach in this app (no `initCrcLength` in `props.conf` for this):**
+
+1. **`crcSalt = <SOURCE>`** in each `monitor://` stanza in `default/inputs.conf` — the **literal** string `<SOURCE>` (angle brackets included), per Splunk’s spec, so the CRC includes the **full path** of the file and distinct paths do not look like the same file under different names.
+2. **Unique spool filenames** — `backfill_log.py` names each output file with a high-resolution time component and PID so each run produces a new basename (see `docs/project_script_design.md`).
+
+A **static** `crcSalt` string shared by all files in a path does not fix header collisions between two different new files. Use `<SOURCE>`, or tune `initCrcLength` only as a separate product-level decision (not the default approach documented here).
+
+## Timestamp extraction (`_time`) and JSON
+
+- **`[cisco:thousandeyes:metric]`** — `default/props.conf` uses `TIME_PREFIX` / `TIME_FORMAT` with the leading raw JSON for the top-level `timestamp` key so `_time` matches the event string from `backfill_log.py` (see `samples/thousandeyes/cisco:thousandeyes:metric/README.md`).
+- **`[cnc_interface_counter_json]`** — nested `latest_data.timestamp` strings; `TIME_PREFIX` / `TIME_FORMAT` in `default/props.conf` target the indexed JSON / raw pattern for this sourcetype (see `samples/telemetry/cnc_interface_counter_json/README.md`).
+
+After changing `props.conf` or `inputs.conf`, **reload** or restart Splunk so forwarders read the new settings.
 
 ## Scenario Control Stanza (`[scenarios]`)
 

@@ -46,14 +46,10 @@ bin/
 4. Write generated events in bulk NDJSON files under app spool paths:
    - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`
    - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`
-5. Ensure generated events include required metadata fields:
-   - `index`
-   - `sourcetype`
-   - `source`
-   - `host`
-   - `timestamp`
-5. Splunk file monitor stanzas in `default/inputs.conf` assign index/sourcetype on ingest
-6. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
+5. Each NDJSON line must be valid JSON and must only include fields that exist in the corresponding `samples/.../sample.json` template (or `samples/.../README.md` if it explicitly authorizes additional keys).
+6. The `{{timestamp}}` placeholder (when present) is generated in the workshop region’s **local wall time** (for example `Australia/Sydney` for `au`, `Asia/Tokyo` for `jp`), not UTC.
+7. **Do not** embed Splunk routing metadata (`index`, `sourcetype`, `source`, `host`) in the JSON unless the sample template/README calls for it. Splunk file monitor stanzas in `default/inputs.conf` are the source of truth for `index=`, `sourcetype=`, and monitor-level `host=` / `source=` (when configured).
+8. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
 
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
@@ -118,13 +114,17 @@ Design intent:
 Scripted input launches `launcher.py` only. Event ingestion is file-based via monitor stanzas:
 
 - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`  
-  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:metric`
+  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:metric`, `host=thousandeyes_at_r9`, `source=ai_lab:backfill:thousandeyes_metric`
 - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_alerts/`  
-  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alerts`
+  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alerts`, `source=ai_lab:backfill:thousandeyes_alerts`
 - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
-  → `index=telemetry`, `sourcetype=cnc_interface_counter_json`
+  → `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry`
 
-**Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. The `alerts` index is populated by scheduled saved searches (workshop “alerting” materialization) rather than the NDJSON spool pipeline.
+**Monitors and TailReader / CRC:** each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
+
+**Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. Population strategy is TBD, but it will not be fed by the NDJSON spool pipeline.
+
+**Derived `episode` index:** there is no file-ingest `samples/...` path for `episode` by design. The `episode` index is intended to be materialized from `alerts` (details TBD); do not add sample monitors for `episode` in `inputs.conf`.
 
 ---
 

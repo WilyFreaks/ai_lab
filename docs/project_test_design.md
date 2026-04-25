@@ -104,7 +104,9 @@ Minimum SPL assertions for smoke pass:
    - `index=<app_index> | stats count`
 2. If `alerts` is present in `default/indexes.conf`, it is part of the same “empty pre-run” contract:
    - it may legitimately be empty in a clean workshop (scheduled searches have not materialized output yet)
-3. No parser/format failures for generated payloads:
+3. If `episode` is present, it is also part of the same “empty pre-run” contract:
+   - it is derived from `alerts` and may be empty if no alerts exist yet, or if the materialization job has not run
+4. No parser/format failures for generated payloads:
    - check `_internal` for relevant parsing errors.
 
 Execution rules:
@@ -144,7 +146,7 @@ Recommended additional assertions:
 
 - Uses `backfill_days` to compute historical window.
 - Writes NDJSON outputs to configured spool paths.
-- Sets required metadata fields for downstream ingest validation.
+- Each NDJSON line should match the sample template in `samples/.../sample.json` (only add keys the template/README authorizes). Splunk routing metadata comes from `default/inputs.conf` monitors, not from extra JSON fields.
 - Marks `backfill_completed=true` on success.
 
 ### live_log.py
@@ -192,11 +194,13 @@ Purpose:
 
 Conventions and safety:
 
-- Uses `SPLUNK_HOME` when set; defaults to `/opt/splunk`.
+- Uses `SPLUNK_HOME` when set; defaults to `/opt/splunk`. On **macOS** developer machines, set `SPLUNK_HOME` to the real install, e.g. `export SPLUNK_HOME=/Applications/Splunk`, before running.
 - Index targets are derived from `default/indexes.conf` (no hardcoded index list).
 - Script validates index names and refuses unsafe delete targets.
 - Script validates resolved delete path remains under `$SPLUNK_DB`.
 - Supports interactive confirm and non-interactive mode (`--yes`).
+- Post-start verification **requires** `SPLUNK_AUTH` (e.g. `export SPLUNK_AUTH=admin:…`); the script exits non-zero if verification is required but auth is not set. Workshop password used in local docs: see `docs/project_ai_lab.md`.
+- Operator checklist and “next session” pointers: `docs/project_ai_lab.md` → *Handoff: operators and the next implementer*.
 
 ---
 

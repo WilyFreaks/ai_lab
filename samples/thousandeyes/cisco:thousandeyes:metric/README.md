@@ -6,7 +6,7 @@ HTTP test metrics from a ThousandEyes Cloud & Enterprise Agent behind R9-NCS540 
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
-| `{{timestamp}}` | ISO 8601 UTC timestamp of the test run | `2026-04-21T10:00:00Z` |
+| `{{timestamp}}` | Region-local wall time for the test run (same as workshop `region` in `ai_lab_scenarios`) | `2026-04-21T10:00:00` |
 | `{{sequence}}` | Incrementing integer, unique per event | `1001` |
 | `{{response_time_ms}}` | HTTP response time in seconds (float) | `0.187` |
 | `{{throughput_kbps}}` | HTTP throughput in kbps (float) | `2345.6` |
@@ -22,4 +22,4 @@ HTTP test metrics from a ThousandEyes Cloud & Enterprise Agent behind R9-NCS540 
 - `thousandeyes.test.name` is `R9-to-Google-HTTP`
 - `thousandeyes.test.type` is `http-server`
 - `server.address` is always `google.com`
-- `DATETIME_CONFIG = CURRENT` — timestamp is set at ingest time, not from the event
+- The `timestamp` key is present in the JSON; `backfill_log.py` fills it from the same local datetime as the other metric placeholders. `default/props.conf` for `cisco:thousandeyes:metric` uses `TIME_PREFIX` / `TIME_FORMAT` so `_time` matches that value.
