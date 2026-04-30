@@ -6,7 +6,7 @@ IOS-XR–style interface counter snapshot: packet rates (`ifInPktsRate` / `ifOut
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
-| `{{timestamp}}` | Region-local wall time for the sample (same as workshop `region` in `ai_lab_scenarios`) | `2026-04-21T10:00:00` |
+| `{{timestamp}}` | Region-local wall time for the sample (same as workshop `region` in `ai_lab_scenarios`), with a short suffix (`JST` for `jp`, and `AEST`/`AEDT` as applicable for `au` via `Australia/Sydney`) | `2026-04-21T10:00:00 JST` |
 | `{{<name>}}` where `<name>` is `R[2-9]_<interfaceToken>_ifInPktsRate` or `…_ifOutPktsRate` | Float packet rate for that router, interface, and direction. The template name matches the scenario key suffix (see below). | `6.15` |
 
 Interface tokens in placeholder names use underscores instead of `/` (for example `HundredGigE0_0_0_0` for `HundredGigE0/0/0/0`, `Bundle_Ether145` for `Bundle-Ether145`).
@@ -81,4 +81,4 @@ R9_HundredGigE0_0_0_29_ifOutPktsRate
 - Do not add JSON keys, devices, or interfaces that are not in `sample.json` unless this README and `default/ai_lab_scenarios.conf` are updated to match. Splunk routing metadata belongs in `default/inputs.conf` (not embedded in the JSON).
 - Ingest: `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry` (see `default/inputs.conf`).
 - `backfill_log.py` fills `{{timestamp}}` the same way as the ThousandEyes metric template. Nested `latest_data.timestamp` values follow that string.
-- Timestamp extraction for this sourcetype is configured under `[cnc_interface_counter_json]` in `default/props.conf` (`TIME_PREFIX` / `TIME_FORMAT`, plus indexed JSON settings).
+- Timestamp extraction for this sourcetype is configured under `[cnc_interface_counter_json]` in `default/props.conf` (`TIME_PREFIX` / `TIME_FORMAT` with the timezone token, plus indexed JSON settings).

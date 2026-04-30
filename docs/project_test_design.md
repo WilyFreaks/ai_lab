@@ -54,10 +54,10 @@ Out of scope:
 
 ## Canonical Test Contract
 
-The repository should expose one command as the test contract:
+The repository exposes one canonical command as the test contract:
 
 ```bash
-bash tests/smoke/test_smoke.sh
+bash scripts/test_smoke.sh
 ```
 
 This command should return:
@@ -65,18 +65,18 @@ This command should return:
 - exit `0`: all required checks passed
 - non-zero: failure (must include actionable error output)
 
-Recommended layout:
+Current layout:
 
-- `tests/smoke/test_smoke.sh`
-- `tests/splunk/run_spl_checks.sh`
-- `tests/README.md`
+- `scripts/test_smoke.sh`
+- `scripts/test_backfill.sh`
+- `scripts/test_scenario_1.sh`
 
 The smoke script should orchestrate:
 
 1. static/syntax checks for Python files
 2. runtime precondition checks (required config/paths)
-3. Splunk SPL assertions for ingestion and control behavior
-4. hard precondition that app indexes are empty before scenario execution
+3. spool directory emptiness check (`var/spool/ai_lab`)
+4. Splunk SPL assertions for **reset-ready state** (all app indexes empty)
 
 ---
 
@@ -98,9 +98,12 @@ All tests must cover these two mandatory scenarios:
 
 ## SPL Validation Matrix
 
-Minimum SPL assertions for smoke pass:
+Minimum assertions for smoke pass (4 checks, all must pass):
 
-1. All app indexes from `default/indexes.conf` are empty:
+1. Python syntax: `py_compile` on all `bin/*.py` files
+2. Runtime preconditions: required files/paths/auth present
+3. Spool directory empty: `var/spool/ai_lab` contains 0 files
+4. All app indexes from `default/indexes.conf` are empty:
    - `index=<app_index> | stats count`
 2. If `alerts` is present in `default/indexes.conf`, it is part of the same “empty pre-run” contract:
    - it may legitimately be empty in a clean workshop (scheduled searches have not materialized output yet)
@@ -122,14 +125,37 @@ Recommended additional assertions:
 - region lock/unlock behavior in `workshop_introduction`
 - scenario activation write path in `scenariocontrol`
 
+Execution sequencing (important):
+
+1. **Reset-phase checks** (`scripts/test_smoke.sh`) are meaningful immediately after reset/start and must pass with empty indexes (clean slate ready to start workshop).
+2. **Post-generation quality checks** (`scripts/test_backfill.sh`) are meaningful only after generation has started and saved-search datasets are populated.
+3. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
+4. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
+
+Contract clarification:
+
+- `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract).
+- `scripts/test_backfill.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints).
+
+Saved-search quality intent for backfill checks:
+
+- `telemetry_if_counter_test`:
+  - directional gap must never be negative
+  - drop rate must never exceed `1`
+- `interface_ifInPktsRate_test`, `interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
+  - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
+  - values should fluctuate gradually, unless an explicitly activated scenario fault window expects abrupt change
+
 ---
 
 ## Dashboard-Specific Tests
 
 ### workshop_introduction
 
-- If region is not set in local, region selector is available.
-- After save, selected region is shown and selector is locked.
+- On load, JS dispatches `| workshopregion action="status"` (no baseline Simple XML search).
+- If `region_ready=false`: fieldset (dropdown + Submit) visible, save row hidden.
+- If `region_ready=true`: fieldset + description hidden by JS; backfill status panel visible.
+- After save (Submit clicked): `<done>` sets `region_locked=true`, transitions to locked state.
 - Dashboard default navigation lands on this view.
 
 ### scenario_control
@@ -162,7 +188,7 @@ Recommended additional assertions:
 To allow automatic test execution by Cursor:
 
 1. Keep canonical command stable:
-   - `bash tests/smoke/test_smoke.sh`
+   - `bash scripts/test_smoke.sh`
 2. Document it in `.cursor/rules/splunk_app_rules.md`.
 3. Ensure scripts are non-interactive and produce clear pass/fail output.
 
@@ -170,8 +196,7 @@ This keeps test behavior consistent across manual and agent-driven runs.
 
 Transport/auth for scripted tests:
 
-- `tests/splunk/run_spl_checks.sh` uses local Splunk CLI auth (`-auth "$SPLUNK_AUTH"`).
-- MCP token-based query execution is intentionally not used for test scripts.
+- Auth transport for scripted tests should support either local CLI auth (`-auth "$SPLUNK_AUTH"`) or token auth (`-token "$SPLUNK_TOKEN"`).
 
 ---
 
@@ -224,7 +249,7 @@ To keep documentation maintainable:
 - Project/app runtime decisions are documented in project files under `docs/`.
 - Splunk SPL authoring and review conventions are documented in the Cursor skill:
   - `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`
-- Test behavior and pass/fail contract remain in this file and `tests/README.md`.
+- Test behavior and pass/fail contract remain in this file and the scripts under `scripts/`.
 
 Project files should capture app-specific behavior (runtime state model, test contract, restart behavior), while SPL syntax/style policy should be maintained in the Splunk skill.
 

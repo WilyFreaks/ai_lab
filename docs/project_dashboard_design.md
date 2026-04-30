@@ -32,67 +32,111 @@ Current dashboard entries include:
 
 ## Workshop Introduction Dashboard
 
-View file: `default/data/ui/views/workshop_introduction.xml`
+View file: `default/data/ui/views/workshop_introduction.xml`  
+JS file: `appserver/static/workshop_introduction_submit_toggle.js`
 
 ### Primary goals
 
 1. Show workshop context image (`data_sources.jpg`)
-2. Allow user to choose region (`au` or `jp`)
+2. Allow user to choose region (`au` or `jp`) when not yet persisted
 3. Persist selected region to local runtime config
 4. Open the baseline generation gate and trigger launcher
-5. Load persisted region and readiness state when dashboard opens
+5. On load, read persisted region and show backfill status
 
-### Visual components
+### Visual states
 
-- Form title: **Workshop Introduction**
-- Dropdown input:
-  - token: `region`
-  - choices: `au`, `jp`
-  - initial/default UI value: blank (no preselected region)
-- Image panel:
-  - `/static/app/ai_lab/data_sources.jpg`
-- Save result panel:
-  - table search used as write feedback for command output (`set` action)
-- Readiness panel:
-  - shows region readiness, generation gate state, and backfill state
+**Unlocked** (region not yet persisted — `region_ready=false`):
 
-### Startup/load behavior
+- Fieldset (dropdown + Submit button) is visible
+- Dashboard description is visible
+- Dropdown input (`token=region`, choices: `au`/`jp`) is visible (`depends="$region_unlocked$"`)
+- Data Sources image panel is visible
 
-At load, dashboard runs:
+**Locked** (region persisted — `region_ready=true`):
 
-```spl
-| workshopregion action="status"
+- Fieldset, description hidden by JS (`setControlHidden(true)`)
+- Data Sources image panel is visible
+- Backfill status panel visible (`depends="$region_locked$"`), running `action="set"` to show result
+
+### Startup / load behavior
+
+At load, the JS module (`workshop_introduction_submit_toggle.js`) runs once:
+
+1. Immediately calls `setControlHidden(true)` to suppress fieldset before status resolves (prevents slideshow flicker)
+2. Dispatches `| workshopregion action="status"` via `SearchManager` (id: `region_search`, `autostart: false`)
+3. On result, calls `syncFromRow(row)` which sets:
+   - `region_locked=true` + unset `region_unlocked` (if `region_ready=true`)
+   - `region_unlocked=true` + unset `region_locked` (if `region_ready=false`)
+   - `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed`
+4. Calls `applyVisibilityFromReady()` which reads `status_region_ready` and calls `setControlHidden(true/false)`
+
+**No baseline Simple XML `<search>` is used.** All initial state is driven by JS.
+
+### Token architecture
+
+| Token | Purpose | Set by |
+|---|---|---|
+| `region_locked` | XML `depends` for locked rows | JS `syncFromRow`, XML `<done>` |
+| `region_unlocked` | XML `depends` for unlocked rows/input | JS `syncFromRow`, XML `<done>` |
+| `status_region` | Display + save query parameter | JS `syncFromRow`, XML `<done>` |
+| `status_region_ready` | JS visibility signal | JS `syncFromRow`, XML `<done>` |
+| `status_enabled` | Display | JS `syncFromRow`, XML `<done>` |
+| `status_backfill_start` | Display | JS `syncFromRow`, XML `<done>` |
+| `status_backfill_completed` | Display | JS `syncFromRow`, XML `<done>` |
+| `region` | Form input token (dropdown) | Form selection, XML `<done>` |
+
+Key design constraint: JS does **not** set the `region` form token on load. This prevents the save row (`depends="$region_unlocked$"`) from triggering the save search before the user explicitly selects and submits.
+
+### `depends` and search execution
+
+`depends` on a `<row>` controls **visual visibility only** — the panel's search still executes when its query tokens are set, even if the row is hidden.
+
+`autoRun="false"` on `<fieldset>` defers **all** panel searches until Submit is clicked — regardless of whether their query tokens are form inputs or not. If Submit is never clicked (e.g. locked state where the fieldset is hidden), no panel search ever runs.
+
+In locked state, JS triggers Submit programmatically after setting all tokens so the locked panel's search runs on reload:
+```javascript
+setTimeout(function() {
+    $(".fieldset button.btn.btn-primary").trigger("click");
+}, 100);
 ```
-
-Returned fields are mapped into dashboard tokens:
-
-- `region`
-- `effective_region`
-- `region_ready`
-- `baseline_generation_enabled`
-- `backfill_start_time`
-- `backfill_completed`
-
-Dashboard token behavior:
-
-- region selector is visible by default on initial render (`region_unlocked=true`).
-- if `region_ready=true`, region selector is locked and current region is shown as read-only text.
-- if `region_ready` is not true, region selector is shown and editable.
-
-Fallback behavior:
-
-- If no valid region exists in conf, default region is `au`.
 
 ### Save behavior
 
-On form submit, dashboard runs:
+On form Submit (unlocked state):
+
+1. User selects `au` or `jp` from dropdown → `$region$` set in default token model
+2. User clicks Submit → `$submitted.region$` set → save search runs:
 
 ```spl
-| workshopregion action="set" region="$form.region$"
+| workshopregion action="set" region="$region$"
 ```
 
-The command validates and persists the value, sets `baseline_generation_enabled=true`, and triggers `launcher.py`.
-`backfill_start_time`/`backfill_completed` are not prefilled by the dashboard command; they are owned by launcher/backfill runtime.
+The `<done>` block updates all tokens:
+
+- `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed` from result fields
+- `region_locked=true`, unset `region_unlocked` → transitions dashboard to locked state
+
+### Locked state backfill status panel
+
+When locked, the panel (`depends="$region_locked$"`) runs:
+
+```spl
+| workshopregion action="set" region="$status_region$"
+```
+
+This allows the user to view backfill and generation status on each dashboard load.  
+`$status_region$` is used (not `$region$`) because `$region$` is intentionally unset in the locked state.
+
+### JS visibility control (`setControlHidden`)
+
+Controls hidden when `region_ready=true` (or unknown):
+
+- `.fieldset button.btn.btn-primary` (Submit button)
+- `a.hide-global-filters` and `.dashboard-form-globalfilters`
+- `.dashboard-form-globalfieldset` (fieldset container)
+- `.dashboard-header-description` (description text)
+
+Listener: `defaultTokenModelun.on("change:status_region_ready", applyVisibilityFromReady)`
 
 ---
 
@@ -112,11 +156,12 @@ Default/fallback source:
 - stanza: `[baseline]`
 - key: `region`
 
-Selection precedence in runtime logic:
+Selection precedence for **persisted** workshop region (`region` / `region_ready`):
 
-1. local value (if present and valid)
-2. default value (if present and valid)
-3. fallback hard default: `au`
+1. Local `local/ai_lab_scenarios.conf` (if valid `au`|`jp`)
+2. Default `default/ai_lab_scenarios.conf` (if valid)
+
+If neither yields a valid `au`|`jp`, `region` is empty and `region_ready` is false. Backfill `*_local` timestamps use UTC in that case.
 
 Valid values are strictly:
 
@@ -142,11 +187,14 @@ Implementation file: `bin/workshop_region.py`
 Supported actions:
 
 - `action=get`
-  - returns current effective region
+  - returns configured region snapshot (same family as status)
 - `action=status`
-  - returns explicit configured region (`region`, may be blank), fallback-safe runtime value (`effective_region`), and readiness/generation state
+  - returns configured persisted region (`region`, may be blank), `region_ready`, and readiness/generation state
 - `action=set region=<au|jp>`
   - writes region to local conf, sets generation gate to true, and triggers launcher
+  - returns same field schema as `action=status` plus `region_ready: "true"` (always true on successful set)
+
+`effective_region` fallback (previously defaulted to `au` when unset) has been removed. If no valid region is persisted, `region` is empty and `region_ready` is `false`.
 
 Why command-based persistence:
 
@@ -200,4 +248,3 @@ To add read-only intro content without write behavior:
 
 - keep `action=get` load search
 - remove save panel and submit flow
-

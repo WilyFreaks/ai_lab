@@ -93,6 +93,49 @@ def spawn(script_name):
     return proc
 
 
+def running_pids_for_script(script_name):
+    script_path = os.path.join(BIN_DIR, script_name)
+    script_real = os.path.realpath(script_path)
+    pids = []
+
+    # Use process table inspection to avoid launching duplicate workers.
+    ps = subprocess.run(
+        ["ps", "-eo", "pid=,args="],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ps.returncode != 0:
+        return pids
+
+    for line in ps.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+
+        try:
+            pid = int(parts[0])
+        except ValueError:
+            continue
+
+        if pid == os.getpid():
+            continue
+
+        args = parts[1]
+        argv = args.split()
+        for token in argv:
+            token_real = os.path.realpath(token)
+            if token_real == script_real or os.path.basename(token_real) == script_name:
+                pids.append(pid)
+                break
+
+    return pids
+
+
 def main():
     cfg = read_local_conf()
     gate_ok, reason = generation_gate_open(cfg)
@@ -104,11 +147,23 @@ def main():
     ensure_backfill_start_time(cfg)
     ensure_scenario_activation_keys(cfg)
 
-    backfill_proc = spawn("backfill_log.py")
-    live_proc = spawn("live_log.py")
+    started_procs = []
+    for script_name in ("backfill_log.py", "live_log.py"):
+        running_pids = running_pids_for_script(script_name)
+        if running_pids:
+            print(
+                f"launcher: {script_name} already running (pid={','.join(str(pid) for pid in running_pids)}); skipping spawn",
+                flush=True,
+            )
+            continue
+        started_procs.append(spawn(script_name))
 
-    backfill_proc.wait()
-    live_proc.wait()
+    if not started_procs:
+        print("launcher: no new processes started", flush=True)
+        return
+
+    for proc in started_procs:
+        proc.wait()
 
 
 if __name__ == "__main__":

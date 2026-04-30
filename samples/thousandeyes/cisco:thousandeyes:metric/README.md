@@ -6,7 +6,7 @@ HTTP test metrics from a ThousandEyes Cloud & Enterprise Agent behind R9-NCS540 
 
 | Placeholder | Description | Example |
 |-------------|-------------|---------|
-| `{{timestamp}}` | Region-local wall time for the test run (same as workshop `region` in `ai_lab_scenarios`) | `2026-04-21T10:00:00` |
+| `{{timestamp}}` | Region-local wall time for the test run (same as workshop `region` in `ai_lab_scenarios`), with a short suffix (`JST` for `jp`, and `AEST`/`AEDT` as applicable for `au` via `Australia/Sydney`) | `2026-04-21T10:00:00 JST` |
 | `{{sequence}}` | Incrementing integer, unique per event | `1001` |
 | `{{response_time_ms}}` | HTTP response time in seconds (float) | `0.187` |
 | `{{throughput_kbps}}` | HTTP throughput in kbps (float) | `2345.6` |
@@ -22,4 +22,4 @@ HTTP test metrics from a ThousandEyes Cloud & Enterprise Agent behind R9-NCS540 
 - `thousandeyes.test.name` is `R9-to-Google-HTTP`
 - `thousandeyes.test.type` is `http-server`
 - `server.address` is always `google.com`
-- The `timestamp` key is present in the JSON; `backfill_log.py` fills it from the same local datetime as the other metric placeholders. `default/props.conf` for `cisco:thousandeyes:metric` uses `TIME_PREFIX` / `TIME_FORMAT` so `_time` matches that value.
+- The `timestamp` key is present in the JSON; `backfill_log.py` fills it from the same local datetime as the other metric placeholders. `default/props.conf` for `cisco:thousandeyes:metric` uses `TIME_PREFIX` / `TIME_FORMAT` (including the timezone token) so `_time` matches that value.

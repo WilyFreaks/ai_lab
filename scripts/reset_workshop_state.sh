@@ -4,8 +4,9 @@ set -euo pipefail
 # Reset workshop runtime state:
 # 1) stop Splunk
 # 2) delete ai_lab index directories (derived from default/indexes.conf)
-# 3) delete local/ai_lab_scenarios.conf
-# 4) start Splunk
+# 3) delete all files under app var/spool (monitored spool JSON, etc.)
+# 4) delete local/ai_lab_scenarios.conf
+# 5) start Splunk
 
 APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Default to Linux-style install path. Override with SPLUNK_HOME when needed.
@@ -14,9 +15,11 @@ SPLUNK_BIN="$SPLUNK_HOME/bin/splunk"
 INDEX_CONF="$APP_ROOT/default/indexes.conf"
 LOCAL_SCENARIO_CONF="$APP_ROOT/local/ai_lab_scenarios.conf"
 SPLUNK_DB="$SPLUNK_HOME/var/lib/splunk"
-SPLUNK_APP_HOME="$SPLUNK_HOME/etc/apps/ai_lab"
-SPOOL_ROOT="$SPLUNK_APP_HOME/var/spool/ai_lab"
+SPOOL_ROOTS=(
+  "$APP_ROOT/var/spool/ai_lab"
+)
 SPLUNK_AUTH="${SPLUNK_AUTH:-}"
+SPLUNK_TOKEN="${SPLUNK_TOKEN:-${AUTH_TOKEN:-}}"
 
 ASSUME_YES="false"
 if [[ "${1:-}" == "--yes" ]]; then
@@ -89,7 +92,10 @@ echo "Reset plan:"
 echo "- Stop Splunk"
 echo "- Delete index directories and .dat files under $SPLUNK_DB for:"
 printf '  - %s\n' "${APP_INDEXES[@]}"
-echo "- Delete monitored spool JSON files under $SPOOL_ROOT"
+echo "- Delete all files under app var/spool (workshop spool JSON, etc.):"
+for _sr in "${SPOOL_ROOTS[@]}"; do
+  printf '  - %s\n' "$_sr"
+done
 echo "- Delete $LOCAL_SCENARIO_CONF (if present)"
 echo "- Start Splunk"
 
@@ -139,17 +145,40 @@ for idx in "${APP_INDEXES[@]}"; do
   fi
 done
 
-echo "Removing monitored spool files..."
-if [[ -d "$SPOOL_ROOT" ]]; then
-  if ! ensure_path_under_base "$SPOOL_ROOT" "$SPLUNK_APP_HOME"; then
-    echo "ERROR: Refusing to delete spool path outside app home: $SPOOL_ROOT"
+echo "Removing all spool files under var/spool..."
+_seen_realpaths=()
+for SPOOL_ROOT in "${SPOOL_ROOTS[@]}"; do
+  if [[ ! -d "$SPOOL_ROOT" ]]; then
+    echo "  skip (not found): $SPOOL_ROOT"
+    continue
+  fi
+  if ! ensure_path_under_base "$SPOOL_ROOT" "$APP_ROOT"; then
+    echo "ERROR: Refusing to delete spool path outside app roots: $SPOOL_ROOT"
     exit 1
   fi
-  rm -rf "$SPOOL_ROOT"
-  echo "  removed: $SPOOL_ROOT"
-else
-  echo "  skip (not found): $SPOOL_ROOT"
-fi
+  rp="$(realpath_py "$SPOOL_ROOT")"
+  dup="false"
+  for prev in "${_seen_realpaths[@]+"${_seen_realpaths[@]}"}"; do
+    if [[ "$prev" == "$rp" ]]; then
+      dup="true"
+      break
+    fi
+  done
+  if [[ "$dup" == "true" ]]; then
+    echo "  skip (same path as earlier): $SPOOL_ROOT"
+    continue
+  fi
+  _seen_realpaths+=("$rp")
+  # All files under var/spool (e.g. workshop_region JSON); keep the var/spool directory.
+  fc="$(find "$SPOOL_ROOT" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  find "$SPOOL_ROOT" -type f -delete 2>/dev/null || true
+  for ((_i = 0; _i < 100; _i++)); do
+    n="$(find "$SPOOL_ROOT" -mindepth 1 -type d -empty 2>/dev/null | wc -l | tr -d '[:space:]')"
+    [[ "${n:-0}" -eq 0 ]] && break
+    find "$SPOOL_ROOT" -mindepth 1 -type d -empty -delete 2>/dev/null || break
+  done
+  echo "  removed ${fc:-0} file(s) under $SPOOL_ROOT (empty dirs pruned)"
+done
 
 if [[ -f "$LOCAL_SCENARIO_CONF" ]]; then
   if ! ensure_path_under_base "$LOCAL_SCENARIO_CONF" "$APP_ROOT"; then
@@ -176,16 +205,26 @@ extract_count() {
 }
 
 echo "Verifying index data deletion with SPL..."
-if [[ -z "$SPLUNK_AUTH" ]]; then
-  echo "ERROR: SPLUNK_AUTH is required for verification (example: export SPLUNK_AUTH='admin:changeme')"
+if [[ -z "$SPLUNK_AUTH" && -z "$SPLUNK_TOKEN" ]]; then
+  echo "ERROR: SPLUNK_AUTH or SPLUNK_TOKEN is required for verification."
+  echo "       Examples:"
+  echo "         export SPLUNK_AUTH='admin:changeme'"
+  echo "         export SPLUNK_TOKEN='<mcp bearer token>'"
   exit 1
 fi
 
 for idx in "${APP_INDEXES[@]}"; do
   query="index=$idx earliest=0 latest=now | stats count"
-  if ! count="$("$SPLUNK_BIN" search "$query" -auth "$SPLUNK_AUTH" | extract_count)"; then
-    echo "ERROR: Verification search failed for index '$idx'"
-    exit 1
+  if [[ -n "$SPLUNK_TOKEN" ]]; then
+    if ! count="$("$SPLUNK_BIN" search "$query" -token "$SPLUNK_TOKEN" | extract_count)"; then
+      echo "ERROR: Verification search failed for index '$idx'"
+      exit 1
+    fi
+  else
+    if ! count="$("$SPLUNK_BIN" search "$query" -auth "$SPLUNK_AUTH" | extract_count)"; then
+      echo "ERROR: Verification search failed for index '$idx'"
+      exit 1
+    fi
   fi
   if (( count != 0 )); then
     echo "ERROR: Index '$idx' still has events: $count"

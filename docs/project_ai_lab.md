@@ -100,15 +100,14 @@ Key project behavior that must remain stable across changes:
 - Runtime mutable state is written to `local/ai_lab_scenarios.conf` (not `default/` files).
 - Workshop generation is host-gated via region selection and baseline enablement before launch.
 - Historical and live generation must preserve timeline continuity across Splunk restarts.
-- Canonical verification entrypoint is:
-  - `bash tests/smoke/test_smoke.sh`
+- Canonical verification entrypoint: `bash scripts/test_smoke.sh` (4-check smoke: Python syntax, runtime preconditions, spool empty, app indexes empty).
 - Environment reset for repeatable workshops/tests is handled by:
   - `scripts/reset_workshop_state.sh`
 
 ### Handoff: operators and the next implementer
 
 - **Splunk install path:** scripts default to `SPLUNK_HOME=/opt/splunk`. On **macOS** (developer installs), set `SPLUNK_HOME` explicitly, e.g. `export SPLUNK_HOME=/Applications/Splunk`, when running the reset script or any doc examples that call `$SPLUNK_HOME/bin/splunk`.
-- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops Splunk, deletes per-index data under `$SPLUNK_DB`, removes `etc/apps/ai_lab/var/spool/ai_lab`, removes `local/ai_lab_scenarios.conf`, restarts, then (if set) verifies all `default/indexes.conf` app indexes are empty. **Requires** `SPLUNK_AUTH` (same credentials as the workshop admin user) for the post-start SPL verification. See `docs/project_test_design.md` for the full contract.
+- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops Splunk, deletes per-index data under `$SPLUNK_DB`, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), removes `local/ai_lab_scenarios.conf`, restarts, then (if set) verifies all `default/indexes.conf` app indexes are empty. **Requires** `SPLUNK_AUTH` (same credentials as the workshop admin user) for the post-start SPL verification. See `docs/project_test_design.md` for the full contract.
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.json` — do not add JSON keys the README does not authorize; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
 - **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
@@ -119,4 +118,4 @@ Key project behavior that must remain stable across changes:
 ## Local Splunk Credential (Workshop Environment)
 
 - Username: `admin`
-- Password: `p4ssw0rd`
+- Password: `ailab2025`
