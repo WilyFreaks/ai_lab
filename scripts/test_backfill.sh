@@ -9,6 +9,7 @@ SPLUNK_AUTH="${SPLUNK_AUTH:-}"
 SPLUNK_TOKEN="${SPLUNK_TOKEN:-${AUTH_TOKEN:-}}"
 TIME_WINDOW="${TIME_WINDOW:-24h}"
 SCENARIO_CONF="$ROOT_DIR/default/ai_lab_scenarios.conf"
+LOCAL_SCENARIO_CONF="$ROOT_DIR/local/ai_lab_scenarios.conf"
 
 fail() {
   echo "FAIL: $1" >&2
@@ -31,6 +32,133 @@ run_search_csv() {
   else
     "$SPLUNK_BIN" search "$query" -app "$SPLUNK_APP" -auth "$SPLUNK_AUTH" -earliest_time 0 -latest_time now -output csv
   fi
+}
+
+read_backfill_window() {
+  python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" <<'PY'
+import configparser
+import os
+import sys
+
+default_conf, local_conf = sys.argv[1], sys.argv[2]
+cfg = configparser.ConfigParser(interpolation=None, delimiters=("=",), strict=False)
+if os.path.exists(default_conf):
+    cfg.read(default_conf)
+if os.path.exists(local_conf):
+    cfg.read(local_conf)
+
+if not cfg.has_section("baseline"):
+    raise SystemExit("missing [baseline] section")
+
+try:
+    start_anchor = int(float(cfg.get("baseline", "backfill_start_time")))
+except Exception:
+    raise SystemExit("missing baseline.backfill_start_time")
+
+try:
+    backfill_days = int(float(cfg.get("baseline", "backfill_days")))
+except Exception:
+    backfill_days = 7
+
+start_ts = start_anchor - (backfill_days * 86400)
+end_ts = start_anchor
+print(f"{start_ts} {end_ts}")
+PY
+}
+
+read_stream_interval() {
+  local stream_key="$1"
+  python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" "$stream_key" <<'PY'
+import configparser
+import os
+import sys
+
+default_conf, local_conf, stream_key = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg = configparser.ConfigParser(interpolation=None, delimiters=("=",), strict=False)
+if os.path.exists(default_conf):
+    cfg.read(default_conf)
+if os.path.exists(local_conf):
+    cfg.read(local_conf)
+
+interval = 1
+try:
+    interval = int(float(cfg.get("baseline", stream_key)))
+except Exception:
+    interval = 1
+print(max(interval, 1))
+PY
+}
+
+assert_backfill_duration_coverage() {
+  local label="$1"
+  local query="$2"
+  local expected_start="$3"
+  local expected_end="$4"
+  local step_seconds="$5"
+  local tmp_csv
+  tmp_csv="$(mktemp)"
+
+  if ! run_search_csv "$query" >"$tmp_csv"; then
+    rm -f "$tmp_csv"
+    fail "$label query failed"
+  fi
+
+  if ! python3 - "$tmp_csv" "$expected_start" "$expected_end" "$step_seconds" <<'PY'
+import csv
+import io
+import math
+import sys
+
+csv_path, expected_start, expected_end, step_seconds = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+
+raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
+header_idx = None
+for i, line in enumerate(raw_lines):
+    probe = line.replace('"', "").strip().lower()
+    if "min_time" in probe and "max_time" in probe and "," in probe:
+        header_idx = i
+        break
+
+if header_idx is None:
+    raise SystemExit("no csv payload in search output")
+
+reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
+rows = list(reader)
+if not rows:
+    raise SystemExit("no rows returned")
+
+row = rows[0]
+try:
+    min_time = float(row.get("min_time", "nan"))
+    max_time = float(row.get("max_time", "nan"))
+except Exception:
+    raise SystemExit("failed to parse min_time/max_time")
+
+if math.isnan(min_time) or math.isnan(max_time):
+    raise SystemExit("min_time/max_time missing")
+
+# Backfill loop emits ts in range(start_ts, end_ts, step).
+# So min should be close to start_ts, and max should be >= end_ts-step.
+start_allow = expected_start + step_seconds
+tail_target = expected_end - step_seconds
+
+if min_time > start_allow:
+    raise SystemExit(
+        f"earliest event too late: min_time={min_time:.3f} expected<= {start_allow}"
+    )
+
+if max_time < tail_target:
+    raise SystemExit(
+        f"latest event too early: max_time={max_time:.3f} expected>= {tail_target}"
+    )
+PY
+  then
+    rm -f "$tmp_csv"
+    fail "$label failed"
+  fi
+
+  rm -f "$tmp_csv"
+  echo "PASS: $label"
 }
 
 extract_count() {
@@ -340,6 +468,26 @@ echo "Running backfill data-quality checks (app=$SPLUNK_APP, window=$TIME_WINDOW
 if [[ ! -f "$SCENARIO_CONF" ]]; then
   fail "Scenario config not found: $SCENARIO_CONF"
 fi
+
+read -r BACKFILL_START_TS BACKFILL_END_TS <<<"$(read_backfill_window)"
+TE_INTERVAL_MIN="$(read_stream_interval "thousandeyes#cisco:thousandeyes:metric#interval")"
+TM_INTERVAL_MIN="$(read_stream_interval "telemetry#cnc_interface_counter_json#interval")"
+TE_STEP_SECONDS=$(( TE_INTERVAL_MIN * 60 ))
+TM_STEP_SECONDS=$(( TM_INTERVAL_MIN * 60 ))
+
+assert_backfill_duration_coverage \
+  "Backfill duration coverage (thousandeyes metric head/tail)" \
+  "index=thousandeyes sourcetype=cisco:thousandeyes:metric | stats min(_time) as min_time max(_time) as max_time" \
+  "$BACKFILL_START_TS" \
+  "$BACKFILL_END_TS" \
+  "$TE_STEP_SECONDS"
+
+assert_backfill_duration_coverage \
+  "Backfill duration coverage (telemetry head/tail)" \
+  "index=telemetry sourcetype=cnc_interface_counter_json | stats min(_time) as min_time max(_time) as max_time" \
+  "$BACKFILL_START_TS" \
+  "$BACKFILL_END_TS" \
+  "$TM_STEP_SECONDS"
 
 read -r IFOUT_MIN IFOUT_MAX IFOUT_STEP <<<"$(read_bounds "_ifOutPktsRate" "raw")"
 read -r IFIN_MIN IFIN_MAX IFIN_STEP <<<"$(read_bounds "_ifInPktsRate" "raw")"

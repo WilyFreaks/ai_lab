@@ -68,8 +68,9 @@ This command should return:
 Current layout:
 
 - `scripts/test_smoke.sh`
-- `scripts/test_backfill.sh`
+- `scripts/test_baseline.sh`
 - `scripts/test_scenario_1.sh`
+- `scripts/test_backfill.sh` (backfill-focused historical-window coverage checks; used by baseline wrapper)
 
 The smoke script should orchestrate:
 
@@ -128,14 +129,26 @@ Recommended additional assertions:
 Execution sequencing (important):
 
 1. **Reset-phase checks** (`scripts/test_smoke.sh`) are meaningful immediately after reset/start and must pass with empty indexes (clean slate ready to start workshop).
-2. **Post-generation quality checks** (`scripts/test_backfill.sh`) are meaningful only after generation has started and saved-search datasets are populated.
+2. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated.
 3. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
 4. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
 
 Contract clarification:
 
 - `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract).
-- `scripts/test_backfill.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints).
+- `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints).
+- `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks).
+
+Saved-search contract for baseline/live verification:
+
+- App context: run saved searches in `ai_lab`.
+- Required saved searches:
+  - `telemetry_if_counter_test`
+  - `interface_ifOutPktsRate_test`
+  - `interface_ifInPktsRate_test`
+  - `thousandeyes_response_time_sec_test`
+- Live verification window:
+  - use a recent bounded window (recommended `earliest=-5m latest=now`) when confirming active `live_log.py` generation.
 
 Saved-search quality intent for backfill checks:
 
@@ -180,6 +193,8 @@ Saved-search quality intent for backfill checks:
 - Runs continuously once implemented.
 - Uses same region-timezone `peak_rate_*` mapping as backfill.
 - Applies scenario fault window overrides correctly.
+- Uses 1-minute orchestrator ticks and per-source interval gating (`minute % interval == 0`).
+- Persists and resumes minute cursor (`baseline.live_last_tick_epoch`) for restart continuity.
 
 ---
 
@@ -189,7 +204,7 @@ To allow automatic test execution by Cursor:
 
 1. Keep canonical command stable:
    - `bash scripts/test_smoke.sh`
-2. Document it in `.cursor/rules/splunk_app_rules.md`.
+2. Document it in `.cursor/rules/splunk_app_rules.mdc`.
 3. Ensure scripts are non-interactive and produce clear pass/fail output.
 
 This keeps test behavior consistent across manual and agent-driven runs.

@@ -25,6 +25,7 @@ Current dashboard entries include:
 
 - `workshop_introduction`
 - `scenario_control`
+- `scenario_1_monitor` (planned next dashboard)
 
 `search` remains the search view target for ad-hoc SPL.
 
@@ -248,3 +249,27 @@ To add read-only intro content without write behavior:
 
 - keep `action=get` load search
 - remove save panel and submit flow
+
+---
+
+## Planned Dashboard: `scenario_1_monitor`
+
+Goal:
+
+- Provide a focused monitor view for `scenario_1` metric behavior during baseline and fault windows.
+
+Validation data source policy:
+
+- Prefer existing saved searches in app `ai_lab` as panel sources:
+  - `telemetry_if_counter_test`
+  - `interface_ifOutPktsRate_test`
+  - `interface_ifInPktsRate_test`
+  - `thousandeyes_response_time_sec_test`
+- For "live is active now" checks, use a bounded recent window (recommended last 5 minutes).
+
+Initial panel intent:
+
+1. Telemetry directional gap/drop-rate status (`telemetry_if_counter_test`)
+2. Interface outbound packet-rate trend (`interface_ifOutPktsRate_test`)
+3. Interface inbound packet-rate trend (`interface_ifInPktsRate_test`)
+4. ThousandEyes response-time trend (`thousandeyes_response_time_sec_test`)

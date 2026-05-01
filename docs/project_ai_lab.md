@@ -111,6 +111,7 @@ Key project behavior that must remain stable across changes:
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.json` — do not add JSON keys the README does not authorize; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
 - **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
+- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `interface_ifOutPktsRate_test`, `interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`). Use a recent window (recommended last 5 minutes) when validating active live generation.
 - **Credentials for CLI/tests** (workshop): same as below; do not commit real production secrets. Tests expect `SPLUNK_AUTH=admin:password` in the environment.
 
 ---

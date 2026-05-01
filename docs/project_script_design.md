@@ -121,19 +121,34 @@ This is mandatory to avoid duplicate or missing data.
 
 **Responsibilities:**
 1. Read `backfill_start_time` from conf as the real-time anchor
-2. Generate synthetic events at configured intervals and write to spool files for monitor ingestion
+2. Run a fixed scheduler tick every minute (single orchestrator loop).
+3. On every minute tick, re-read baseline/scenario runtime controls and recompute effective parameters before deciding whether to emit each data source.
+   - Baseline values are the default.
+   - Active scenario values overwrite corresponding baseline keys during the scenario fault window.
+   - This includes overwrite-capable timing keys such as `<source>#interval`.
+4. Generate synthetic events and write to spool files for monitor ingestion only when the current minute matches each source's effective interval schedule.
+   - Example: `interval=5` emits at minute `0,5,10,...,55`.
+   - If scenario override sets `interval=30`, emit only at minute `0,30` while override is active.
    - Guardrail: do not emit events with a domain timestamp later than current runtime time (no future-dated logs). If scheduler/loop drift occurs, clamp generation cursor to `now`.
-3. Read scenario runtime controls from `[scenarios]` in `local/ai_lab_scenarios.conf`
-4. Treat `<scenario>_activated` as activation epoch (`0` means inactive)
-5. Apply scenario overrides only during fault window:
+5. Read scenario runtime controls from `[scenarios]` in `local/ai_lab_scenarios.conf`
+6. Treat `<scenario>_activated` as activation epoch (`0` means inactive)
+7. Apply scenario overrides only during fault window:
    - start: `activated + fault_start * 60`
    - end: `start + fault_duration * 60`
-6. Outside fault window, use baseline values
+8. Outside fault window, use baseline values
+9. Scenario activation state must be evaluated on every scheduler tick (not startup-only) so live behavior reacts immediately to enable/disable actions.
 
 **Restart behavior:** 
 If Splunk restarts and `backfill_start_time` is already set in `local/`, that indicates live_log.py needs to backfill the live events.
 Check the latest timestamp of the events and backfill the events up to the current timestamp.
 This is mandatory to avoid missing data.
+
+Implementation note (phase 1 baseline mode):
+
+- `live_log.py` persists minute cursor state in `local/ai_lab_scenarios.conf`:
+  - `[baseline] live_last_tick_epoch = <epoch_seconds>`
+- First run: starts from minute-aligned `backfill_start_time`.
+- Subsequent runs/restarts: resume from `live_last_tick_epoch + 60` and catch up minute ticks up to now.
 
 ---
 

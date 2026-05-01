@@ -9,6 +9,17 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-01 (Fri)
 
+- Session 2 around **14:40-16:11 JST** in this chat
+- Main activities:
+  - Resumed project from journal anchor and aligned next implementation target (`live_log.py`)
+  - Hardened agent startup behavior: moved project rules to `.cursor/rules/splunk_app_rules.mdc` (`alwaysApply: true`) and added startup hooks for timeline/project-doc context injection
+  - Updated `docs/project_script_design.md` to explicitly require 1-minute live scheduler ticks, per-tick scenario re-evaluation, and interval override semantics
+  - Implemented `bin/live_log.py` phase 1 (baseline mode): minute scheduler, per-source interval gating, restart cursor persistence, no-future guardrail, and shared metric generation model continuity with backfill
+  - Added `scripts/test_baseline.sh` canonical baseline entrypoint and extended `scripts/test_backfill.sh` with backfill head/tail duration coverage checks
+  - Ran reset + smoke + live validation: workshop reset passed, smoke checks passed, saved-search 5-minute checks confirmed active live generation after region lock
+- Resume anchor:
+  - Next: implement a dashboard to monitor metric values for `scenario_1`.
+
 - Session 1 around **01:55-03:29 JST** in this chat
 - Main activities:
   - Updated all project design docs (`project_dashboard_design.md`, `project_test_design.md`, `project_ai_lab.md`)
@@ -197,7 +208,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-01: ~209 minutes (2 sessions), ~20,000 estimated tokens
+- 2026-05-01: ~300 minutes (3 sessions), ~35,000 estimated tokens
 - 2026-04-30: ~301 minutes (1 session), ~55,000 estimated tokens
 - 2026-04-29: ~24 minutes (1 session), ~1,800 estimated tokens
 - 2026-04-27: ~107 minutes (2 sessions), ~4,800 estimated tokens
@@ -210,7 +221,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-01 | ~209 minutes (2 sessions) | ~20,000 |
+| 2026-05-01 | ~300 minutes (3 sessions) | ~35,000 |
 | 2026-04-30 | ~301 minutes (1 session) | ~55,000 |
 | 2026-04-29 | ~24 minutes (1 session) | ~1,800 |
 | 2026-04-27 | ~107 minutes (2 sessions) | ~4,800 |

@@ -1,3 +1,7 @@
+---
+description: Splunk AI Lab project rules — always applied every session
+alwaysApply: true
+---
 # Splunk app rules
 
 Always read:
@@ -6,6 +10,10 @@ Always read:
 - docs/project_script_design.md
 - docs/project_dashboard_design.md
 - docs/project_scenario_*.md
+
+Session resume ("where i am" / "where am i" / "resume my work"):
+- Always read `docs/daily_activity_timeline.md` as the first action when the user asks where they are or wants to resume the project.
+- Report the current session's resume anchor and the most recent activity summary.
 
 When modifying Splunk configuration:
 - Inspect existing files under default/
@@ -27,8 +35,8 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - This file is the project daily journal, but is updated **only when the user explicitly requests** an update to `docs/daily_activity_timeline.md` (no proactive edits).
 
 Update triggers (phrases the user can use):
-- "resume session": treat this as a **correction signal** for the **active session’s start time** (JST). If the user states a time, use it; otherwise set start time using the precedence below. Do **not** invent a “nice” start time that overlaps the previous session’s end time.
-- "update @docs/daily_activity_timeline.md" / "update docs/daily_activity_timeline.md": perform a **timeline checkpoint update** for the day: refresh session text, and set/refresh the **active session’s end time** using the precedence below (unless the user says the session is still ongoing / asks for a partial update only).
+- "resume session": treat this as a **correction signal** for the **active session's start time** (JST). If the user states a time, use it; otherwise set start time using the precedence below. Do **not** invent a "nice" start time that overlaps the previous session's end time.
+- "update @docs/daily_activity_timeline.md" / "update docs/daily_activity_timeline.md": perform a **timeline checkpoint update** for the day: refresh session text, and set/refresh the **active session's end time** using the precedence below (unless the user says the session is still ongoing / asks for a partial update only).
 - "anchor" / "anchor the next action": set/refresh the **Resume anchor** for the active session. If the session header is still single-time, convert it to range form per the anchor keyword rule.
 - Anchor keyword rule: when the user says "anchor" (or uses phrasing like "anchor the next action"), update the current session header from single-time format to range format: `Session N around **<start>-<end> JST**`.
 
@@ -61,6 +69,15 @@ Durations and summaries:
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.
 - Use `SPLUNK_AUTH` (`user:pass`) only as fallback when token auth is unavailable.
 - If a reset run appears slow/hung, first verify whether it is waiting for prompt input, then check `/opt/splunk/var/log/splunk/splunkd.log` for actual stop/start activity.
+
+Saved-search validation rules (Splunk test/verification):
+- For app-level validation, use saved searches in app `ai_lab` (do not write raw SPL unless the user explicitly asks for ad-hoc SPL).
+- Preferred saved searches for baseline/live checks:
+  - `telemetry_if_counter_test`
+  - `interface_ifOutPktsRate_test`
+  - `interface_ifInPktsRate_test`
+  - `thousandeyes_response_time_sec_test`
+- For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 
 Splunk Simple XML `fieldset` visibility:
 - `<fieldset>` only supports `autoRun` and `submitButton` (not `depends`). To show or hide the whole form input block (including Submit), wrap it in `<row depends="$token$">` (or use `depends` / `rejects` on `<input>` per input docs).
