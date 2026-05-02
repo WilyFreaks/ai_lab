@@ -29,6 +29,8 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 - Per-source event generation follows effective interval gating (`minute % interval == 0`).
 - With no active scenario, baseline values and baseline intervals apply.
 - Restart continuity uses `baseline.live_last_tick_epoch` in `local/ai_lab_scenarios.conf`.
+- For `cnc_srte_path_json`, output wire format follows sample extension (`sample.txt` -> `.txt` spool payload), while `props.conf`/`transforms.conf` must still break and parse per-event JSON correctly.
+- `scenario_happening_probability` is per-source (`<index>#<sourcetype>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
 
 ## Quick checklist
 
@@ -36,3 +38,32 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 2. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
 3. Run saved searches over `-5m` and verify non-zero recent data.
 4. Run baseline quality tests via `scripts/test_baseline.sh`.
+
+## SRTE-specific verification addendum
+
+Use this when validating `index=telemetry sourcetype=cnc_srte_path_json`:
+
+1. Confirm recent events exist in the last 5 minutes.
+2. Confirm event separation is correct (no multi-object merge in a single event).
+3. Confirm host metadata extraction works per event (`host` should reflect payload host values like `cnc_vlan1001..1004`).
+4. During active `scenario_1`, confirm impacted VLAN path ratio behavior follows `telemetry#cnc_srte_path_json#scenario_happening_probability` in a recent window.
+
+## Imported dashboard data-source audit
+
+Use this when a dashboard XML is copied from another Splunk environment.
+
+1. Extract all SPL data sources (`index=`, `sourcetype=`, `source=`, host filters, and explicit time windows).
+2. Save an inventory CSV under `docs/` with columns:
+   - `index,sourcetype,source,host,time duration`
+3. Mark non-`ai_lab` dependencies (for example legacy indexes or external app script paths) as external dependencies.
+4. Use the inventory as the source for a follow-up comparison CSV when mapping to `ai_lab` saved searches and indexes.
+
+## Post-migration generation checkpoint
+
+After data-source remapping in imported dashboards, validate that runtime data exists for the remapped streams before panel-level UI validation.
+
+- Required stream checkpoint for current `scenario_1_au` migration:
+  - `index=twamp`
+  - `index=telemetry sourcetype=cnc_srte_path_json`
+  - `index=telemetry sourcetype=cnc_interface_counter_json`
+- If these streams are not present in a recent window, trigger generation first, then rerun validation.

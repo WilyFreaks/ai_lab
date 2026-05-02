@@ -11,6 +11,17 @@ bin/
 └── live_log.py      # continuous real-time data generation + scenario trigger
 ```
 
+## Sample Template Formats
+
+Sample files under `samples/` are source-specific templates and are **not limited to JSON files**.
+
+- Allowed template formats include `json`, `xml`, `csv`, and `txt`.
+- Choose template format per sourcetype/data shape requirement, not by a global single-format rule.
+- `txt` is the most flexible option for unstructured or mixed-format payload templates.
+- Scripts must check the sample file extension first (for example `.json`, `.xml`, `.csv`, `.txt`) and then apply the corresponding load/render logic path.
+- Generator parsing/rendering may use source-specific handlers so each source can load/render its template safely.
+- Current implemented streams use `.json` and `.txt` templates, and generated spool payload format follows the sample extension (`.json` -> NDJSON, `.csv` -> CSV text, `.xml` -> XML text, `.txt` -> plain text).
+
 ## Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601
 
 Workshop data should treat timestamps as a **first-class, timezone-explicit** domain clock (not “Splunk’s indexer local time by accident”).
@@ -96,15 +107,22 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
 2. If `backfill_completed = true`, exit immediately (already done)
 3. Generate synthetic events at configured intervals for the window:
    `(backfill_start_time - backfill_days)` → `backfill_start_time`
-4. Write generated events in bulk NDJSON files under app spool paths:
+4. Write generated events in bulk spool files under app spool paths:
    - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`
    - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`
-5. Each NDJSON line must be valid JSON and must only include fields that exist in the corresponding `samples/.../sample.json` template (or `samples/.../README.md` if it explicitly authorizes additional keys).
-6. The `{{timestamp}}` placeholder (when present) must be generated as a **timezone-aware, ISO-8601 string with a numeric offset**, using the region’s IANA zone (`Asia/Tokyo` for `jp`, `Australia/Sydney` for `au`) so offsets/DST are correct for each instant. See **Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601** above.
-7. **Do not** embed Splunk routing metadata (`index`, `sourcetype`, `source`, `host`) in the JSON unless the sample template/README calls for it. Splunk file monitor stanzas in `default/inputs.conf` are the source of truth for `index=`, `sourcetype=`, and monitor-level `host=` / `source=` (when configured).
-8. For telemetry link pairs, enforce directional packet conservation using the bidirectional interface lookup (`lookups/router_if_connected_bidirectional.csv`, fallback `lookups/router_if_connections_bidirectional.csv`): receiver `ifInPktsRate` must not exceed connected peer `ifOutPktsRate` in either direction (loss is allowed; packet creation is not).
-9. Telemetry packet drop-rate model requirement: for each linked direction, keep drop rate below 1% in generated baseline data (equivalently, keep inbound rate in the range `0.99 * ifOutPktsRate` to `ifOutPktsRate` when `ifOutPktsRate > 0`).
-10. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
+   - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`
+5. Template source files may use `json`, `xml`, `csv`, or `txt` under `samples/.../` (for example `sample.json` or `sample.txt`), and must follow each source template contract documented in `samples/.../README.md` when present.
+6. Loader logic must first inspect the template file extension and route to the matching parser/renderer behavior for that format.
+7. Output wire format must follow sample extension: `.json` templates emit NDJSON lines; `.csv`/`.xml`/`.txt` templates emit the corresponding text payload format.
+8. For sources that emit NDJSON, each line must be valid JSON and should only include fields authorized by the corresponding sample template/README.
+9. The `{{timestamp}}` placeholder (when present) must be generated as a **timezone-aware, ISO-8601 string with a numeric offset**, using the region’s IANA zone (`Asia/Tokyo` for `jp`, `Australia/Sydney` for `au`) so offsets/DST are correct for each instant. See **Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601** above.
+10. **Do not** embed Splunk routing metadata (`index`, `sourcetype`, `source`, `host`) in payloads unless the sample template/README calls for it. Splunk file monitor stanzas in `default/inputs.conf` are the source of truth for `index=`, `sourcetype=`, and monitor-level `host=` / `source=` (when configured).
+11. For telemetry link pairs, enforce directional packet conservation using the bidirectional interface lookup (`lookups/router_if_connected_bidirectional.csv`, fallback `lookups/router_if_connections_bidirectional.csv`): receiver `ifInPktsRate` must not exceed connected peer `ifOutPktsRate` in either direction (loss is allowed; packet creation is not).
+12. Telemetry packet drop-rate model requirement: for each linked direction, keep drop rate below 1% in generated baseline data (equivalently, keep inbound rate in the range `0.99 * ifOutPktsRate` to `ifOutPktsRate` when `ifOutPktsRate > 0`).
+13. `scenario_happening_probability` is a common per-source runtime key using this pattern: `<index>#<sourcetype>#scenario_happening_probability`.
+14. During active scenario windows in live generation, evaluate this probability per source/event to decide whether that source uses scenario-overridden values or baseline values (`0` never happens, `1` always happens, clamped to `0..1`).
+15. If `scenario_happening_probability` is missing or invalid for a source, treat it as `1` (always happens).
+16. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
 
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
@@ -137,6 +155,7 @@ This is mandatory to avoid duplicate or missing data.
    - end: `start + fault_duration * 60`
 8. Outside fault window, use baseline values
 9. Scenario activation state must be evaluated on every scheduler tick (not startup-only) so live behavior reacts immediately to enable/disable actions.
+10. For each source, evaluate `<index>#<sourcetype>#scenario_happening_probability` on each emitted event (using effective baseline/scenario-overridden config) to decide whether to apply scenario-overridden values for that source or fall back to baseline values for that event.
 
 **Restart behavior:** 
 If Splunk restarts and `backfill_start_time` is already set in `local/`, that indicates live_log.py needs to backfill the live events.
@@ -196,6 +215,8 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
   → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alerts`, `source=ai_lab:backfill:thousandeyes_alerts`
 - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
   → `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry`
+- `var/spool/ai_lab/telemetry/cnc_srte_path_json/`  
+  → `index=telemetry`, `sourcetype=cnc_srte_path_json`, base monitor host is `cnc_srte_path`, and per-event host metadata is overridden from payload `host` via `props.conf` + `transforms.conf` index-time transform
 
 **Monitors and TailReader / CRC:** each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
 

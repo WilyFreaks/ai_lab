@@ -41,4 +41,40 @@
       </table>
     </panel>
   </row>
+  <row>
+    <panel>
+      <single>
+        <title>Open Monitoring Dashboard (AU)</title>
+        <search>
+          <query>| makeresults | eval text="Central Victoria, AU"</query>
+          <earliest>-1m</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="field">text</option>
+        <option name="drilldown">all</option>
+        <option name="height">51</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/ai_lab/scenario_1_au</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <single>
+        <title>Open Monitoring Dashboard (JP)</title>
+        <search>
+          <query>| makeresults | eval text="Western Japan, JP"</query>
+          <earliest>-1m</earliest>
+          <latest>now</latest>
+        </search>
+        <option name="field">text</option>
+        <option name="drilldown">all</option>
+        <option name="height">51</option>
+        <option name="refresh.display">progressbar</option>
+        <drilldown>
+          <link target="_blank">/app/ai_lab/scenario_1_jp</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
 </form>

@@ -47,6 +47,14 @@ STREAMS = [
             SPOOL_ROOT, "telemetry", "cnc_interface_counter_json"
         ),
     },
+    {
+        "index": "telemetry",
+        "sourcetype": "cnc_srte_path_json",
+        "sample": os.path.join(
+            SAMPLES_DIR, "telemetry", "cnc_srte_path_json", "sample.txt"
+        ),
+        "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_srte_path_json"),
+    },
 ]
 
 
@@ -196,6 +204,15 @@ def parse_float(cfg, section, key, default=None):
         return default
 
 
+def clamp_probability(value):
+    if value is None:
+        return 1.0
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except Exception:
+        return 1.0
+
+
 def parse_int(cfg, section, key, default=None):
     try:
         return int(float(cfg.get(section, key)))
@@ -264,15 +281,29 @@ def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, st
         return stream["sourcetype"]
 
     value = metric_value(cfg, section, prefix, local_dt)
-    if value is None:
+    if value is not None:
+        if placeholder in ("availability", "http_status_code"):
+            return int(round(value))
+        return round(value, 6)
+
+    # Fallback for non-numeric template values (for example JSON fragments used in .txt samples).
+    raw_value = cfg.get(section, prefix, fallback=None)
+    if raw_value is None:
         return 0
-
-    if placeholder in ("availability", "http_status_code"):
-        return int(round(value))
-    return round(value, 6)
+    return str(raw_value).strip()
 
 
-def render_template(template_text, replacements):
+def scenario_happening_probability(cfg, section, prefix_base):
+    key = f"{prefix_base}scenario_happening_probability"
+    return clamp_probability(parse_float(cfg, section, key, default=1.0))
+
+
+def sample_extension(sample_path):
+    ext = os.path.splitext(sample_path)[1].lower()
+    return ext or ".txt"
+
+
+def render_template(template_text, replacements, sample_path):
     def _sub(match):
         key = match.group(1)
         value = replacements.get(key, "")
@@ -281,7 +312,13 @@ def render_template(template_text, replacements):
         return str(value)
 
     rendered = PLACEHOLDER_RE.sub(_sub, template_text)
-    return json.loads(rendered)
+    ext = sample_extension(sample_path)
+    if ext == ".json":
+        # Keep NDJSON compact output for JSON templates.
+        return [json.dumps(json.loads(rendered), separators=(",", ":"))]
+    if ext in (".txt", ".csv", ".xml"):
+        return [rendered.rstrip("\n")]
+    raise ValueError(f"Unsupported sample extension for template rendering: {sample_path}")
 
 
 def clone_cfg(cfg):
@@ -366,21 +403,23 @@ def generate_single_event(cfg, stream, ts, tzinfo, region, sequence):
         if links:
             enforce_telemetry_directional_conservation(replacements, placeholder_index, links)
 
-    return render_template(template_text, replacements)
+    return render_template(template_text, replacements, stream["sample"])
 
 
 def write_stream_events(stream, events):
     if not events:
         return None
     os.makedirs(stream["spool_dir"], exist_ok=True)
+    output_ext = sample_extension(stream["sample"])
     output_path = os.path.join(
         stream["spool_dir"],
-        f"live_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}.json",
+        f"live_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}{output_ext}",
     )
     with open(output_path, "w") as out:
-        for event_obj in events:
-            out.write(json.dumps(event_obj, separators=(",", ":")))
-            out.write("\n")
+        for payload in events:
+            out.write(payload)
+            if not payload.endswith("\n"):
+                out.write("\n")
     return output_path
 
 
@@ -418,21 +457,31 @@ def process_tick(tick_ts, sequence_state):
     per_stream_counts = {}
     for stream in STREAMS:
         prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
-        interval = parse_int(effective_cfg, "baseline", f"{prefix_base}interval", default=1)
+        stream_cfg = effective_cfg
+        if active_scenarios:
+            probability = scenario_happening_probability(
+                effective_cfg, "baseline", prefix_base
+            )
+            if random.random() >= probability:
+                stream_cfg = base_cfg
+
+        interval = parse_int(stream_cfg, "baseline", f"{prefix_base}interval", default=1)
         interval = max(interval or 1, 1)
         if not minute_due_for_interval(tick_ts, interval):
             continue
         sequence_state["seq"] += 1
-        event_obj = generate_single_event(
-            effective_cfg, stream, tick_ts, tzinfo, region, sequence_state["seq"]
+        event_objs = generate_single_event(
+            stream_cfg, stream, tick_ts, tzinfo, region, sequence_state["seq"]
         )
-        path = write_stream_events(stream, [event_obj])
-        emitted += 1
+        event_count = len(event_objs)
+        path = write_stream_events(stream, event_objs)
+        emitted += event_count
         per_stream_counts[f"{stream['index']}#{stream['sourcetype']}"] = (
-            per_stream_counts.get(f"{stream['index']}#{stream['sourcetype']}", 0) + 1
+            per_stream_counts.get(f"{stream['index']}#{stream['sourcetype']}", 0)
+            + event_count
         )
         print(
-            f"live_log: wrote 1 event to {path} "
+            f"live_log: wrote {event_count} events to {path} "
             f"(tick={tick_ts} index={stream['index']} sourcetype={stream['sourcetype']} interval={interval})",
             flush=True,
         )

@@ -177,6 +177,18 @@ Saved-search quality intent for backfill checks:
 - Submit updates local scenario control keys.
 - Defaults and help text are rendered as intended.
 
+### Imported dashboards (copied from other environments)
+
+- Before migration/refactor, create a source-inventory CSV in `docs/` with columns:
+  - `index,sourcetype,source,host,time duration`
+- Explicitly flag any non-`ai_lab` index usage and external app script paths as external dependencies.
+- Use the inventory CSV as the baseline for a comparison list when remapping panels to `ai_lab` saved searches.
+- After remapping imported dashboard panels, execute a generation checkpoint for remapped streams before UI-level dashboard validation.
+- Current `scenario_1_au` checkpoint streams:
+  - `index=twamp`
+  - `index=telemetry sourcetype=cnc_srte_path_json`
+  - `index=telemetry sourcetype=cnc_interface_counter_json`
+
 ---
 
 ## Data Generation Tests

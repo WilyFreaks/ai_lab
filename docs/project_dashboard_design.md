@@ -25,9 +25,14 @@ Current dashboard entries include:
 
 - `workshop_introduction`
 - `scenario_control`
-- `scenario_1_monitor` (planned next dashboard)
 
 `search` remains the search view target for ad-hoc SPL.
+
+Scenario dashboard navigation policy:
+
+- Do **not** add individual scenario dashboards (for example `scenario_1_*`) as direct links in `default/data/ui/nav/default.xml`.
+- Scenario dashboards are accessed from `scenario_control` only.
+- The scenario link should be generated dynamically in `scenario_control` when the corresponding scenario is enabled.
 
 ---
 
@@ -215,6 +220,7 @@ Design constraints:
 - Uses form submit mode (`submitButton="true"`) to avoid writes on page load
 - Input token names omit `form.` prefix (required for deferred submit behavior)
 - Write operation runs only after submit via `scenariocontrol`
+- Scenario-specific dashboard links are rendered dynamically from runtime scenario state, and only for enabled scenarios.
 
 This pattern is reused in workshop-introduction save flow.
 
@@ -273,3 +279,28 @@ Initial panel intent:
 2. Interface outbound packet-rate trend (`interface_ifOutPktsRate_test`)
 3. Interface inbound packet-rate trend (`interface_ifInPktsRate_test`)
 4. ThousandEyes response-time trend (`thousandeyes_response_time_sec_test`)
+
+---
+
+## Imported Dashboard Intake (Current Practice)
+
+When a dashboard is copied from another Splunk environment (for example `default/data/ui/views/scenario_1_au.xml`), follow this sequence:
+
+1. Keep the imported SPL intact first (no immediate logic rewrites).
+2. Translate user-facing Japanese/non-English strings to English unless workshop language requires otherwise.
+3. Keep scenario description text quiz-oriented (hint only), so attendees investigate root cause from panels.
+4. Inventory all SPL data sources into a CSV under `docs/` with columns:
+   - `index,sourcetype,source,host,time duration`
+5. Treat non-`ai_lab` indexes and external script paths as legacy dependencies to be compared/migrated later.
+
+Current inventory artifact:
+
+- `docs/scenario_1_au_dashboard_data_sources.csv`
+
+Migration checkpoint status:
+
+- The Interface In/Out Packet Count Comparison panel migration is complete for `scenario_1_au`.
+- Next runtime checkpoint before dashboard validation:
+  - generate `twamp`
+  - generate `telemetry#cnc_srte_path_json`
+  - generate `telemetry#cnc_interface_counter_json`

@@ -59,13 +59,13 @@ then add `random.gauss(0, noise_stdev)`
 
 Two separate scripts (not one):
 
-**`bin/backfill_log.py`** — runs once at app start (when gated by `launcher.py`); writes NDJSON lines for the backfill window to **app spool paths** under `var/spool/ai_lab/...` for `monitor://` inputs to pick up. Timestamps in payloads follow the `{{timestamp}}` / sample template rules (region-local wall time where applicable). **Ingestion is file-based, not HEC** for the shipped streams.
+**`bin/backfill_log.py`** — runs once at app start (when gated by `launcher.py`); writes spool payload files for the backfill window to **app spool paths** under `var/spool/ai_lab/...` for `monitor://` inputs to pick up. Output wire format follows sample extension (`.json` -> NDJSON, `.txt`/`.csv`/`.xml` -> matching text payload). Timestamps in payloads follow the `{{timestamp}}` / sample template rules (region-local wall time where applicable). **Ingestion is file-based, not HEC** for the shipped streams.
 
 **`bin/live_log.py`** — runs continuously, writes real-time events to the same spool/monitor model from `app_start_time` onward, and applies scenario fault windows when implemented.
 
 ## File monitor inputs: CRC, `crcSalt`, and spool files
 
-**Problem:** The forwarder’s initial CRC is derived from the **first 256 bytes** of a file. Templated NDJSON with identical leading bytes can **collide** across different filenames, so the tailer may skip a file (see `_internal` TailReader / initcrc errors).
+**Problem:** The forwarder’s initial CRC is derived from the **first 256 bytes** of a file. Template-based outputs with identical leading bytes can **collide** across different filenames, so the tailer may skip a file (see `_internal` TailReader / initcrc errors).
 
 **Approach in this app (no `initCrcLength` in `props.conf` for this):**
 
@@ -78,6 +78,7 @@ A **static** `crcSalt` string shared by all files in a path does not fix header 
 
 - **`[cisco:thousandeyes:metric]`** — `default/props.conf` uses `TIME_PREFIX` / `TIME_FORMAT` with the leading raw JSON for the top-level `timestamp` key so `_time` matches the event string from `backfill_log.py` (see `samples/thousandeyes/cisco:thousandeyes:metric/README.md`).
 - **`[cnc_interface_counter_json]`** — nested `latest_data.timestamp` strings; `TIME_PREFIX` / `TIME_FORMAT` in `default/props.conf` target the indexed JSON / raw pattern for this sourcetype (see `samples/telemetry/cnc_interface_counter_json/README.md`).
+- **`[cnc_srte_path_json]`** — multi-object `.txt` payloads are broken into per-object events via `LINE_BREAKER`; `TIME_PREFIX` / `TIME_FORMAT` extract per-event `_time`; host metadata is set at index time through `TRANSFORMS-set_host = set_host_from_cnc_srte_path_json` in `props.conf` and `DEST_KEY = MetaData:Host` transform in `default/transforms.conf`.
 
 After changing `props.conf` or `inputs.conf`, **reload** or restart Splunk so forwarders read the new settings.
 
@@ -114,5 +115,5 @@ samples/
 └── <index>/
     └── <sourcetype>/
         ├── README.md      # placeholder docs and conventions
-        └── sample.json    # example log template with {{placeholders}}
+        └── sample.<ext>   # example template with {{placeholders}} (json/txt/csv/xml)
 ```

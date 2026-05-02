@@ -1,0 +1,56 @@
+{
+    "timestamp": "{{timestamp}}",
+    "host": "cnc_vlan1001",
+    "sr_policy_results": [
+        {
+            "head-end": "10.0.255.9",
+            "end-point": "10.0.255.2",
+            "color": 1005,
+            "hops": [
+                "R9-NCS540", "R8-NCS540", "R6-NCS560", "R4-NCS55A2", "R2-NCS5504"
+            ]
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "host": "cnc_vlan1002",
+    "sr_policy_results": [
+        {
+            "head-end": "10.0.255.9",
+            "end-point": "10.0.255.2",
+            "color": 1007,
+            "hops": [
+                {{impacted_vlan_path}}
+            ]
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "host": "cnc_vlan1003",
+    "sr_policy_results": [
+        {
+            "head-end": "10.0.255.9",
+            "end-point": "10.0.255.2",
+            "color": 1003,
+            "hops": [
+                {{impacted_vlan_path}}
+            ]
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "host": "cnc_vlan1004",
+    "sr_policy_results": [
+        {
+            "head-end": "10.0.255.9",
+            "end-point": "10.0.255.2",
+            "color": 1001,
+            "hops": [
+                "R9-NCS540", "R7-NCS560", "R6-NCS560", "R4-NCS55A2", "R2-NCS5504"
+            ]
+        }
+    ]
+}

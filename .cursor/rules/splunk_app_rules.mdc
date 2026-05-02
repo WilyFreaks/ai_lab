@@ -79,6 +79,15 @@ Saved-search validation rules (Splunk test/verification):
   - `thousandeyes_response_time_sec_test`
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 
+Imported dashboard intake rules:
+- When importing/copied dashboards from other environments, keep SPL behavior unchanged first, then document dependencies before refactoring.
+- Translate non-English dashboard user-facing text (`<label>`, `<description>`, panel titles, option labels) to English unless the user asks to keep the original language.
+- Keep workshop scenario descriptions hint-style for attendee quizzes; avoid explicit root-cause disclosure unless requested.
+- Create a data-source inventory CSV under `docs/` for imported dashboards using columns: `index,sourcetype,source,host,time duration`.
+- If SPL references non-`ai_lab` indexes or external app paths, record them explicitly in the CSV as legacy/external dependencies instead of silently rewriting them.
+- After remapping imported dashboard SPL to project data sources, document and execute a data-generation checkpoint before UI validation.
+- Current checkpoint target streams for `scenario_1_au` migration: `twamp`, `telemetry#cnc_srte_path_json`, `telemetry#cnc_interface_counter_json`.
+
 Splunk Simple XML `fieldset` visibility:
 - `<fieldset>` only supports `autoRun` and `submitButton` (not `depends`). To show or hide the whole form input block (including Submit), wrap it in `<row depends="$token$">` (or use `depends` / `rejects` on `<input>` per input docs).
 

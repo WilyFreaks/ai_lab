@@ -7,9 +7,49 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-03 (Sun)
+
+- Session 1 around **02:52-04:56 JST** in this chat
+- Main activities:
+  - Resumed project work from the latest journal anchor
+  - Confirmed the next checkpoint target is generation for `twamp`, `telemetry#cnc_srte_path_json`, and `telemetry#cnc_interface_counter_json`
+  - Requested a project journal update to start a new session for today
+  - Created and finalized `samples/telemetry/cnc_srte_path_json/sample.txt` and documented it in a new sample README
+  - Extended generator design/implementation for extension-based sample loading and output format alignment (`.json`/`.txt`, with `.csv`/`.xml` paths documented)
+  - Added `cnc_srte_path_json` stream wiring to generation scripts, plus scenario-driven path variation controls (`impacted_vlan_path`, `scenario_happening_probability`)
+  - Added and reviewed `inputs.conf`/`props.conf` integration for `cnc_srte_path_json` ingestion, then implemented index-time host extraction via `TRANSFORMS` + new `default/transforms.conf`
+  - Ran local generation smoke checks and confirmed `scenario_1` behavior for impacted VLAN path ratio
+- Resume anchor:
+  - Next: test `cnc_srte_path_json` generation in Splunk.
+
+## 2026-05-02 (Sat)
+
+- Carryover around **00:00-00:15 JST** in this chat (continuation of 2026-05-01 Session 4)
+- Main activities:
+  - Completed imported dashboard migration updates in `scenario_1_au.xml` for project data sources
+  - Completed migration of the Interface In/Out Packet Count Comparison panel to project index/sourcetype/source mappings
+  - Updated dashboard design documentation to enforce dynamic scenario-link navigation from `scenario_control`
+- Resume anchor:
+  - Next: generate `twamp`, `telemetry#cnc_srte_path_json`, and `telemetry#cnc_interface_counter_json`.
+
 ## 2026-05-01 (Fri)
 
-- Session 2 around **14:40-16:11 JST** in this chat
+- Session 4 around **22:32-00:00 JST** in this chat (continues into 2026-05-02)
+- Main activities:
+  - Resumed project work and requested a daily timeline update with a new session entry
+  - Completed data-source mapping inventory updates for imported `scenario_1_au` dashboard dependencies
+  - Remapped major imported dashboard queries from legacy indexes/sources to project mappings (`telemetry`, `twamp`, and updated source values)
+  - Updated project dashboard policy: scenario dashboards should not be listed directly in nav and should be linked dynamically from `scenario_control`
+- Resume anchor:
+  - Continued in 2026-05-02 carryover session to finish migration checkpoint and set next generation target.
+
+- Session 3 around **16:26-17:24 JST** in this chat
+- Main activities:
+  - Started dashboard implementation to monitor metric values for `scenario_1`
+- Resume anchor:
+  - Next: after dinner, resume work and complete the CSV comparison list showing data source differences.
+
+- Session 2 around **14:40-16:26 JST** in this chat
 - Main activities:
   - Resumed project from journal anchor and aligned next implementation target (`live_log.py`)
   - Hardened agent startup behavior: moved project rules to `.cursor/rules/splunk_app_rules.mdc` (`alwaysApply: true`) and added startup hooks for timeline/project-doc context injection
@@ -208,7 +248,9 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-01: ~300 minutes (3 sessions), ~35,000 estimated tokens
+- 2026-05-03: ~124 minutes (1 sessions), ~36,000 estimated tokens
+- 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
+- 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
 - 2026-04-30: ~301 minutes (1 session), ~55,000 estimated tokens
 - 2026-04-29: ~24 minutes (1 session), ~1,800 estimated tokens
 - 2026-04-27: ~107 minutes (2 sessions), ~4,800 estimated tokens
@@ -221,7 +263,9 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-01 | ~300 minutes (3 sessions) | ~35,000 |
+| 2026-05-03 | ~124 minutes (1 sessions) | ~36,000 |
+| 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
+| 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |
 | 2026-04-30 | ~301 minutes (1 session) | ~55,000 |
 | 2026-04-29 | ~24 minutes (1 session) | ~1,800 |
 | 2026-04-27 | ~107 minutes (2 sessions) | ~4,800 |

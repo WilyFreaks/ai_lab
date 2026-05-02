@@ -1,0 +1,10 @@
+index,Project index,sourcetype,Project source type,Source,Project source,host,Project host,time duration
+test_cnc,telemetry,N/A,cnc_srte_path_json,*srte_path_*.py,srte_path_vlan,N/A (host field used; no host filter),,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+pca,twamp,pca_twamp_csv,twamp_csv,N/A,,N/A,,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+test_cnc,telemetry,N/A,cnc_service_health_json,,,N/A,,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+test_cnc,telemetry,N/A,"cnc_interface_counter_json
+",/opt/splunk/etc/apps/cisco_showcase_dashboard/bin/cnc_interface_counter.py,router_int_count,N/A,,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+alert,alert,generic_single_line,,N/A,,N/A,,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+alert,alert,N/A,,N/A,,N/A,,$time_token.earliest$ to $time_token.latest$ (default 1774360800 to 1774364100; ~55m)
+N/A,,N/A,,inputlookup router_if.csv,,N/A,,-24h@h to now
+N/A,,N/A,,makeresults,,N/A,,-24h@h to now

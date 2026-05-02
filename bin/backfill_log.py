@@ -45,6 +45,14 @@ STREAMS = [
             SPOOL_ROOT, "telemetry", "cnc_interface_counter_json"
         ),
     },
+    {
+        "index": "telemetry",
+        "sourcetype": "cnc_srte_path_json",
+        "sample": os.path.join(
+            SAMPLES_DIR, "telemetry", "cnc_srte_path_json", "sample.txt"
+        ),
+        "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_srte_path_json"),
+    },
 ]
 
 
@@ -285,15 +293,24 @@ def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, st
         return stream["sourcetype"]
 
     value = metric_value(cfg, section, prefix, local_dt)
-    if value is None:
+    if value is not None:
+        if placeholder in ("availability", "http_status_code"):
+            return int(round(value))
+        return round(value, 6)
+
+    # Fallback for non-numeric template values (for example JSON fragments used in .txt samples).
+    raw_value = cfg.get(section, prefix, fallback=None)
+    if raw_value is None:
         return 0
-
-    if placeholder in ("availability", "http_status_code"):
-        return int(round(value))
-    return round(value, 6)
+    return str(raw_value).strip()
 
 
-def render_template(template_text, replacements):
+def sample_extension(sample_path):
+    ext = os.path.splitext(sample_path)[1].lower()
+    return ext or ".txt"
+
+
+def render_template(template_text, replacements, sample_path):
     def _sub(match):
         key = match.group(1)
         value = replacements.get(key, "")
@@ -302,8 +319,13 @@ def render_template(template_text, replacements):
         return str(value)
 
     rendered = PLACEHOLDER_RE.sub(_sub, template_text)
-    # Ensure each line is valid JSON before writing.
-    return json.loads(rendered)
+    ext = sample_extension(sample_path)
+    if ext == ".json":
+        # Keep NDJSON compact output for JSON templates.
+        return [json.dumps(json.loads(rendered), separators=(",", ":"))]
+    if ext in (".txt", ".csv", ".xml"):
+        return [rendered.rstrip("\n")]
+    raise ValueError(f"Unsupported sample extension for template rendering: {sample_path}")
 
 
 def generate_stream(cfg, stream, start_ts, end_ts, tzinfo, region):
@@ -322,9 +344,10 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo, region):
         telemetry_placeholder_index = index_telemetry_placeholders(placeholders)
         telemetry_links = load_telemetry_bidirectional_links()
     os.makedirs(stream["spool_dir"], exist_ok=True)
+    output_ext = sample_extension(stream["sample"])
     output_path = os.path.join(
         stream["spool_dir"],
-        f"backfill_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}.json",
+        f"backfill_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}{output_ext}",
     )
 
     sequence = 1
@@ -343,11 +366,13 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo, region):
                 enforce_telemetry_directional_conservation(
                     replacements, telemetry_placeholder_index, telemetry_links
                 )
-            event_obj = render_template(template_text, replacements)
-            out.write(json.dumps(event_obj, separators=(",", ":")))
-            out.write("\n")
+            payloads = render_template(template_text, replacements, stream["sample"])
+            for payload in payloads:
+                out.write(payload)
+                if not payload.endswith("\n"):
+                    out.write("\n")
+                count += 1
             sequence += 1
-            count += 1
 
     print(
         f"backfill_log: wrote {count} events to {output_path} "

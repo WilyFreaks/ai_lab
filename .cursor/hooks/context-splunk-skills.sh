@@ -5,6 +5,7 @@ from pathlib import Path
 
 skills_root = Path.home() / ".cursor" / "skills-cursor"
 skill_paths = sorted(glob.glob(str(skills_root / "*" / "SKILL.md")))
+project_skill_paths = sorted(glob.glob(str(Path.cwd() / ".cursor" / "skills" / "*" / "SKILL.md")))
 splunk_skill_paths = []
 
 for skill_path in skill_paths:
@@ -18,7 +19,16 @@ for skill_path in skill_paths:
     except Exception:
         continue
 
-print("SPLUNK-RELATED SKILLS — ~/.cursor/skills-cursor:\n")
+for skill_path in project_skill_paths:
+    p = Path(skill_path)
+    try:
+        text = p.read_text(encoding="utf-8")
+    except Exception:
+        continue
+    if "splunk" in str(p).lower() or "splunk" in text.lower() or "ai_lab" in text.lower():
+        splunk_skill_paths.append(p)
+
+print("SPLUNK-RELATED SKILLS — ~/.cursor/skills-cursor and project .cursor/skills:\n")
 if not splunk_skill_paths:
     print("No Splunk-related skill files found.")
 else:
