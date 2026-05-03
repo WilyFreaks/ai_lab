@@ -17,6 +17,7 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 - `interface_ifOutPktsRate_test`
 - `interface_ifInPktsRate_test`
 - `thousandeyes_response_time_sec_test`
+- `srte_path_test`
 
 ## Time windows
 
@@ -34,10 +35,11 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 
 ## Quick checklist
 
-1. Confirm generation gate is open (`region` locked, `baseline_generation_enabled=true`).
-2. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
-3. Run saved searches over `-5m` and verify non-zero recent data.
-4. Run baseline quality tests via `scripts/test_baseline.sh`.
+1. Run `scripts/reset_workshop_state.sh --yes`, then immediately run `scripts/test_smoke.sh` (mandatory reset gate).
+2. Confirm generation gate is open (`region` locked, `baseline_generation_enabled=true`).
+3. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
+4. Run saved searches over `-5m` and verify non-zero recent data.
+5. Run baseline quality tests via `scripts/test_baseline.sh`.
 
 ## SRTE-specific verification addendum
 
@@ -45,7 +47,7 @@ Use this when validating `index=telemetry sourcetype=cnc_srte_path_json`:
 
 1. Confirm recent events exist in the last 5 minutes.
 2. Confirm event separation is correct (no multi-object merge in a single event).
-3. Confirm host metadata extraction works per event (`host` should reflect payload host values like `cnc_vlan1001..1004`).
+3. Confirm host metadata extraction works per event (`host` should reflect payload `vlan` values like `cnc_vlan1001..1004`).
 4. During active `scenario_1`, confirm impacted VLAN path ratio behavior follows `telemetry#cnc_srte_path_json#scenario_happening_probability` in a recent window.
 
 ## Imported dashboard data-source audit

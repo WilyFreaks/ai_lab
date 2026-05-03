@@ -251,6 +251,21 @@ def weekend_multiplier(local_dt, configured):
     return 1.0 + ((configured - 1.0) * weekend_weight)
 
 
+def interpolated_hourly_peak_rate(cfg, section, prefix, local_dt):
+    current_hour = local_dt.hour
+    next_hour = (current_hour + 1) % 24
+    current_rate = parse_float(
+        cfg, section, f"{prefix}.peak_rate_{current_hour:02d}", default=None
+    )
+    next_rate = parse_float(cfg, section, f"{prefix}.peak_rate_{next_hour:02d}", default=None)
+    if current_rate is None:
+        return None
+    if next_rate is None:
+        next_rate = current_rate
+    minute_progress = (local_dt.minute + (local_dt.second / 60.0)) / 60.0
+    return current_rate + ((next_rate - current_rate) * minute_progress)
+
+
 def metric_value(cfg, section, prefix, local_dt):
     base = parse_float(cfg, section, prefix, default=None)
     if base is None:
@@ -258,7 +273,7 @@ def metric_value(cfg, section, prefix, local_dt):
 
     dmin = parse_float(cfg, section, f"{prefix}.daily_min", default=None)
     dmax = parse_float(cfg, section, f"{prefix}.daily_max", default=None)
-    rate = parse_float(cfg, section, f"{prefix}.peak_rate_{local_dt.hour:02d}", default=None)
+    rate = interpolated_hourly_peak_rate(cfg, section, prefix, local_dt)
 
     if dmin is not None and dmax is not None and rate is not None:
         value = dmin + (dmax - dmin) * rate
@@ -282,7 +297,38 @@ def metric_value(cfg, section, prefix, local_dt):
     return value
 
 
-def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, stream, region):
+def telemetry_rate_max_step(cfg, section, prefix):
+    dmin = parse_float(cfg, section, f"{prefix}.daily_min", default=None)
+    dmax = parse_float(cfg, section, f"{prefix}.daily_max", default=None)
+    noise = parse_float(cfg, section, f"{prefix}.noise_stdev", default=0.0) or 0.0
+    range_step = 0.0
+    if dmin is not None and dmax is not None:
+        range_step = abs(dmax - dmin) * 0.25
+    return max(range_step, noise * 6.0)
+
+
+def smooth_telemetry_rate(prev_value, new_value, max_step):
+    if prev_value is None:
+        return new_value
+    if max_step <= 0:
+        return new_value
+    delta = new_value - prev_value
+    if abs(delta) <= max_step:
+        return new_value
+    return prev_value + (max_step if delta > 0 else -max_step)
+
+
+def coerce_placeholder(
+    cfg,
+    section,
+    prefix,
+    placeholder,
+    local_dt,
+    sequence,
+    stream,
+    region,
+    telemetry_rate_state,
+):
     if placeholder == "timestamp":
         # Sample templates use {{timestamp}} as a domain timestamp string; it must reflect
         # the selected workshop region's local wall time (not UTC), with a short TZ suffix.
@@ -294,6 +340,11 @@ def coerce_placeholder(cfg, section, prefix, placeholder, local_dt, sequence, st
 
     value = metric_value(cfg, section, prefix, local_dt)
     if value is not None:
+        if placeholder.endswith("ifOutPktsRate") or placeholder.endswith("ifInPktsRate"):
+            max_step = telemetry_rate_max_step(cfg, section, prefix)
+            prev_value = telemetry_rate_state.get(prefix)
+            value = smooth_telemetry_rate(prev_value, value, max_step)
+            telemetry_rate_state[prefix] = value
         if placeholder in ("availability", "http_status_code"):
             return int(round(value))
         return round(value, 6)
@@ -353,6 +404,7 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo, region):
     sequence = 1
     step = interval * 60
     count = 0
+    telemetry_rate_state = {}
     with open(output_path, "w") as out:
         for ts in range(start_ts, end_ts, step):
             local_dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(tzinfo)
@@ -360,7 +412,15 @@ def generate_stream(cfg, stream, start_ts, end_ts, tzinfo, region):
             for ph in placeholders:
                 prefix = f"{prefix_base}{ph}"
                 replacements[ph] = coerce_placeholder(
-                    cfg, section, prefix, ph, local_dt, sequence, stream, region
+                    cfg,
+                    section,
+                    prefix,
+                    ph,
+                    local_dt,
+                    sequence,
+                    stream,
+                    region,
+                    telemetry_rate_state,
                 )
             if telemetry_links:
                 enforce_telemetry_directional_conservation(

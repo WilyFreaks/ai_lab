@@ -9,6 +9,28 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-03 (Sun)
 
+- Session 3 around **11:22-12:56 JST** in this chat
+- Main activities:
+  - Updated `default/ai_lab_scenarios.conf` ThousandEyes parameters and validated live generator consumption
+  - Diagnosed baseline/backfill test auth failures and standardized token-only test execution using MCP token (`~/.cursor/mcp.json`)
+  - Implemented telemetry baseline smoothing in `backfill_log.py` and `live_log.py` to eliminate abrupt `ifOutPktsRate`/`ifInPktsRate` jumps
+  - Implemented hour-boundary smoothing for `peak_rate_*` by minute interpolation, resolving abrupt ThousandEyes transitions across hours
+  - Updated `cnc_srte_path_json` ingestion host extraction to use payload `vlan` (sample field rename `host` -> `vlan`, with `default/transforms.conf` aligned)
+  - Hardened `scripts/reset_workshop_state.sh` reset sequencing (kill generators first, orphan-process assertion, safe spool/index cleanup order)
+  - Enforced and documented mandatory `reset -> scripts/test_smoke.sh` gate before any post-generation tests
+  - Added `srte_path_test` to baseline/backfill saved-search test coverage and validated full baseline pass after region lock
+- Resume anchor:
+  - Next: generate `cnc_service_health_json`.
+
+- Session 2 around **11:03-11:05 JST** in this chat
+- Main activities:
+  - Started a new session and requested a project journal checkpoint update
+  - Ran unattended workshop reset (`scripts/reset_workshop_state.sh --yes`) using token-based verification auth
+  - Reset flow completed stop/start, index directory cleanup, spool cleanup, and `local/ai_lab_scenarios.conf` removal
+  - Post-reset verification showed all target app indexes empty except `ai_lab_log` with one residual post-start event
+- Resume anchor:
+  - Next: run `cnc_srte_path_json` generation test and validate indexed telemetry events in Splunk.
+
 - Session 1 around **02:52-04:56 JST** in this chat
 - Main activities:
   - Resumed project work from the latest journal anchor
@@ -248,7 +270,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-03: ~124 minutes (1 sessions), ~36,000 estimated tokens
+- 2026-05-03: ~220 minutes (3 sessions), ~92,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
 - 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
 - 2026-04-30: ~301 minutes (1 session), ~55,000 estimated tokens
@@ -263,7 +285,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-03 | ~124 minutes (1 sessions) | ~36,000 |
+| 2026-05-03 | ~220 minutes (3 sessions) | ~92,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
 | 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |
 | 2026-04-30 | ~301 minutes (1 session) | ~55,000 |

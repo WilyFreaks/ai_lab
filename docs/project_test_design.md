@@ -128,16 +128,23 @@ Recommended additional assertions:
 
 Execution sequencing (important):
 
-1. **Reset-phase checks** (`scripts/test_smoke.sh`) are meaningful immediately after reset/start and must pass with empty indexes (clean slate ready to start workshop).
-2. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated.
-3. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
-4. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
+1. **Reset must be followed by smoke (mandatory)**:
+   - every run of `scripts/reset_workshop_state.sh` must be followed immediately by `scripts/test_smoke.sh`
+   - this is the required gate before any further test flow
+2. **Reset-phase checks** (`scripts/test_smoke.sh`) are meaningful immediately after reset/start and must pass with empty indexes (clean slate ready to start workshop).
+3. **Generation gate must be opened before post-generation tests**:
+   - after reset, generation is still gated (`baseline_generation_enabled=false` until region lock path runs)
+   - you must lock/select region first (for example via Workshop Introduction Submit, or `| workshopregion action="set" region="<au|jp>"`)
+   - only after this step should `backfill_log.py`/`live_log.py` populate datasets
+4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated.
+5. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
+6. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
 
 Contract clarification:
 
-- `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract).
-- `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints).
-- `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks).
+- `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract), and must be run immediately after every workshop reset.
+- `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints); do not run it immediately after reset before region lock.
+- `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks); do not run it immediately after reset before region lock.
 
 Saved-search contract for baseline/live verification:
 
@@ -147,6 +154,7 @@ Saved-search contract for baseline/live verification:
   - `interface_ifOutPktsRate_test`
   - `interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
+  - `srte_path_test`
 - Live verification window:
   - use a recent bounded window (recommended `earliest=-5m latest=now`) when confirming active `live_log.py` generation.
 
@@ -155,6 +163,8 @@ Saved-search quality intent for backfill checks:
 - `telemetry_if_counter_test`:
   - directional gap must never be negative
   - drop rate must never exceed `1`
+- `srte_path_test`:
+  - must return non-zero results when `cnc_srte_path_json` generation is active
 - `interface_ifInPktsRate_test`, `interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
   - values should fluctuate gradually, unless an explicitly activated scenario fault window expects abrupt change
@@ -235,14 +245,18 @@ Repository reset helper:
 
 Purpose:
 
-1. stop Splunk
-2. delete app index data (directory tree and matching `<index>.dat` metadata, where present)
-3. delete monitored spool files under the app:
+1. stop app generator workers (`backfill_log.py`, `live_log.py`)
+2. confirm no orphan `launcher.py` / `backfill_log.py` / `live_log.py` process remains
+3. stop Splunk
+4. delete monitored spool files under the app:
    - `$SPLUNK_HOME/etc/apps/ai_lab/var/spool/ai_lab`
-4. delete `local/ai_lab_scenarios.conf`
-5. start Splunk
-6. optional verification pass:
-   - `index=<app_index> earliest=0 latest=now | stats count` must be 0 (requires `SPLUNK_AUTH`)
+5. delete app index data (directory tree and matching `<index>.dat` metadata, where present)
+6. delete `local/ai_lab_scenarios.conf`
+7. start Splunk
+8. mandatory immediate smoke gate:
+   - run `bash scripts/test_smoke.sh` and require pass before generation tests
+9. optional verification pass:
+   - `index=<app_index> earliest=0 latest=now | stats count` must be 0 (supports token auth via `SPLUNK_TOKEN`)
 
 Conventions and safety:
 
@@ -251,7 +265,7 @@ Conventions and safety:
 - Script validates index names and refuses unsafe delete targets.
 - Script validates resolved delete path remains under `$SPLUNK_DB`.
 - Supports interactive confirm and non-interactive mode (`--yes`).
-- Post-start verification **requires** `SPLUNK_AUTH` (e.g. `export SPLUNK_AUTH=admin:…`); the script exits non-zero if verification is required but auth is not set. Workshop password used in local docs: see `docs/project_ai_lab.md`.
+- Post-start verification should prefer `SPLUNK_TOKEN` (or `AUTH_TOKEN`) from Cursor MCP config, and support `SPLUNK_AUTH` only as fallback.
 - Operator checklist and “next session” pointers: `docs/project_ai_lab.md` → *Handoff: operators and the next implementer*.
 
 ---

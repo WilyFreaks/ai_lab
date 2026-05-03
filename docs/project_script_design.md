@@ -179,6 +179,7 @@ Implementation note (phase 1 baseline mode):
 - This transition policy is mandatory across **all generation scripts** (`launcher.py`, `backfill_log.py`, `live_log.py`) and any shared helper logic they use.
 - `backfill_log.py` and `live_log.py` must use the same transition model/parameters so historical and real-time curves remain continuous.
 - Scope clarification: this smoothing requirement applies to **all generated metrics**, including telemetry `ifInPktsRate` and `ifOutPktsRate`, unless a scenario explicitly defines/activates a sudden step change as part of the test objective.
+- Telemetry packet-rate smoothing should cap per-tick deltas for `ifOutPktsRate`/`ifInPktsRate` to keep transitions gradual under baseline tests (consistent with threshold logic derived from config range/noise).
 - Preferred transition windows:
   - ramp-up to weekend: Friday 18:00 -> Saturday 00:00 (region local time)
   - ramp-down to weekday: Sunday 18:00 -> Monday 00:00 (region local time)
@@ -196,6 +197,7 @@ Behavior:
 
 - Same UTC timestamp may map to different `peak_rate_*` keys depending on selected region.
 - Hour lookup for `peak_rate_<HH>` must use region-local wall-clock hour (`HH` in `00..23`).
+- To avoid hard step changes at hour boundaries, generators should interpolate per minute between the current hour's `peak_rate_<HH>` and the next hour's `peak_rate_<HH+1>`.
 - Region timezone mapping must be deterministic and shared by backfill/live logic.
 
 Design intent:
@@ -216,7 +218,7 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
 - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
   → `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry`
 - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`  
-  → `index=telemetry`, `sourcetype=cnc_srte_path_json`, base monitor host is `cnc_srte_path`, and per-event host metadata is overridden from payload `host` via `props.conf` + `transforms.conf` index-time transform
+  → `index=telemetry`, `sourcetype=cnc_srte_path_json`, base monitor host is `cnc_srte_path`, and per-event host metadata is overridden from payload `vlan` via `props.conf` + `transforms.conf` index-time transform
 
 **Monitors and TailReader / CRC:** each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
 

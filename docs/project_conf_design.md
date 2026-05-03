@@ -43,6 +43,8 @@ param.interval = 1                         # how often (minutes) to generate eve
 **Formula:** `value = daily_min + (daily_max - daily_min) × peak_rate`
 then add `random.gauss(0, noise_stdev)`
 
+**Hour-boundary smoothing:** `peak_rate` should be interpolated per minute between `peak_rate_<HH>` and `peak_rate_<HH+1>` (region-local wall-clock) to avoid direct step jumps on the hour.
+
 **Weekend transition:** smoothly interpolates multiplier over 2 hours around Fri→Sat and Sun→Mon boundaries (not an abrupt switch).
 
 **Note:** `noise_stdev` (not `noise_stddev`) — use the Splunk-familiar abbreviation.
@@ -78,7 +80,7 @@ A **static** `crcSalt` string shared by all files in a path does not fix header 
 
 - **`[cisco:thousandeyes:metric]`** — `default/props.conf` uses `TIME_PREFIX` / `TIME_FORMAT` with the leading raw JSON for the top-level `timestamp` key so `_time` matches the event string from `backfill_log.py` (see `samples/thousandeyes/cisco:thousandeyes:metric/README.md`).
 - **`[cnc_interface_counter_json]`** — nested `latest_data.timestamp` strings; `TIME_PREFIX` / `TIME_FORMAT` in `default/props.conf` target the indexed JSON / raw pattern for this sourcetype (see `samples/telemetry/cnc_interface_counter_json/README.md`).
-- **`[cnc_srte_path_json]`** — multi-object `.txt` payloads are broken into per-object events via `LINE_BREAKER`; `TIME_PREFIX` / `TIME_FORMAT` extract per-event `_time`; host metadata is set at index time through `TRANSFORMS-set_host = set_host_from_cnc_srte_path_json` in `props.conf` and `DEST_KEY = MetaData:Host` transform in `default/transforms.conf`.
+- **`[cnc_srte_path_json]`** — multi-object `.txt` payloads are broken into per-object events via `LINE_BREAKER`; `TIME_PREFIX` / `TIME_FORMAT` extract per-event `_time`; host metadata is set at index time through `TRANSFORMS-set_host = set_host_from_cnc_srte_path_json` in `props.conf` and `DEST_KEY = MetaData:Host` transform in `default/transforms.conf`, with regex extraction from payload `vlan`.
 
 After changing `props.conf` or `inputs.conf`, **reload** or restart Splunk so forwarders read the new settings.
 

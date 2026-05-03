@@ -1,6 +1,6 @@
 {
     "timestamp": "{{timestamp}}",
-    "host": "cnc_vlan1001",
+    "vlan": "cnc_vlan1001",
     "sr_policy_results": [
         {
             "head-end": "10.0.255.9",
@@ -14,7 +14,7 @@
 }
 {
     "timestamp": "{{timestamp}}",
-    "host": "cnc_vlan1002",
+    "vlan": "cnc_vlan1002",
     "sr_policy_results": [
         {
             "head-end": "10.0.255.9",
@@ -28,7 +28,7 @@
 }
 {
     "timestamp": "{{timestamp}}",
-    "host": "cnc_vlan1003",
+    "vlan": "cnc_vlan1003",
     "sr_policy_results": [
         {
             "head-end": "10.0.255.9",
@@ -42,7 +42,7 @@
 }
 {
     "timestamp": "{{timestamp}}",
-    "host": "cnc_vlan1004",
+    "vlan": "cnc_vlan1004",
     "sr_policy_results": [
         {
             "head-end": "10.0.255.9",

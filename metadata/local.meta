@@ -31,3 +31,9 @@ modtime = 1777570243.373657000
 [views/scenario_1_au]
 version = 9.4.2
 modtime = 1777646794.809069000
+
+[savedsearches/srte_path_test]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1777779543.988630000

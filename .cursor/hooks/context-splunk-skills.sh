@@ -39,4 +39,9 @@ else:
         except Exception as e:
             print(f"[Read error: {e}]")
         print("\n---\n")
+
+print("OPERATIONAL REMINDERS:\n")
+print("- Reset flow: stop backfill/live -> verify no orphan launcher/backfill/live -> stop Splunk -> clean spool -> remove indexes -> start Splunk")
+print("- Mandatory gate after every reset: run bash scripts/test_smoke.sh before any generation or baseline/scenario tests")
+print("- Preferred auth for scripted checks: token from ~/.cursor/mcp.json (mcpServers.splunk-mcp-server.env.AUTH_TOKEN)")
 PY

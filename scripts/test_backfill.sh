@@ -340,6 +340,16 @@ def load_metric_params(path, selector):
                 params[metric]["noise_stdev"] = fv
     return params
 
+def interpolated_rate(local_dt, rates):
+    current_hour = local_dt.hour
+    next_hour = (current_hour + 1) % 24
+    current_rate = rates.get(current_hour)
+    if current_rate is None:
+        return None
+    next_rate = rates.get(next_hour, current_rate)
+    minute_progress = (local_dt.minute + (local_dt.second / 60.0)) / 60.0
+    return current_rate + ((next_rate - current_rate) * minute_progress)
+
 def metric_name_from_column(col, suffix):
     # New saved-search format (preferred): R9_HundredGigE0/0/0/29_ifOutPktsRate
     if ":" not in col:
@@ -418,7 +428,7 @@ for row in reader:
             continue
         dmin = p.get("daily_min")
         dmax = p.get("daily_max")
-        rate = p.get("rates", {}).get(local_dt.hour)
+        rate = interpolated_rate(local_dt, p.get("rates", {}))
         if dmin is None or dmax is None or rate is None:
             continue
 
@@ -540,6 +550,10 @@ assert_count_eq \
 assert_count_gt_zero \
   "Saved search thousandeyes_response_time_sec_test returns results" \
   "| savedsearch thousandeyes_response_time_sec_test | stats count as count"
+
+assert_count_gt_zero \
+  "Saved search srte_path_test returns results" \
+  "| savedsearch srte_path_test | stats count as count"
 
 assert_savedsearch_time_aware_range \
   "thousandeyes_response_time_sec_test values follow day/hour config bounds" \

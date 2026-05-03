@@ -68,6 +68,8 @@ Durations and summaries:
 - Read the token from Cursor MCP config (`~/.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.
 - Use `SPLUNK_AUTH` (`user:pass`) only as fallback when token auth is unavailable.
+- Reset execution order is mandatory: stop `backfill_log.py`/`live_log.py` -> confirm no orphan `launcher.py`/`backfill_log.py`/`live_log.py` remains -> stop Splunk -> clean spool -> remove indexes safely -> start Splunk.
+- Immediately run `bash scripts/test_smoke.sh` after every reset and require pass before any generation/baseline/scenario tests.
 - If a reset run appears slow/hung, first verify whether it is waiting for prompt input, then check `/opt/splunk/var/log/splunk/splunkd.log` for actual stop/start activity.
 
 Saved-search validation rules (Splunk test/verification):
@@ -77,6 +79,7 @@ Saved-search validation rules (Splunk test/verification):
   - `interface_ifOutPktsRate_test`
   - `interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
+  - `srte_path_test`
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 
 Imported dashboard intake rules:

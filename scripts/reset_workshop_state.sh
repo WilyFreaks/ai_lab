@@ -2,11 +2,12 @@
 set -euo pipefail
 
 # Reset workshop runtime state:
-# 1) stop Splunk
-# 2) delete ai_lab index directories (derived from default/indexes.conf)
+# 1) stop ai_lab generators (backfill/live) and confirm no orphan app generator python remains
+# 2) stop Splunk
 # 3) delete all files under app var/spool (monitored spool JSON, etc.)
-# 4) delete local/ai_lab_scenarios.conf
-# 5) start Splunk
+# 4) delete ai_lab index directories (derived from default/indexes.conf)
+# 5) delete local/ai_lab_scenarios.conf
+# 6) start Splunk
 
 APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # Default to Linux-style install path. Override with SPLUNK_HOME when needed.
@@ -89,13 +90,15 @@ ensure_path_under_base() {
 }
 
 echo "Reset plan:"
+echo "- Stop ai_lab generator processes (backfill/live)"
+echo "- Confirm no orphan ai_lab generator python remains (launcher/backfill/live)"
 echo "- Stop Splunk"
-echo "- Delete index directories and .dat files under $SPLUNK_DB for:"
-printf '  - %s\n' "${APP_INDEXES[@]}"
 echo "- Delete all files under app var/spool (workshop spool JSON, etc.):"
 for _sr in "${SPOOL_ROOTS[@]}"; do
   printf '  - %s\n' "$_sr"
 done
+echo "- Delete index directories and .dat files under $SPLUNK_DB for:"
+printf '  - %s\n' "${APP_INDEXES[@]}"
 echo "- Delete $LOCAL_SCENARIO_CONF (if present)"
 echo "- Start Splunk"
 
@@ -107,43 +110,87 @@ if [[ "$ASSUME_YES" != "true" ]]; then
   fi
 fi
 
+stop_ai_lab_generators() {
+  local names=(backfill_log live_log)
+  local pids=()
+  local seen=""
+
+  for name in "${names[@]}"; do
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      if [[ " $seen " == *" $pid "* ]]; then
+        continue
+      fi
+      pids+=("$pid")
+      seen="$seen $pid"
+    done < <(pgrep -f "$APP_ROOT/bin/$name.py" || true)
+  done
+
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    echo "No lingering backfill/live generator processes found."
+    return 0
+  fi
+
+  echo "Stopping lingering ai_lab generator processes: ${pids[*]}"
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+
+  for _ in {1..10}; do
+    local alive=()
+    for pid in "${pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        alive+=("$pid")
+      fi
+    done
+    if [[ "${#alive[@]}" -eq 0 ]]; then
+      echo "All backfill/live generator processes stopped."
+      return 0
+    fi
+    sleep 1
+  done
+
+  local still_alive=()
+  for pid in "${pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      still_alive+=("$pid")
+    fi
+  done
+  if [[ "${#still_alive[@]}" -gt 0 ]]; then
+    echo "Force-killing remaining backfill/live generator processes: ${still_alive[*]}"
+    kill -KILL "${still_alive[@]}" 2>/dev/null || true
+  fi
+}
+
+assert_no_orphan_ai_lab_python() {
+  local pids=()
+  local seen=""
+  local names=(launcher backfill_log live_log)
+
+  for name in "${names[@]}"; do
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      if [[ " $seen " == *" $pid "* ]]; then
+        continue
+      fi
+      pids+=("$pid")
+      seen="$seen $pid"
+    done < <(pgrep -f "$APP_ROOT/bin/$name.py" || true)
+  done
+
+  if [[ "${#pids[@]}" -gt 0 ]]; then
+    echo "ERROR: Orphan ai_lab generator python process(es) still running: ${pids[*]}"
+    echo "       Expected none for launcher/backfill/live before reset continues."
+    exit 1
+  fi
+  echo "Confirmed: no orphan ai_lab generator python processes."
+}
+
+echo "Stopping backfill/live generators..."
+stop_ai_lab_generators
+echo "Confirming no orphan ai_lab generator python remains..."
+assert_no_orphan_ai_lab_python
+
 echo "Stopping Splunk..."
 "$SPLUNK_BIN" stop
-
-echo "Removing index data directories and .dat files..."
-for idx in "${APP_INDEXES[@]}"; do
-  if ! is_safe_index_name "$idx"; then
-    echo "ERROR: Unsafe index name from indexes.conf: '$idx'"
-    exit 1
-  fi
-
-  idx_path="$SPLUNK_DB/$idx"
-  idx_dat_path="$SPLUNK_DB/$idx.dat"
-
-  # Defense-in-depth: ensure resolved targets stay under SPLUNK_DB.
-  if ! ensure_path_under_base "$idx_path" "$SPLUNK_DB"; then
-    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_path"
-    exit 1
-  fi
-  if ! ensure_path_under_base "$idx_dat_path" "$SPLUNK_DB"; then
-    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_dat_path"
-    exit 1
-  fi
-
-  if [[ -d "$idx_path" ]]; then
-    rm -rf "$idx_path"
-    echo "  removed: $idx_path"
-  else
-    echo "  skip (not found): $idx_path"
-  fi
-
-  if [[ -f "$idx_dat_path" ]]; then
-    rm -f "$idx_dat_path"
-    echo "  removed: $idx_dat_path"
-  else
-    echo "  skip (not found): $idx_dat_path"
-  fi
-done
 
 echo "Removing all spool files under var/spool..."
 _seen_realpaths=()
@@ -178,6 +225,41 @@ for SPOOL_ROOT in "${SPOOL_ROOTS[@]}"; do
     find "$SPOOL_ROOT" -mindepth 1 -type d -empty -delete 2>/dev/null || break
   done
   echo "  removed ${fc:-0} file(s) under $SPOOL_ROOT (empty dirs pruned)"
+done
+
+echo "Removing index data directories and .dat files..."
+for idx in "${APP_INDEXES[@]}"; do
+  if ! is_safe_index_name "$idx"; then
+    echo "ERROR: Unsafe index name from indexes.conf: '$idx'"
+    exit 1
+  fi
+
+  idx_path="$SPLUNK_DB/$idx"
+  idx_dat_path="$SPLUNK_DB/$idx.dat"
+
+  # Defense-in-depth: ensure resolved targets stay under SPLUNK_DB.
+  if ! ensure_path_under_base "$idx_path" "$SPLUNK_DB"; then
+    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_path"
+    exit 1
+  fi
+  if ! ensure_path_under_base "$idx_dat_path" "$SPLUNK_DB"; then
+    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_dat_path"
+    exit 1
+  fi
+
+  if [[ -d "$idx_path" ]]; then
+    rm -rf "$idx_path"
+    echo "  removed: $idx_path"
+  else
+    echo "  skip (not found): $idx_path"
+  fi
+
+  if [[ -f "$idx_dat_path" ]]; then
+    rm -f "$idx_dat_path"
+    echo "  removed: $idx_dat_path"
+  else
+    echo "  skip (not found): $idx_dat_path"
+  fi
 done
 
 if [[ -f "$LOCAL_SCENARIO_CONF" ]]; then
