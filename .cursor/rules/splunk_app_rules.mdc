@@ -76,11 +76,20 @@ Saved-search validation rules (Splunk test/verification):
 - For app-level validation, use saved searches in app `ai_lab` (do not write raw SPL unless the user explicitly asks for ad-hoc SPL).
 - Preferred saved searches for baseline/live checks:
   - `telemetry_if_counter_test`
-  - `interface_ifOutPktsRate_test`
-  - `interface_ifInPktsRate_test`
+  - `cnc_interface_ifOutPktsRate_test`
+  - `cnc_interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
-  - `srte_path_test`
+  - `cnc_srte_path_test`
+  - `cnc_service_health_test`
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
+- Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
+
+Index intent policy:
+- `ran` and `fwa` indexes are reserved for other scenario streams.
+- `alerts` and `episode` indexes are expected to be populated by scheduled searches/materialization, not direct generator file inputs.
+
+Manual import policy (scenario dashboards):
+- If the user says they will manually import a scenario dashboard source from another Splunk environment, do not propose or modify that dashboard design/details unless the user explicitly asks.
 
 Imported dashboard intake rules:
 - When importing/copied dashboards from other environments, keep SPL behavior unchanged first, then document dependencies before refactoring.

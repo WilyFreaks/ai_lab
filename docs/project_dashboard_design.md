@@ -268,16 +268,16 @@ Validation data source policy:
 
 - Prefer existing saved searches in app `ai_lab` as panel sources:
   - `telemetry_if_counter_test`
-  - `interface_ifOutPktsRate_test`
-  - `interface_ifInPktsRate_test`
+  - `cnc_interface_ifOutPktsRate_test`
+  - `cnc_interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
 - For "live is active now" checks, use a bounded recent window (recommended last 5 minutes).
 
 Initial panel intent:
 
 1. Telemetry directional gap/drop-rate status (`telemetry_if_counter_test`)
-2. Interface outbound packet-rate trend (`interface_ifOutPktsRate_test`)
-3. Interface inbound packet-rate trend (`interface_ifInPktsRate_test`)
+2. Interface outbound packet-rate trend (`cnc_interface_ifOutPktsRate_test`)
+3. Interface inbound packet-rate trend (`cnc_interface_ifInPktsRate_test`)
 4. ThousandEyes response-time trend (`thousandeyes_response_time_sec_test`)
 
 ---
@@ -287,11 +287,12 @@ Initial panel intent:
 When a dashboard is copied from another Splunk environment (for example `default/data/ui/views/scenario_1_au.xml`), follow this sequence:
 
 1. Keep the imported SPL intact first (no immediate logic rewrites).
-2. Translate user-facing Japanese/non-English strings to English unless workshop language requires otherwise.
-3. Keep scenario description text quiz-oriented (hint only), so attendees investigate root cause from panels.
-4. Inventory all SPL data sources into a CSV under `docs/` with columns:
+2. If workshop owner says they will manually import/update a dashboard source, treat that import content as user-managed and do not preemptively redesign it.
+3. Translate user-facing Japanese/non-English strings to English unless workshop language requires otherwise.
+4. Keep scenario description text quiz-oriented (hint only), so attendees investigate root cause from panels.
+5. Inventory all SPL data sources into a CSV under `docs/` with columns:
    - `index,sourcetype,source,host,time duration`
-5. Treat non-`ai_lab` indexes and external script paths as legacy dependencies to be compared/migrated later.
+6. Treat non-`ai_lab` indexes and external script paths as legacy dependencies to be compared/migrated later.
 
 Current inventory artifact:
 

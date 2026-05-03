@@ -10,7 +10,7 @@ combined=$(
     "$timeline_block" \
     "$skills_block" \
     "$docs_block" \
-    "Instruction: Use the resume anchor from the timeline and align all work with the project design docs and Splunk skill guidance."
+    "Instruction: Use the resume anchor from the timeline and align all work with the project design docs and Splunk skill guidance. Apply saved-search sync as full-copy local->default unless merge is explicitly requested, and avoid unsolicited scenario-dashboard design changes when user says import is manual."
 )
 
 python3 -c 'import json,sys; print(json.dumps({"additional_context": sys.stdin.read()}))' <<< "$combined"

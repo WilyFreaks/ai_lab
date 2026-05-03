@@ -518,33 +518,33 @@ assert_count_eq \
   0
 
 assert_count_gt_zero \
-  "Saved search interface_ifOutPktsRate_test returns results" \
-  "| savedsearch interface_ifOutPktsRate_test | stats count as count"
+  "Saved search cnc_interface_ifOutPktsRate_test returns results" \
+  "| savedsearch cnc_interface_ifOutPktsRate_test | stats count as count"
 
 assert_savedsearch_time_aware_range \
-  "interface_ifOutPktsRate_test values follow day/hour config bounds" \
-  "| savedsearch interface_ifOutPktsRate_test" \
+  "cnc_interface_ifOutPktsRate_test values follow day/hour config bounds" \
+  "| savedsearch cnc_interface_ifOutPktsRate_test" \
   "_ifOutPktsRate" \
   "interface_ifOut"
 
 assert_count_eq \
-  "interface_ifOutPktsRate_test fluctuates gradually (no abrupt jumps)" \
-  "| savedsearch interface_ifOutPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFOUT_STEP | stats count as count" \
+  "cnc_interface_ifOutPktsRate_test fluctuates gradually (no abrupt jumps)" \
+  "| savedsearch cnc_interface_ifOutPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFOUT_STEP | stats count as count" \
   0
 
 assert_count_gt_zero \
-  "Saved search interface_ifInPktsRate_test returns results" \
-  "| savedsearch interface_ifInPktsRate_test | stats count as count"
+  "Saved search cnc_interface_ifInPktsRate_test returns results" \
+  "| savedsearch cnc_interface_ifInPktsRate_test | stats count as count"
 
 assert_savedsearch_time_aware_range \
-  "interface_ifInPktsRate_test values follow day/hour config bounds" \
-  "| savedsearch interface_ifInPktsRate_test" \
+  "cnc_interface_ifInPktsRate_test values follow day/hour config bounds" \
+  "| savedsearch cnc_interface_ifInPktsRate_test" \
   "_ifInPktsRate" \
   "interface_ifIn"
 
 assert_count_eq \
-  "interface_ifInPktsRate_test fluctuates gradually (no abrupt jumps)" \
-  "| savedsearch interface_ifInPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFIN_STEP | stats count as count" \
+  "cnc_interface_ifInPktsRate_test fluctuates gradually (no abrupt jumps)" \
+  "| savedsearch cnc_interface_ifInPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFIN_STEP | stats count as count" \
   0
 
 assert_count_gt_zero \
@@ -552,8 +552,17 @@ assert_count_gt_zero \
   "| savedsearch thousandeyes_response_time_sec_test | stats count as count"
 
 assert_count_gt_zero \
-  "Saved search srte_path_test returns results" \
-  "| savedsearch srte_path_test | stats count as count"
+  "Saved search cnc_srte_path_test returns results" \
+  "| savedsearch cnc_srte_path_test | stats count as count"
+
+assert_count_gt_zero \
+  "Saved search cnc_service_health_test returns results" \
+  "| savedsearch cnc_service_health_test | stats count as count"
+
+assert_count_eq \
+  "cnc_service_health_test baseline has no SERVICE_DEGRADED rows" \
+  "| savedsearch cnc_service_health_test | search generated_data=\"*SERVICE_DEGRADED*\" | stats count as count" \
+  0
 
 assert_savedsearch_time_aware_range \
   "thousandeyes_response_time_sec_test values follow day/hour config bounds" \

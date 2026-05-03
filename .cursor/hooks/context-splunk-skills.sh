@@ -44,4 +44,7 @@ print("OPERATIONAL REMINDERS:\n")
 print("- Reset flow: stop backfill/live -> verify no orphan launcher/backfill/live -> stop Splunk -> clean spool -> remove indexes -> start Splunk")
 print("- Mandatory gate after every reset: run bash scripts/test_smoke.sh before any generation or baseline/scenario tests")
 print("- Preferred auth for scripted checks: token from ~/.cursor/mcp.json (mcpServers.splunk-mcp-server.env.AUTH_TOKEN)")
+print("- Saved-search sync policy: full-copy local/savedsearches.conf -> default/savedsearches.conf; do not merge unless explicitly requested")
+print("- Index intent: ran/fwa are reserved for other scenarios; alerts/episode are scheduled-search derived indexes")
+print("- If user says scenario dashboard will be manually imported, do not propose dashboard design changes unless explicitly requested")
 PY

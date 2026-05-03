@@ -53,6 +53,14 @@ STREAMS = [
         ),
         "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_srte_path_json"),
     },
+    {
+        "index": "telemetry",
+        "sourcetype": "cnc_service_health_json",
+        "sample": os.path.join(
+            SAMPLES_DIR, "telemetry", "cnc_service_health_json", "sample.txt"
+        ),
+        "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_service_health_json"),
+    },
 ]
 
 

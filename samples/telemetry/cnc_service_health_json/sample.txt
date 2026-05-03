@@ -1,0 +1,284 @@
+{
+    "timestamp": "{{timestamp}}",
+    "vlan": "cnc_vlan1001",
+    "vpn_name": "NSS-5G_Slice_Vlan1001-internal",
+    "devices": [
+        "R2-NCS5504",
+        "R9-NCS540"
+    ],
+    "subservice_health": [
+        {
+            "category": "vrf_route_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "vrf_route_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "vlan": "cnc_vlan1002",
+    "vpn_name": "NSS-5G_Slice_Vlan1002-internal",
+    "devices": [
+        "R2-NCS5504",
+        "R9-NCS540"
+    ],
+    "subservice_health": [
+        {
+            "category": "vrf_route_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "vrf_route_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R9-NCS540",
+            "health_status": "{{impacted_sre_policy_health_status}}",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "vlan": "cnc_vlan1003",
+    "vpn_name": "NSS-5G_Slice_Vlan1003-internal",
+    "devices": [
+        "R2-NCS5504",
+        "R9-NCS540"
+    ],
+    "subservice_health": [
+        {
+            "category": "vrf_route_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "vrf_route_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R9-NCS540",
+            "health_status": "{{impacted_sre_policy_health_status}}",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        }
+    ]
+}
+{
+    "timestamp": "{{timestamp}}",
+    "vlan": "cnc_vlan1004",
+    "vpn_name": "NSS-5G_Slice_Vlan1004-internal",
+    "devices": [
+        "R2-NCS5504",
+        "R9-NCS540"
+    ],
+    "subservice_health": [
+        {
+            "category": "vrf_route_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R2-NCS5504",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "vrf_route_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "interface_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "sr_policy",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "pcep_session_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        },
+        {
+            "category": "bgp_nbr_health",
+            "device": "R9-NCS540",
+            "health_status": "SERVICE_UP",
+            "health_score": 100
+        }
+    ]
+}

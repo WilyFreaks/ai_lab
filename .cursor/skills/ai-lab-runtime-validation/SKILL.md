@@ -10,14 +10,19 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 
 - Use saved searches in app `ai_lab` for app-level verification.
 - Do not use ad-hoc/raw SPL unless the user explicitly asks for it.
+- Treat `local/savedsearches.conf` as the full source-of-truth set when the user asks to sync saved searches.
+- Default sync behavior is full-copy replacement: copy `local/savedsearches.conf` to `default/savedsearches.conf`.
+- Do not merge `local` and `default` saved-search stanzas unless the user explicitly asks for a merge.
+- Respect manual dashboard-import ownership: if the user says they will manually import a dashboard source, do not propose dashboard design changes unless explicitly requested.
 
 ## Saved searches
 
 - `telemetry_if_counter_test`
-- `interface_ifOutPktsRate_test`
-- `interface_ifInPktsRate_test`
+- `cnc_interface_ifOutPktsRate_test`
+- `cnc_interface_ifInPktsRate_test`
 - `thousandeyes_response_time_sec_test`
-- `srte_path_test`
+- `cnc_srte_path_test`
+- `cnc_service_health_test`
 
 ## Time windows
 
@@ -32,6 +37,9 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 - Restart continuity uses `baseline.live_last_tick_epoch` in `local/ai_lab_scenarios.conf`.
 - For `cnc_srte_path_json`, output wire format follows sample extension (`sample.txt` -> `.txt` spool payload), while `props.conf`/`transforms.conf` must still break and parse per-event JSON correctly.
 - `scenario_happening_probability` is per-source (`<index>#<sourcetype>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
+- Index intent:
+  - `ran`/`fwa` are reserved for other scenarios.
+  - `alerts`/`episode` are derived from scheduled searches (not direct generator streams).
 
 ## Quick checklist
 

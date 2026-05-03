@@ -70,6 +70,10 @@ Indexes are defined in `default/indexes.conf`. Current intent:
 
 - **Raw/ingest indexes** (populated from workshop generators and monitor inputs)
   - `thousandeyes`, `twamp`, `ran`, `fwa`, `syslog`, `telemetry`, `ios`
+  - Current implementation status:
+    - active generator/monitor wiring: `thousandeyes`, `telemetry`
+    - planned next direct-ingest streams: `twamp`, `syslog`, `ios`
+    - reserved for other scenarios: `ran`, `fwa`
 - **Derived `alerts` index**
   - `alerts` is reserved for *scheduled-search output* (workshop “alerting” signals).
   - It is expected to be empty until those scheduled searches run, and it does not require `samples/...` templates.
@@ -113,7 +117,7 @@ Key project behavior that must remain stable across changes:
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.<ext>` — keep payload structure aligned with the README/template contract; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
 - **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
-- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `interface_ifOutPktsRate_test`, `interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`, `srte_path_test`). Use a recent window (recommended last 5 minutes) when validating active live generation.
+- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `cnc_interface_ifOutPktsRate_test`, `cnc_interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`, `cnc_srte_path_test`, `cnc_service_health_test`). Use a recent window (recommended last 5 minutes) when validating active live generation.
 - **Credentials for CLI/tests** (workshop): same as below; do not commit real production secrets. Tests expect `SPLUNK_AUTH=admin:password` in the environment.
 
 ---

@@ -145,16 +145,19 @@ Contract clarification:
 - `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract), and must be run immediately after every workshop reset.
 - `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints); do not run it immediately after reset before region lock.
 - `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks); do not run it immediately after reset before region lock.
+- Saved-search packaging sync policy: when promoting runtime search definitions, copy `local/savedsearches.conf` to `default/savedsearches.conf` as full replacement unless an explicit merge is requested.
 
 Saved-search contract for baseline/live verification:
 
 - App context: run saved searches in `ai_lab`.
+- Naming convention: use `cnc_`-prefixed saved-search names for interface/SRTE/service-health baseline checks.
 - Required saved searches:
   - `telemetry_if_counter_test`
-  - `interface_ifOutPktsRate_test`
-  - `interface_ifInPktsRate_test`
+  - `cnc_interface_ifOutPktsRate_test`
+  - `cnc_interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
-  - `srte_path_test`
+  - `cnc_srte_path_test`
+  - `cnc_service_health_test`
 - Live verification window:
   - use a recent bounded window (recommended `earliest=-5m latest=now`) when confirming active `live_log.py` generation.
 
@@ -163,9 +166,9 @@ Saved-search quality intent for backfill checks:
 - `telemetry_if_counter_test`:
   - directional gap must never be negative
   - drop rate must never exceed `1`
-- `srte_path_test`:
+- `cnc_srte_path_test`:
   - must return non-zero results when `cnc_srte_path_json` generation is active
-- `interface_ifInPktsRate_test`, `interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
+- `cnc_interface_ifInPktsRate_test`, `cnc_interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
   - values should fluctuate gradually, unless an explicitly activated scenario fault window expects abrupt change
 

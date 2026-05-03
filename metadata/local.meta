@@ -12,18 +12,6 @@ owner = admin
 version = 9.4.2
 modtime = 1777619026.194845000
 
-[savedsearches/interface_ifInPktsRate_test]
-export = none
-owner = admin
-version = 9.4.2
-modtime = 1777618285.834527000
-
-[savedsearches/interface_ifOutPktsRate_test]
-export = none
-owner = admin
-version = 9.4.2
-modtime = 1777618943.664405000
-
 [views/workshop_introduction]
 version = 9.4.2
 modtime = 1777570243.373657000
@@ -32,8 +20,28 @@ modtime = 1777570243.373657000
 version = 9.4.2
 modtime = 1777646794.809069000
 
-[savedsearches/srte_path_test]
+[savedsearches/cnc_interface_ifInPktsRate_test]
+owner = admin
+version = 9.4.2
+modtime = 1777790791.194969000
+
+[savedsearches/cnc_interface_ifOutPktsRate_test]
+owner = admin
+version = 9.4.2
+modtime = 1777790824.254711000
+
+[savedsearches/cnc_service_health_test]
+owner = admin
+version = 9.4.2
+modtime = 1777790850.588307000
+
+[savedsearches/cnc_srte_path_test]
+owner = admin
+version = 9.4.2
+modtime = 1777790878.252484000
+
+[savedsearches/thousandeyes_response_time_sec_test]
 export = none
 owner = admin
 version = 9.4.2
-modtime = 1777779543.988630000
+modtime = 1777791402.541870000

@@ -9,6 +9,28 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-03 (Sun)
 
+- Session 5 around **16:11-16:59 JST** in this chat
+- Main activities:
+  - Verified index/data-source coverage status and confirmed current intent split (`ran`/`fwa` reserved for other scenario streams; `alerts`/`episode` scheduled-search derived)
+  - Updated project governance artifacts with newly learned policies across `.cursor/rules/splunk_app_rules.mdc`, `.cursor/skills/ai-lab-runtime-validation/SKILL.md`, and startup hook context scripts
+  - Updated project design docs (`docs/project_ai_lab.md`, `docs/project_test_design.md`, `docs/project_dashboard_design.md`) with saved-search sync behavior, naming conventions, manual dashboard-import handling, and index intent clarifications
+  - Re-ran baseline/backfill checks to validate renamed saved-search wiring (`cnc_*` names); confirmed all renamed-search checks pass, with only the known ThousandEyes outlier jump check still failing
+  - Re-synced `default/savedsearches.conf` from `local/savedsearches.conf` using full-copy replacement and verified file identity
+- Resume anchor:
+  - Next: generate `twamp`, `ios`, and `syslog`.
+
+- Session 4 around **14:21-16:10 JST** in this chat
+- Main activities:
+  - Created and aligned `samples/telemetry/cnc_service_health_json` (`sample.txt` + README contract) and added baseline/scenario keys in `default/ai_lab_scenarios.conf`
+  - Added `cnc_service_health_json` generation/ingestion wiring across `default/inputs.conf`, `default/props.conf`, `default/transforms.conf`, `bin/backfill_log.py`, and `bin/live_log.py`
+  - Updated `default/props.conf` for `cnc_interface_counter_json` to use `KV_MODE = json` without `INDEXED_EXTRACTIONS = json`
+  - Ran workshop reset + mandatory smoke gate, then baseline/backfill checks; identified the known ThousandEyes abrupt-jump test outlier behavior
+  - Added `cnc_service_health_test` assertions in `scripts/test_backfill.sh`/`scripts/test_baseline.sh`
+  - Renamed saved-search references to new names (`cnc_interface_ifInPktsRate_test`, `cnc_interface_ifOutPktsRate_test`, `cnc_service_health_test`, `cnc_srte_path_test`) to improve future identification/traceability
+  - Synced `local/savedsearches.conf` to `default/savedsearches.conf` as a full-copy replacement
+- Resume anchor:
+  - Next: proceed with dashboard import/testing tasks only when explicitly instructed.
+
 - Session 3 around **11:22-12:56 JST** in this chat
 - Main activities:
   - Updated `default/ai_lab_scenarios.conf` ThousandEyes parameters and validated live generator consumption
@@ -270,7 +292,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-03: ~220 minutes (3 sessions), ~92,000 estimated tokens
+- 2026-05-03: ~377 minutes (5 sessions), ~147,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
 - 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
 - 2026-04-30: ~301 minutes (1 session), ~55,000 estimated tokens
@@ -285,7 +307,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-03 | ~220 minutes (3 sessions) | ~92,000 |
+| 2026-05-03 | ~377 minutes (5 sessions) | ~147,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
 | 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |
 | 2026-04-30 | ~301 minutes (1 session) | ~55,000 |
