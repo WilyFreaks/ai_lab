@@ -19,6 +19,7 @@ else:
         print("\n---\n")
 
 print("CURRENT IMPLEMENTATION FOCUS:")
+print("- Scenario dashboards (e.g. scenario_1_au.xml): edit under local/data/ui/views/; on explicit request ('copy local dashboard to default') full-copy to default/data/ui/views/; Splunk prefers local at runtime when both exist")
 print("- TWAMP baseline verification: saved searches twamp_event_count_test, twamp_dmean_test, twamp_jmean_test (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")
-print("- Generate TWAMP data correlated with cnc_interface_counter_json values; scenario_1 packet-loss coupling for VLANs 1002/1003")
+print("- TWAMP: shared per-slice noise for delay/jitter integer cells + pps packet-rate model; correlate with cnc_interface_counter_json in scenario_1 for VLANs 1002/1003")
 PY

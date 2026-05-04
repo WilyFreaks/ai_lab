@@ -34,6 +34,19 @@ Scenario dashboard navigation policy:
 - Scenario dashboards are accessed from `scenario_control` only.
 - The scenario link should be generated dynamically in `scenario_control` when the corresponding scenario is enabled.
 
+### Scenario dashboard authoring: `local/` vs `default/`
+
+During workshop iteration, scenario Simple XML is **maintained under** `local/data/ui/views/` (Splunk UI “save” targets `local`, or files are edited there directly).
+
+The **`default/data/ui/views/`** copy is the **packaged / Git-tracked** source of truth for the same view name.
+
+**Sync policy:**
+
+- When the user explicitly asks to promote changes (for example “copy local dashboard to default”, “sync `scenario_1_au` from local to default”), copy **`local/data/ui/views/<view>.xml`** → **`default/data/ui/views/<view>.xml`** as a **full-file replacement**—use a single OS-level copy (`cp`), not a manual merge (same pattern as `local/savedsearches.conf` → `default/savedsearches.conf` on request).
+- Agents do **not** auto-copy on every edit; wait for an explicit sync request so `local/` remains the safe edit surface.
+- **Which file Splunk uses:** for the same view name, **`local/data/ui/views/` overrides `default/data/ui/views/`**. Packaging updates land in `default/`; day-to-day UI edits usually hit `local/`. Keep both in sync when promoting so Git reflects the dashboard you intend to ship.
+- After a sync, **reload the dashboard** (or refresh the Splunk view) if the browser still shows older XML.
+
 ---
 
 ## Workshop Introduction Dashboard

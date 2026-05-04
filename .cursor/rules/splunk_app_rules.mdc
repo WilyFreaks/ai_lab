@@ -26,12 +26,21 @@ Do not introduce new field names unless explicitly required.
 - Treat `local/ai_lab_scenarios.conf` as test-owned state managed by Splunk/test flow.
 - Agent/code changes must target `default/` and docs, not pre-populate or mutate `local/` content.
 
+Scenario dashboard Simple XML (`scenario_1_au.xml`, etc.):
+- The workshop owner edits scenario views under **`local/data/ui/views/`** in Splunk (UI save path or manual file edit).
+- **`default/data/ui/views/`** holds the **shipped / Git-tracked** copy of the same dashboard.
+- **Explicit sync only:** when the user asks (for example "copy local dashboard to default", "sync scenario dashboard", "promote `scenario_1_au` local → default"), copy **`local/data/ui/views/<name>.xml`** → **`default/data/ui/views/<name>.xml`** as a **full-file replacement** (e.g. OS `cp`; no merge or hand-edited diffs into default). Do **not** auto-sync on every edit.
+- **Splunk precedence:** if both `local` and `default` define the same view name, runtime uses the **`local`** copy. Syncing to `default/` keeps Git/AMI packaging aligned; the UI still reflects `local/` until that file changes or is removed.
+- **After sync:** reload the dashboard or refresh the view in Splunk if the editor/browser showed a stale buffer.
+- Mirrors the saved-search policy pattern (`local/` authoring, **`default/`** packaging on request) but for dashboard views.
+
 For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/live_log.py`):
 - Keep weekend/weekday transition behavior smooth.
 - Avoid abrupt value jumps at boundary times (notably Sunday 22:00-23:59 JST).
 - Use interpolation windows around Fri→Sat and Sun→Mon transitions.
 - For TWAMP (`pca_twamp_csv`) correlated with `cnc_interface_counter_json`, treat packet-rate fields as packets-per-second (pps) and keep cross-source packet-loss behavior aligned per tick during scenario windows.
 - TWAMP CSV wire format: **integer-only** metric cells after generation (see `samples/twamp/pca_twamp_csv/README.md` and `format_pca_twamp_csv_metric` / `normalize_pca_twamp_csv_replacements` in `bin/backfill_log.py` / `bin/live_log.py`).
+- TWAMP delay/jitter on the wire: **`noise_stdev × ε`** per slice per event (one shared standard-normal **ε** per slice so integer delay/jitter columns move together); tune `twamp#pca_twamp_csv#default.noise_stdev` in `default/ai_lab_scenarios.conf`. Detail: `docs/project_script_design.md` (*TWAMP + Telemetry Correlation Contract*).
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):

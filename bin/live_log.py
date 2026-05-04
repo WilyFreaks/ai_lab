@@ -29,6 +29,23 @@ _TWAMP_DELAY_JITTER_NAME = re.compile(
     re.I,
 )
 
+_TWAMP_SLICE_FROM_PLACEHOLDER = re.compile(r"^(slice\d+)_", re.I)
+
+
+def twamp_slice_id_from_placeholder_key(placeholder_key):
+    m = _TWAMP_SLICE_FROM_PLACEHOLDER.match(placeholder_key or "")
+    return m.group(1) if m else None
+
+
+def twamp_slice_noise_epsilons_for_placeholders(placeholders):
+    """One standard-normal draw per slice per event: shared shift for all noisy TWAMP metrics in that slice."""
+    eps = {}
+    for ph in placeholders:
+        sid = twamp_slice_id_from_placeholder_key(ph)
+        if sid and sid not in eps:
+            eps[sid] = random.gauss(0.0, 1.0)
+    return eps
+
 
 def stream_default_metric_prefix(prefix):
     parts = prefix.split("#", 2)
@@ -415,7 +432,7 @@ def interpolated_hourly_peak_rate(cfg, section, prefix, local_dt):
     return current_rate + ((next_rate - current_rate) * minute_progress)
 
 
-def metric_value(cfg, section, prefix, local_dt):
+def metric_value(cfg, section, prefix, local_dt, twamp_shared_noise_epsilon=None):
     base = parse_float(cfg, section, prefix, default=None)
     if base is None:
         return None
@@ -441,7 +458,10 @@ def metric_value(cfg, section, prefix, local_dt):
 
     noise = resolve_noise_stdev(cfg, section, prefix)
     if noise > 0:
-        value += random.gauss(0.0, noise)
+        if twamp_shared_noise_epsilon is not None:
+            value += noise * twamp_shared_noise_epsilon
+        else:
+            value += random.gauss(0.0, noise)
 
     return value
 
@@ -553,6 +573,7 @@ def coerce_placeholder(
     stream,
     region,
     telemetry_rate_state,
+    twamp_slice_noise=None,
 ):
     if placeholder == "timestamp":
         return format_domain_timestamp(local_dt, region)
@@ -575,7 +596,13 @@ def coerce_placeholder(
                 pass
         return 0
 
-    value = metric_value(cfg, section, prefix, local_dt)
+    twamp_eps = None
+    if twamp_slice_noise:
+        sid = twamp_slice_id_from_placeholder_key(placeholder)
+        if sid:
+            twamp_eps = twamp_slice_noise.get(sid)
+
+    value = metric_value(cfg, section, prefix, local_dt, twamp_eps)
     if value is not None:
         if placeholder.endswith("ifOutPktsRate") or placeholder.endswith("ifInPktsRate"):
             max_step = telemetry_rate_max_step(cfg, section, prefix)
@@ -753,6 +780,9 @@ def generate_single_event(
     placeholders = sorted(set(PLACEHOLDER_RE.findall(template_text)))
     local_dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(tzinfo)
     replacements = {}
+    twamp_slice_noise = None
+    if stream.get("sourcetype") == "pca_twamp_csv":
+        twamp_slice_noise = twamp_slice_noise_epsilons_for_placeholders(placeholders)
     for ph in placeholders:
         prefix = f"{prefix_base}{ph}"
         replacements[ph] = coerce_placeholder(
@@ -765,6 +795,7 @@ def generate_single_event(
             stream,
             region,
             telemetry_rate_state,
+            twamp_slice_noise,
         )
 
     if stream["index"] == "telemetry" and stream["sourcetype"] == "cnc_interface_counter_json":

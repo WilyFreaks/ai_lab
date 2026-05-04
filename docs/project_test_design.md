@@ -146,6 +146,7 @@ Contract clarification:
 - `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints); do not run it immediately after reset before region lock.
 - `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks); do not run it immediately after reset before region lock.
 - Saved-search packaging sync policy: when promoting runtime search definitions, copy `local/savedsearches.conf` to `default/savedsearches.conf` as full replacement unless an explicit merge is requested.
+- Scenario dashboard XML sync (on explicit request): copy `local/data/ui/views/<view>.xml` to `default/data/ui/views/<view>.xml` as a full-file replacement (`cp`); no merge. Splunk resolves the same view name with **`local` over `default`**, so functional UI state follows `local/` when both exist—sync to `default/` for repo/AMI parity and documentation.
 
 Saved-search contract for baseline/live verification:
 

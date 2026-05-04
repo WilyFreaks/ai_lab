@@ -15,6 +15,13 @@ Use this skill when validating runtime generation behavior for `ai_lab`.
 - Do not merge `local` and `default` saved-search stanzas unless the user explicitly asks for a merge.
 - Respect manual dashboard-import ownership: if the user says they will manually import a dashboard source, do not propose dashboard design changes unless explicitly requested.
 
+## Scenario dashboard XML (local → default)
+
+- Scenario views (for example `scenario_1_au.xml`) are **edited under** `local/data/ui/views/` during workshop iteration.
+- On explicit user request ("copy local dashboard to default", "sync scenario dashboard", "promote scenario XML local → default"), replace **`default/data/ui/views/<view>.xml`** with **`local/data/ui/views/<view>.xml`** via **full-file copy** (no merge). Optional: verify with `cmp` that files are byte-identical.
+- **Splunk runtime:** when both files exist for the same view, **`local` wins**. `default/` is for repo and packaging; keep them in sync on request so what you ship matches what you authored.
+- Do not overwrite `local/` from `default/` unless the user asks (opposite direction is rare). After copying to `default/`, reload the view in Splunk if the UI looks stale.
+
 ## Saved searches
 
 - `telemetry_if_counter_test`
@@ -54,6 +61,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 - For `cnc_srte_path_json`, output wire format follows sample extension (`sample.txt` -> `.txt` spool payload), while `props.conf`/`transforms.conf` must still break and parse per-event JSON correctly.
 - `scenario_happening_probability` is per-source (`<index>#<sourcetype>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
 - For TWAMP CSV (`pca_twamp_csv`), treat packet-rate fields as packets per second (pps) unless the user explicitly asks for a different unit model.
+- TWAMP delay/jitter integers still **fluctuate across ticks**: one standard-normal draw **per slice per event** scales `twamp#pca_twamp_csv#default.noise_stdev` for all noisy delay/jitter fields in that slice (see `docs/project_script_design.md`).
 - TWAMP UL packet sequence continuity is mandatory across backfill/live/restart:
   - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
   - no-loss check: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`

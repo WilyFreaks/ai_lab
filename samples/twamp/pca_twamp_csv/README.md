@@ -174,7 +174,7 @@ RT placeholders:
 
 ## CSV numeric typing (wire format)
 
-Real PCA TWAMP CSV exports use **integer cells only** (no fractional literals). After `metric_value` (including Gaussian `noise_stdev` on delay/jitter metrics), generators round to integers for every `slice####_*` field: `int(round(value))` in `format_pca_twamp_csv_metric` in `bin/live_log.py` and `bin/backfill_log.py`.
+Real PCA TWAMP CSV exports use **integer cells only** (no fractional literals). After `metric_value` (including `noise_stdev` on delay/jitter metrics), generators round to integers for every `slice####_*` field: `int(round(value))` in `format_pca_twamp_csv_metric` in `bin/live_log.py` and `bin/backfill_log.py`. For each emitted event, delay/jitter noise uses **one** standard-normal draw **per slice** (`noise_stdev * ε`) so all percentiles for that slice move together—this keeps `dmin ≤ dp25 ≤ …` plausible while still letting integers **±1** (or more) across ticks when `default.noise_stdev` is in roughly the **0.35–0.55** range.
 
 Packet sequence contract per slice (applies to `ul_*`, `dl_*`, and `rt_*`):
 
@@ -194,7 +194,7 @@ Per-metric keys in `default/ai_lab_scenarios.conf` use the same `metric_value` p
 
 1. **Per-event “wobble” without hourly curves:** set `noise_stdev` on the TWAMP keys you want to jitter (for example `twamp#pca_twamp_csv#slice1001_ul_dp50.noise_stdev = 0.15`). Each emitted row gets `value += random.gauss(0, noise_stdev)` after the base / `daily_min`–`daily_max` step.
 2. **Time-of-day shape:** add `peak_rate_00` … `peak_rate_23` for that metric prefix. When `daily_min`, `daily_max`, and the current hour’s `peak_rate_*` are all present, the value follows the interpolated daily curve (and still gets `noise_stdev` if set).
-3. **Ordering:** Real PCA rows keep an ordering such as `dmin ≤ dp25 ≤ dp50 ≤ … ≤ dmax`. Independent noise on every percentile can violate that. For strict ordering, keep noise small, tie noise to a single latent draw, or reserve larger moves for `dmean` / `dmax` only.
+3. **Ordering:** Real PCA rows keep an ordering such as `dmin ≤ dp25 ≤ dp50 ≤ … ≤ dmax`. Generators apply **shared ε per slice** for delay/jitter noise (see above). If per-metric `.noise_stdev` overrides differ a lot, rare inversions are still possible—keep overrides near `default.noise_stdev` if that matters.
 
 ## Splunk generation cadence vs PCA row window
 

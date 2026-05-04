@@ -1,5 +1,5 @@
 <form version="1.1" theme="dark">
-  <label>[Cisco Showcase] Backbone Network Monitoring Dashboard</label>
+  <label>#1 Backbone Network Status</label>
   <description>Workshop scenario: latency was detected on a specific VLAN over the WDM backbone. Investigate and identify the root cause.</description>
   <fieldset submitButton="false" autoRun="true">
     <input type="time" token="PERIOD">
@@ -12,7 +12,7 @@
   </fieldset>
   <row>
     <panel depends="$alwaysHideCSS$">
-      <title>Single value</title>
+      <title>Style Sheet</title>
       <html>
         <style>
         #Panel1{max-width:40% !important;}
@@ -25,184 +25,153 @@
   </row>
   <row>
     <panel id="Panel1">
-      <viz type="maps-for-splunk_cust.maps-plus">
-        <title>TopoIogy</title>
+      <title>WDM Network Topology in Central Victoria</title>
+      <viz type="leaflet_maps_app.maps-plus">
         <search>
-          <query>index=telemetry sourcetype=cnc_srte_path_json source="srte_path_vlan"
-| table _time host sr_policy_results{}.hops{}
-| rename sr_policy_results{}.hops{} as hops
-| eval hops_string=mvjoin(hops, ",")
-| sort 0 host, _time
-| streamstats count as seq by host
-| eventstats last(hops_string) as latest_hops by host
-| eventstats dc(hops_string) as unique_routes by host
-| eval route_changed=if(unique_routes&gt;1, "YES", "NO")
-| where seq=1
-| eval hops_org=hops
-| eval hop_index=mvrange(0, mvcount(hops))
-| eval hops_with_index=mvzip(hop_index, hops, ":::")
-| mvexpand hops_with_index
-| rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$"
-| table host router_name hop_index route_changed unique_routes
-| lookup router_lat_lon.csv router_name
-| eval description="Tx&lt;br&gt;Rx", tooltip="", pathColor=if(path="cnc_vlan1001","red","green")
-| eval customIcon="router3.png", markerSize=70, pathWeight=3
-| rename host as path
-| eval pathColor=if(path="cnc_vlan1002" OR path="cnc_vlan1003","red","green")
-| eval markerPriority=if(path="cnc_vlan1002" OR path="cnc_vlan1003",2,1)
+          <query>index=telemetry sourcetype=cnc_srte_path_json 
+| table _time host sr_policy_results{}.hops{} 
+| rename sr_policy_results{}.hops{} as hops 
+| eval hops_string=mvjoin(hops, ",") 
+| sort 0 host, _time 
+| streamstats count as seq by host 
+| eventstats last(hops_string) as latest_hops by host 
+| eventstats dc(hops_string) as unique_routes by host 
+| eval route_changed=if(unique_routes&gt;1, "YES", "NO") 
+| where seq=1 
+| eval hops_org=hops 
+| eval hop_index=mvrange(0, mvcount(hops)) 
+| eval hops_with_index=mvzip(hop_index, hops, ":::") 
+| mvexpand hops_with_index 
+| rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$" 
+| table host router_name hop_index route_changed unique_routes 
+| lookup au_router_areas.csv router_name 
+| eval description="Tx&lt;br&gt;Rx", tooltip="", pathColor=if(path="cnc_vlan1001","red","green") 
+| eval customIcon="router.png", markerSize=70, pathWeight=3 
+| rename host as path 
+| eval pathColor=if(path="cnc_vlan1002" OR path="cnc_vlan1003","red","green") 
+| eval markerPriority=if(path="cnc_vlan1002" OR path="cnc_vlan1003",2,1) 
 | appendpipe 
-    [| stats count by router_name customIcon latitude longitude markerSize router
-    | eval markerPriority=3
-    | eval tooltip=substr(router_name,1,2)
-    | eval path=router_name
-
-    | fields - count]</query>
+    [ stats count by router_name customIcon latitude longitude markerSize router area
+    | eval markerPriority=3 
+    | eval tooltip=router.": ".area
+    | eval path=router_name 
+    | fields - count ]</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
         <option name="height">500</option>
-        <option name="maps-for-splunk_cust.maps-plus.allPopups">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.animate">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.autoFitAndZoom">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.autoFitAndZoomDelay">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.bingMaps">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.bingMapsLabelLanguage">en-US</option>
-        <option name="maps-for-splunk_cust.maps-plus.bingMapsTileLayer">CanvasLight</option>
-        <option name="maps-for-splunk_cust.maps-plus.cluster">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.contextMenu">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.criticalThreshold">80</option>
-        <option name="maps-for-splunk_cust.maps-plus.defaultHeight">500</option>
-        <option name="maps-for-splunk_cust.maps-plus.disableClusteringAtZoom">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.drilldown">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.drilldownAction">dblclick</option>
-        <option name="maps-for-splunk_cust.maps-plus.fullScreen">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.googlePlacesPosition">topleft</option>
-        <option name="maps-for-splunk_cust.maps-plus.googlePlacesSearch">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.googlePlacesZoomLevel">12</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapBlur">15</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapColorGradient">{"0.4":"blue","0.6":"cyan","0.7":"lime","0.8":"yellow","1":"red"}</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapEnable">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapMinOpacity">1.0</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapOnly">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.heatmapRadius">25</option>
-        <option name="maps-for-splunk_cust.maps-plus.i18nLanguage">en</option>
-        <option name="maps-for-splunk_cust.maps-plus.layerControl">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.layerControlCollapsed">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.mapCenterLat">33.6</option>
-        <option name="maps-for-splunk_cust.maps-plus.mapCenterLon">132.5</option>
-        <option name="maps-for-splunk_cust.maps-plus.mapCenterZoom">7</option>
-        <option name="maps-for-splunk_cust.maps-plus.mapTile">https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png</option>
-        <option name="maps-for-splunk_cust.maps-plus.maxClusterRadius">80</option>
-        <option name="maps-for-splunk_cust.maps-plus.maxSpiderfySize">100</option>
-        <option name="maps-for-splunk_cust.maps-plus.maxZoom">7</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureActiveColor">#00ff00</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureCompletedColor">#0066ff</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureIconPosition">topright</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureLocalization">en</option>
-        <option name="maps-for-splunk_cust.maps-plus.measurePrimaryAreaUnit">acres</option>
-        <option name="maps-for-splunk_cust.maps-plus.measurePrimaryLengthUnit">feet</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureSecondaryAreaUnit">sqmiles</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureSecondaryLengthUnit">miles</option>
-        <option name="maps-for-splunk_cust.maps-plus.measureTool">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.minZoom">7</option>
-        <option name="maps-for-splunk_cust.maps-plus.multiplePopups">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.pathColorList">#0003F0,#D43C29,darkgreen,0xe2d400,darkred,#23A378</option>
-        <option name="maps-for-splunk_cust.maps-plus.pathIdentifier">path</option>
-        <option name="maps-for-splunk_cust.maps-plus.pathSplitInterval">60</option>
-        <option name="maps-for-splunk_cust.maps-plus.pathSplits">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.permanentTooltip">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.playbackSpeed">100</option>
-        <option name="maps-for-splunk_cust.maps-plus.playbackTickLength">50</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeOneBgColor">#B5E28C</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeOneFgColor">#6ECC39</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeThreeBgColor">#FD9C73</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeThreeFgColor">#F18017</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeTwoBgColor">#F1D357</option>
-        <option name="maps-for-splunk_cust.maps-plus.rangeTwoFgColor">#F0C20C</option>
-        <option name="maps-for-splunk_cust.maps-plus.refreshInterval">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.renderer">canvas</option>
-        <option name="maps-for-splunk_cust.maps-plus.scrollWheelZoom">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.showPathLines">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.showPlayback">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.showPlaybackDateControl">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.showPlaybackPlayControl">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.showPlaybackSliderControl">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.showProgress">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.singleMarkerMode">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.spiderfyDistanceMultiplier">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.splunkVersionCheck">1</option>
-        <option name="maps-for-splunk_cust.maps-plus.stickyTooltip">0</option>
-        <option name="maps-for-splunk_cust.maps-plus.warningThreshold">55</option>
+        <option name="leaflet_maps_app.maps-plus-plus.animate">0</option>
+        <option name="leaflet_maps_app.maps-plus.allPopups">0</option>
+        <option name="leaflet_maps_app.maps-plus.animate">1</option>
+        <option name="leaflet_maps_app.maps-plus.antarcticMapTile">https://tile.gbif.org/3031/omt/{z}/{x}/{y}@{r}x.png?gbif-geyser</option>
+        <option name="leaflet_maps_app.maps-plus.antarcticProj">0</option>
+        <option name="leaflet_maps_app.maps-plus.autoFitAndZoom">1</option>
+        <option name="leaflet_maps_app.maps-plus.autoFitAndZoomDelay">0</option>
+        <option name="leaflet_maps_app.maps-plus.bingMaps">0</option>
+        <option name="leaflet_maps_app.maps-plus.bingMapsLabelLanguage">en-US</option>
+        <option name="leaflet_maps_app.maps-plus.bingMapsTileLayer">CanvasLight</option>
+        <option name="leaflet_maps_app.maps-plus.clickLatLngToken">0</option>
+        <option name="leaflet_maps_app.maps-plus.cluster">0</option>
+        <option name="leaflet_maps_app.maps-plus.contextMenu">1</option>
+        <option name="leaflet_maps_app.maps-plus.criticalThreshold">80</option>
+        <option name="leaflet_maps_app.maps-plus.defaultHeight">600</option>
+        <option name="leaflet_maps_app.maps-plus.disableClusteringAtZoom">0</option>
+        <option name="leaflet_maps_app.maps-plus.drilldown">0</option>
+        <option name="leaflet_maps_app.maps-plus.drilldownAction">dblclick</option>
+        <option name="leaflet_maps_app.maps-plus.fullScreen">0</option>
+        <option name="leaflet_maps_app.maps-plus.gibsFormat">jpg</option>
+        <option name="leaflet_maps_app.maps-plus.gibsLayerId">MODIS_Aqua_CorrectedReflectance_TrueColor</option>
+        <option name="leaflet_maps_app.maps-plus.gibsLowerCorner">-4194304</option>
+        <option name="leaflet_maps_app.maps-plus.gibsTileMatrixSet">250m</option>
+        <option name="leaflet_maps_app.maps-plus.gibsUpperCorner">4194304</option>
+        <option name="leaflet_maps_app.maps-plus.googlePlacesPosition">topleft</option>
+        <option name="leaflet_maps_app.maps-plus.googlePlacesSearch">0</option>
+        <option name="leaflet_maps_app.maps-plus.googlePlacesZoomLevel">12</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapBlur">15</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapColorGradient">{"0.4":"blue","0.6":"cyan","0.7":"lime","0.8":"yellow","1":"red"}</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapEnable">0</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapMinOpacity">1.0</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapOnly">0</option>
+        <option name="leaflet_maps_app.maps-plus.heatmapRadius">25</option>
+        <option name="leaflet_maps_app.maps-plus.i18nLanguage">en</option>
+        <option name="leaflet_maps_app.maps-plus.layerControl">1</option>
+        <option name="leaflet_maps_app.maps-plus.layerControlCollapsed">1</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterLat">-37.2</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterLon">145.5</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterZoom">7</option>
+        <option name="leaflet_maps_app.maps-plus.mapTile">https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png</option>
+        <option name="leaflet_maps_app.maps-plus.maplibreStylePreset">liberty</option>
+        <option name="leaflet_maps_app.maps-plus.maps-plus.allPopups">0</option>
+        <option name="leaflet_maps_app.maps-plus.maxClusterRadius">80</option>
+        <option name="leaflet_maps_app.maps-plus.maxSpiderfySize">100</option>
+        <option name="leaflet_maps_app.maps-plus.maxZoom">8</option>
+        <option name="leaflet_maps_app.maps-plus.measureActiveColor">#00ff00</option>
+        <option name="leaflet_maps_app.maps-plus.measureCompletedColor">#0066ff</option>
+        <option name="leaflet_maps_app.maps-plus.measureIconPosition">topright</option>
+        <option name="leaflet_maps_app.maps-plus.measureLocalization">en</option>
+        <option name="leaflet_maps_app.maps-plus.measurePrimaryAreaUnit">acres</option>
+        <option name="leaflet_maps_app.maps-plus.measurePrimaryLengthUnit">feet</option>
+        <option name="leaflet_maps_app.maps-plus.measureSecondaryAreaUnit">sqmiles</option>
+        <option name="leaflet_maps_app.maps-plus.measureSecondaryLengthUnit">miles</option>
+        <option name="leaflet_maps_app.maps-plus.measureTool">0</option>
+        <option name="leaflet_maps_app.maps-plus.minZoom">6</option>
+        <option name="leaflet_maps_app.maps-plus.msColorMode">Light</option>
+        <option name="leaflet_maps_app.maps-plus.multiplePopups">0</option>
+        <option name="leaflet_maps_app.maps-plus.pathColorList">#0003F0,#D43C29,darkgreen,0xe2d400,darkred,#23A378</option>
+        <option name="leaflet_maps_app.maps-plus.pathIdentifier">path</option>
+        <option name="leaflet_maps_app.maps-plus.pathSplitInterval">60</option>
+        <option name="leaflet_maps_app.maps-plus.pathSplits">0</option>
+        <option name="leaflet_maps_app.maps-plus.permanentTooltip">1</option>
+        <option name="leaflet_maps_app.maps-plus.playbackSpeed">100</option>
+        <option name="leaflet_maps_app.maps-plus.playbackTickLength">50</option>
+        <option name="leaflet_maps_app.maps-plus.rangeOneBgColor">#B5E28C</option>
+        <option name="leaflet_maps_app.maps-plus.rangeOneFgColor">#6ECC39</option>
+        <option name="leaflet_maps_app.maps-plus.rangeThreeBgColor">#FD9C73</option>
+        <option name="leaflet_maps_app.maps-plus.rangeThreeFgColor">#F18017</option>
+        <option name="leaflet_maps_app.maps-plus.rangeTwoBgColor">#F1D357</option>
+        <option name="leaflet_maps_app.maps-plus.rangeTwoFgColor">#F0C20C</option>
+        <option name="leaflet_maps_app.maps-plus.refreshInterval">0</option>
+        <option name="leaflet_maps_app.maps-plus.renderer">canvas</option>
+        <option name="leaflet_maps_app.maps-plus.scrollWheelZoom">0</option>
+        <option name="leaflet_maps_app.maps-plus.selectingMarkers">0</option>
+        <option name="leaflet_maps_app.maps-plus.showClickMarker">1</option>
+        <option name="leaflet_maps_app.maps-plus.showPathLines">1</option>
+        <option name="leaflet_maps_app.maps-plus.showPlayback">0</option>
+        <option name="leaflet_maps_app.maps-plus.showPlaybackDateControl">1</option>
+        <option name="leaflet_maps_app.maps-plus.showPlaybackPlayControl">1</option>
+        <option name="leaflet_maps_app.maps-plus.showPlaybackSliderControl">1</option>
+        <option name="leaflet_maps_app.maps-plus.showProgress">1</option>
+        <option name="leaflet_maps_app.maps-plus.singleMarkerMode">0</option>
+        <option name="leaflet_maps_app.maps-plus.spiderfyDistanceMultiplier">1</option>
+        <option name="leaflet_maps_app.maps-plus.splunkVersionCheck">1</option>
+        <option name="leaflet_maps_app.maps-plus.stickyTooltip">0</option>
+        <option name="leaflet_maps_app.maps-plus.useOpenFreeMap">0</option>
+        <option name="leaflet_maps_app.maps-plus.warningThreshold">55</option>
         <option name="refresh.display">progressbar</option>
       </viz>
     </panel>
-    <panel id="Panel2">
-      <table>
-        <title>VPN/Metrics</title>
-        <search>
-          <query>index=twamp sourcetype=twamp_csv
-| rename "Source Ip" as src_ip, "Destination Ip" as dest_ip, "Session Name" as session_name
-| rex field=session_name "^(?&lt;src_host&gt;[^-]+)-(?&lt;dest_host&gt;[^_]+)"
-| bin span=1h _time
-| stats avg(rt_dp95) as delay avg(rt_jp95) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by _time src_host src_ip Interface dest_host dest_ip session_name
-| eval dl_lostperc=ifnull(dl_lostperc,1000000)
-| eval ul_lostperc=ifnull(ul_lostperc,1000000)
-| stats avg(delay) as delay avg(jitter) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by src_host src_ip Interface dest_host dest_ip session_name
-| eval delay=round(delay,1), jitter=round(jitter,1), dl_lostperc=round(dl_lostperc/10000,1), ul_lostperc=round(ul_lostperc/10000,1)
-| table session_name delay jitter dl_lostperc ul_lostperc
-| eval slice=substr(session_name, 18, 4)
-| join type=left slice [
-| search index=telemetry sourcetype=cnc_srte_path_json source="srte_path_vlan"
-| table _time host sr_policy_results{}.hops{}
-| rename sr_policy_results{}.hops{} as hops
-| eval src=mvindex(hops, 0), hop1=mvindex(hops, 1), hop2=mvindex(hops, 2), hop3=mvindex(hops, 3), dest=mvindex(hops, 4)
-| stats count by _time host src hop1 hop2 hop3 dest
-| eval slice=substr(host, 9, 4)]
-| table session_name dl_lostperc ul_lostperc delay jitter src hop* dest
-| search session_name=R2*
-| sort session_name
-| rename session_name as "Session name", ul_lostperc as "Packet Loss R2-&gt;R9[%]", dl_lostperc as "Packet Loss R9-&gt;R2[%]", delay as "Delay[ms]", jitter as "Jitter[us]", src as Src, hop* as Hop*, dest as Dest
-| table "Session name" "Packet Loss R2-&gt;R9[%]" "Packet Loss R9-&gt;R2[%]" "Delay[ms]" "Jitter[us]" Src Hop* Dest</query>
-          <earliest>$PERIOD.earliest$</earliest>
-          <latest>$PERIOD.latest$</latest>
-          <sampleRatio>1</sampleRatio>
-        </search>
-        <option name="count">20</option>
-        <option name="dataOverlayMode">none</option>
-        <option name="drilldown">none</option>
-        <option name="percentagesRow">false</option>
-        <option name="refresh.display">progressbar</option>
-        <option name="rowNumbers">false</option>
-        <option name="totalsRow">false</option>
-        <option name="wrap">true</option>
-        <format type="color" field="Packet Loss R2-&gt;R9[%]">
-          <colorPalette type="list">[#252A2F,#CBA700,#D94E17]</colorPalette>
-          <scale type="threshold">1,30</scale>
-        </format>
-      </table>
-    </panel>
-  </row>
-  <row>
     <panel>
+      <title>Network Slice Health Score</title>
       <table>
-        <title>CNC Health</title>
         <search>
           <query>index=telemetry sourcetype=cnc_service_health_json
 | spath subservice_health{}
 | mvexpand subservice_health{}
 | spath input=subservice_health{}
-| table host vpn_name category device health_status health_score
-| stats last(health_score) as health_score last(health_status) as health_status by host vpn_name category device
+| stats last(health_score) as health_score last(health_status) as health_status by vpn_name category device
 | eval Status=replace(health_status, "SERVICE_","")
-| rename health_score as Score, category as Category, vpn_name as "VPN Name", host as Vlan, device as Device
-| table Device Vlan "VPN Name" Category Status Score
-| search Vlan=*100*
+| rename health_score as Score, category as Category, vpn_name as Slice, device as Device
+| fields Slice Device Category Status Score
 | sort Score</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
-        <option name="count">6</option>
+        <option name="count">18</option>
         <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
         <format type="color" field="Score">
@@ -217,16 +186,55 @@
   </row>
   <row>
     <panel>
-      <chart>
-        <title>Delay</title>
+      <title>TWAMP Metrics for Network Slice: Avg Delay, Jitter, and P95 Packet Loss %</title>
+      <table>
         <search>
-          <query>index=twamp sourcetype=twamp_csv
+          <query>index=twamp sourcetype=pca_twamp_csv 
+| rename "Source Ip" as src_ip, "Destination Ip" as dest_ip, "Session Name" as session_name 
+| rex field=session_name "^(?&lt;src_host&gt;[^-]+)-(?&lt;dest_host&gt;[^_]+)_TWAMP_Slice(?&lt;slice&gt;[^_]+)" 
+| bin span=1h _time 
+| stats avg(rt_dmean) as delay avg(rt_jmean) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by _time session_name src_host src_ip Interface dest_host dest_ip slice
+| eval dl_lostperc=ifnull(dl_lostperc,1000000) 
+| eval ul_lostperc=ifnull(ul_lostperc,1000000) 
+| stats avg(delay) as delay avg(jitter) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by session_name src_host src_ip Interface dest_host dest_ip slice
+| eval delay=round(delay,1), jitter=round(jitter,1), dl_lostperc=round(dl_lostperc/10000,1), ul_lostperc=round(ul_lostperc/10000,1) 
+| fields session_name slice delay jitter dl_lostperc ul_lostperc src_ip dest_ip 
+| join type=left slice 
+    [ search index=telemetry sourcetype=cnc_srte_path_json
+    | fields _time host sr_policy_results{}.hops{} 
+    | rename sr_policy_results{}.hops{} as hops 
+    | eval src=mvindex(hops, 0), hop1=mvindex(hops, 1), hop2=mvindex(hops, 2), hop3=mvindex(hops, 3), dest=mvindex(hops, 4) 
+    | stats count by _time host src hop1 hop2 hop3 dest 
+    | eval slice=substr(host, 9, 4) ] 
+| fields session_name slice dl_lostperc ul_lostperc delay jitter src hop* dest 
+| eval slice = "Vlan".slice
+| sort slice 
+| rename session_name as Session slice as Slice, ul_lostperc as "Packet Loss S-&gt;R (%)", dl_lostperc as "Packet Loss R-&gt;S (%)", delay as "Delay (ms)", jitter as "Jitter (us)", src as Sender, hop* as Hop*, dest as Reflector 
+| table Session Slice "Packet Loss S-&gt;R (%)" "Packet Loss R-&gt;S (%)" "Delay (ms)" "Jitter (us)" Sender Hop* Reflector</query>
+          <earliest>$PERIOD.earliest$</earliest>
+          <latest>$PERIOD.latest$</latest>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>Delay</title>
+      <chart>
+        <search>
+          <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
 | eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| timechart span=10s avg(rt_dp95) as delay by session_name</query>
+| timechart span=1m avg(rt_dp95) as delay by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -263,16 +271,18 @@
       </chart>
     </panel>
     <panel>
+      <title>Jitter</title>
       <chart>
-        <title>Jitter</title>
         <search>
-          <query>index=twamp sourcetype=twamp_csv
+          <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
 | eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| timechart span=10s avg(rt_jp95) as jitter by session_name</query>
+| timechart span=1m avg(rt_jp95) as jitter by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -309,20 +319,18 @@
       </chart>
     </panel>
     <panel>
+      <title>Packet Loss% (DL)</title>
       <chart>
-        <title>Packet Loss% (DL)</title>
         <search>
-          <query>index=twamp sourcetype=twamp_csv
+          <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
-| eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| eval dl_lostperc=dl_lostperc/10000
-| timechart span=10s avg(dl_lostperc) as dl_lostperc  by session_name
-| foreach Slice* 
-    [eval &lt;&lt;FIELD&gt;&gt;=ifnull(&lt;&lt;FIELD&gt;&gt;,100)]
-| where _time&lt;=now()-120</query>
+| eval session_name = replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
+| timechart span=1m avg(dl_lostperc) as dl_lostperc  by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -360,20 +368,18 @@
       </chart>
     </panel>
     <panel>
+      <title>Packet Loss% (UL)</title>
       <chart>
-        <title>Packet Loss% (UL)</title>
         <search>
-          <query>index=twamp sourcetype=twamp_csv
+          <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
-| eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| eval ul_lostperc=ul_lostperc/10000
-| timechart span=10s avg(ul_lostperc) as ul_lostperc by session_name
-| foreach Slice* 
-    [eval &lt;&lt;FIELD&gt;&gt;=ifnull(&lt;&lt;FIELD&gt;&gt;,100)]
-| where _time&lt;=now()-120</query>
+| eval session_name = replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
+| timechart span=1m avg(ul_lostperc) as ul_lostperc  by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -445,7 +451,7 @@
 | eval timestamp = json_extract(device, "interfaces." . if_name . ".ifInPktsRate.latest_data.timestamp") 
 | rename host_name as router1_name if_name as interface1 
 | table _time router1_name interface1 ifInPktsRate ifOutPktsRate 
-| bin span=5m _time 
+| bin span=1m _time 
 | stats sum(ifInPktsRate) as ifInPktsRate1 sum(ifOutPktsRate) as ifOutPktsRate1 by _time router1_name interface1 
 | join router1_name interface1 
     [ inputlookup router_if_connections.csv 
@@ -465,14 +471,16 @@
     | eval ifOutPktsRate = json_extract(device, "interfaces." . if_name . ".ifOutPktsRate.latest_data.value") 
     | rename host_name as router2_name if_name as interface2 
     | table _time router2_name interface2 ifInPktsRate ifOutPktsRate 
-    | bin span=5m _time 
+    | bin span=1m _time 
     | stats sum(ifInPktsRate) as ifInPktsRate2 sum(ifOutPktsRate) as ifOutPktsRate2 by _time router2_name interface2] 
 | eval path=router1.":".interface1."_".router2.":".interface2 
 | search (router1_name=* OR router2_name=*) AND path="*$ROUTER$*" 
-| timechart span=5m useother=f limit=30 avg(ifOutPktsRate1) as ifOutPktsRate sum(ifInPktsRate2) as ifInPktsRate by path</query>
+| timechart span=1m useother=f limit=30 avg(ifOutPktsRate1) as ifOutPktsRate sum(ifInPktsRate2) as ifInPktsRate by path</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
@@ -502,6 +510,7 @@
         <option name="charting.legend.mode">standard</option>
         <option name="charting.legend.placement">none</option>
         <option name="charting.lineWidth">2</option>
+        <option name="height">627</option>
         <option name="refresh.display">progressbar</option>
         <option name="trellis.enabled">1</option>
         <option name="trellis.scales.shared">1</option>
@@ -541,6 +550,8 @@
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="count">2</option>
         <option name="dataOverlayMode">none</option>
@@ -583,6 +594,8 @@
 | sort 0 severity -_time</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
@@ -608,6 +621,8 @@
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
         <option name="refresh.display">progressbar</option>
@@ -628,34 +643,39 @@
     <panel depends="$null$">
       <viz type="network-diagram-viz.network-diagram-viz">
         <search>
-          <query>index=telemetry sourcetype=cnc_srte_path_json source="srte_path_vlan"
-| table _time host sr_policy_results{}.hops{}
-| rename sr_policy_results{}.hops{} as hops
-| eval hops_string=mvjoin(hops, ",")
-| sort 0 host, _time
-| streamstats count as seq by host
-| eventstats last(hops_string) as latest_hops by host
-| eventstats dc(hops_string) as unique_routes by host
-| eval route_changed=if(unique_routes&gt;1, "YES", "NO")
-| where seq=1
-| eval hops_org=hops
-| eval hop_index=mvrange(0, mvcount(hops))
-| eval hops_with_index=mvzip(hop_index, hops, ":::")
-| mvexpand hops_with_index
-| rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$"
-| table host router_name hop_index route_changed unique_routes
-| lookup router_lat_lon.csv router_name
-| rename host as path
-| eval from=router_name
-| appendpipe [| eval hop_index=hop_index+1 | rename router_name as to | fields path hop_index to]
-| stats values(from) as from values(to) as to by path hop_index
-| search from=*
-| eval linkText="Tx: xxx
-Rx: xxx", linkColor="green"
-| eval type="customimage", customurl="/static/app/network-diagram-viz/customimages/router_2d_64x64.png"</query>
+          <query>index=telemetry sourcetype=cnc_srte_path_json 
+| fields _time host sr_policy_results{}.hops{} 
+| rename sr_policy_results{}.hops{} as hops 
+| eval hops_string = mvjoin(hops, ",") 
+| sort 0 host, _time 
+| streamstats count as seq by host 
+| eventstats last(hops_string) as latest_hops by host 
+| eventstats dc(hops_string) as unique_routes by host 
+| eval route_changed = if(unique_routes&gt;1, "YES", "NO") 
+| where seq=1 
+| eval hops_org = hops 
+| eval hop_index = mvrange(0, mvcount(hops)) 
+| eval hops_with_index = mvzip(hop_index, hops, ":::") 
+| mvexpand hops_with_index 
+| rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$" 
+| fields host router_name hop_index route_changed unique_routes 
+| lookup au_router_areas.csv router_name 
+| rename host as path 
+| eval from = router_name 
+| appendpipe 
+    [ eval hop_index = hop_index+1 
+    | rename router_name as to 
+    | fields path hop_index to ] 
+| stats values(from) as from values(to) as to by path hop_index 
+| search from=* 
+| eval linkText = "Tx: xxx
+Rx: xxx", linkColor="green" 
+| eval type = "customimage", customurl = "/static/app/ai_lab/images/router_2d_64x64.png"</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
         </search>
         <option name="drilldown">none</option>
         <option name="height">369</option>

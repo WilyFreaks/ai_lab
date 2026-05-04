@@ -9,6 +9,16 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-04 (Mon)
 
+- Session 2 around **17:00-22:00 JST** in this chat (closed; end time approximate)
+- Main activities:
+  - Confirmed dashboard iteration path: `scenario_1_au` (and peers) authored under `local/data/ui/views/`, promoted to `default/data/ui/views/` on explicit full copy; documented Splunk **`local` overrides `default`** for the same view at runtime
+  - Improved TWAMP delay/jitter **visible variation** while keeping integer wire cells: shared standard-normal **ε per slice per event** × `twamp#pca_twamp_csv#default.noise_stdev` in `bin/backfill_log.py` / `bin/live_log.py`; raised default noise toward **0.45**; updated sample README + `project_script_design.md`
+  - Ran workshop **reset** (`reset_workshop_state.sh --yes`, token auth) and mandatory **`scripts/test_smoke.sh`** gate (pass)
+  - Synced **`scenario_1_au.xml`** local → default when requested; refreshed **rules, skills, hooks**, and **project docs** (`project_ai_lab.md`, `project_test_design.md`, `project_dashboard_design.md`) for dashboard sync triggers and TWAMP policy
+  - **Milestone:** scenario dashboard **migration complete** for workshop data sources; ready to shift focus to runtime scenario behavior
+- Resume anchor:
+  - Next: **scenario activation** — `scenario_control` / `scenariocontrol`, fault timing (`scenario_1_fault_*`), live generator reaction during active windows, and validation that enabled scenarios drive telemetry/TWAMP/SR-TE as designed.
+
 - Session 1 around **10:00-16:41 JST** in this chat
 - Main activities:
   - Confirmed TWAMP (`pca_twamp_csv`) pipeline: integer-only wire cells via `format_pca_twamp_csv_metric`, `normalize_pca_twamp_csv_replacements`, and CSV/coerce fallbacks in `bin/backfill_log.py` / `bin/live_log.py`
@@ -317,7 +327,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-04: ~401 minutes (1 session), ~40,000 estimated tokens
+- 2026-05-04: ~701 minutes (2 sessions), ~115,000 estimated tokens
 - 2026-05-03: ~513 minutes (6 sessions), ~185,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
 - 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
@@ -333,7 +343,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-04 | ~401 minutes (1 session) | ~40,000 |
+| 2026-05-04 | ~701 minutes (2 sessions) | ~115,000 |
 | 2026-05-03 | ~513 minutes (6 sessions) | ~185,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
 | 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |
