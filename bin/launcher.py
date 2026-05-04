@@ -1,4 +1,5 @@
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -136,6 +137,79 @@ def running_pids_for_script(script_name):
     return pids
 
 
+def _ps_field(pid, field):
+    """Single-column ps output (e.g. ppid=, args=). Works on macOS/BSD."""
+    r = subprocess.run(
+        ["ps", "-p", str(int(pid)), "-o", f"{field}="],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if r.returncode != 0:
+        return ""
+    return (r.stdout or "").strip()
+
+
+def _orphan_generator_pid(pid):
+    """
+    True if this worker should be torn down before (re)spawn.
+
+    Stale live_log/backfill often survives a Splunk restart (reparented to pid 1); launcher
+    previously skipped spawn when it saw any matching PID and left the old code running.
+    Legitimate workers have a live parent whose command line is launcher.py or splunkd.
+    """
+    ppid_s = _ps_field(pid, "ppid")
+    if not ppid_s:
+        return True
+    try:
+        ppid = int(ppid_s)
+    except ValueError:
+        return True
+    if ppid <= 1:
+        return True
+    try:
+        os.kill(ppid, 0)
+    except OSError:
+        return True
+    pcmd = _ps_field(ppid, "args").lower()
+    if "launcher.py" in pcmd:
+        return False
+    if "splunkd" in pcmd:
+        return False
+    return True
+
+
+def terminate_pid(pid, label):
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError as e:
+        print(f"launcher: {label} pid={pid} SIGTERM failed: {e}", flush=True)
+        return
+    for _ in range(20):
+        time.sleep(0.1)
+        try:
+            os.kill(pid, 0)
+        except OSError:
+            print(f"launcher: stopped {label} pid={pid}", flush=True)
+            return
+    try:
+        os.kill(pid, signal.SIGKILL)
+        print(f"launcher: force-killed {label} pid={pid}", flush=True)
+    except OSError as e:
+        print(f"launcher: {label} pid={pid} SIGKILL failed: {e}", flush=True)
+
+
+def reap_stale_generators(script_name):
+    """SIGTERM orphan backfill/live PIDs so a fresh Splunk launch can start new workers."""
+    for pid in running_pids_for_script(script_name):
+        if _orphan_generator_pid(pid):
+            print(
+                f"launcher: stale {script_name} (pid={pid}); terminating before (re)spawn",
+                flush=True,
+            )
+            terminate_pid(pid, script_name)
+
+
 def main():
     cfg = read_local_conf()
     gate_ok, reason = generation_gate_open(cfg)
@@ -149,6 +223,7 @@ def main():
 
     started_procs = []
     for script_name in ("backfill_log.py", "live_log.py"):
+        reap_stale_generators(script_name)
         running_pids = running_pids_for_script(script_name)
         if running_pids:
             print(

@@ -16,6 +16,8 @@ Primary goals:
 2. Verify synthetic event generation and ingestion routing.
 3. Make test execution repeatable so Cursor can run checks automatically.
 
+**Resume after a break:** Ordering and gates → `docs/project_ai_lab.md` → *Handoff* → *Resume after a break*. Never run **`scripts/test_baseline.sh`** on an empty workshop right after reset; run **`scripts/test_smoke.sh`** first, then open the generation gate, then baseline tests.
+
 ---
 
 ## Test Scope
@@ -172,6 +174,8 @@ Saved-search quality intent for backfill checks:
   - drop rate must never exceed `1`
 - `cnc_srte_path_test`:
   - must return non-zero results when `cnc_srte_path_json` generation is active
+- `cnc_service_health_test`:
+  - must return non-zero results when generation is active; during **`scenario_1`**, **`impacted_sre_policy_health_status`** / score overrides apply each tick because **`scenario_happening_probability` defaults to 1** when omitted (validate in UI or ad-hoc recent-window spot-check if extending tests)
 - `cnc_interface_ifInPktsRate_test`, `cnc_interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
   - values should fluctuate gradually, unless an explicitly activated scenario fault window expects abrupt change

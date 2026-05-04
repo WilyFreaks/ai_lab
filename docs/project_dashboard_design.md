@@ -236,7 +236,8 @@ Design constraints:
 
 - Uses form submit mode (`submitButton="true"`) to avoid writes on page load
 - Input token names omit `form.` prefix (required for deferred submit behavior)
-- Write operation runs only after submit via `scenariocontrol`
+- Write operation runs only after submit via `scenariocontrol action=set ...`
+- On load and when the scenario dropdown changes, `appserver/static/scenario_control_status.js` runs `| scenariocontrol action=status scenario=...` and syncs **Activation** / **Fault start** / **Fault duration** from effective config (default overlaid by `local/`)
 - Scenario-specific dashboard links are rendered dynamically from runtime scenario state, and only for enabled scenarios.
 
 This pattern is reused in workshop-introduction save flow.

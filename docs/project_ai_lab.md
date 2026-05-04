@@ -115,6 +115,19 @@ Key project behavior that must remain stable across changes:
 
 ### Handoff: operators and the next implementer
 
+#### Resume after a break (minimal context)
+
+Use this when you are tired or returning cold — **one read, then pause**.
+
+1. **Where you left off (optional narrative):** if you use the project journal, open `docs/daily_activity_timeline.md` and find the latest **Resume anchor**. The AI session rule is: read that file first when you ask “where am I” in chat. The journal is updated **only when you explicitly request** a timeline update.
+2. **Authoritative behavior:** `docs/project_script_design.md`, `docs/project_conf_design.md`, `docs/project_scenario_*.md`, and per-stream `samples/.../README.md` — not stale chat.
+3. **Packaging vs runtime:** ship scenario defaults and docs in **`default/`**; Splunk/workshop **runtime** mutates **`local/ai_lab_scenarios.conf`**. Do not ask tooling to pre-fill **`local/`** for routine changes.
+4. **After any full workshop reset:** run `bash scripts/test_smoke.sh` immediately; do not run baseline/data-quality scripts until the region is locked and generators have populated indexes.
+5. **Live scenario ticks:** `scenario_happening_probability` is read in **`live_log.py`** with **default `1.0` if missing or invalid** — so **`[scenario_1]`** does **not** need `telemetry#cnc_service_health_json#scenario_happening_probability` unless you want a **fractional** (stochastic) skip.
+6. **TWAMP panels:** `*_lostperc` on the wire is **integer percent 0–100**; packet-rate style fields are modeled as **pps**; VLAN **1002/1003** loss in **`scenario_1`** should stay aligned with `cnc_interface_counter_json` directional gaps.
+7. **After editing `bin/backfill_log.py`, `bin/live_log.py`, or `default/ai_lab_scenarios.conf`:** if **`live_log.py` / `backfill_log.py` are already running**, **restart** those workers (or Splunk) so the new logic and conf merge are picked up.
+8. **Verification:** prefer saved searches in app `ai_lab` (list under *Saved-search-first* below); live checks use a recent window (e.g. last 5 minutes).
+
 - **Splunk install path:** scripts default to `SPLUNK_HOME=/opt/splunk`. On **macOS** (developer installs), set `SPLUNK_HOME` explicitly, e.g. `export SPLUNK_HOME=/Applications/Splunk`, when running the reset script or any doc examples that call `$SPLUNK_HOME/bin/splunk`.
 - **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops Splunk, deletes per-index data under `$SPLUNK_DB`, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), removes `local/ai_lab_scenarios.conf`, restarts, then (if set) verifies all `default/indexes.conf` app indexes are empty. **Requires** `SPLUNK_AUTH` (same credentials as the workshop admin user) for the post-start SPL verification. See `docs/project_test_design.md` for the full contract.
 - **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops app generators first (`backfill_log.py`/`live_log.py`), confirms no orphan `launcher.py`/`backfill_log.py`/`live_log.py`, stops Splunk, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), deletes per-index data under `$SPLUNK_DB`, removes `local/ai_lab_scenarios.conf`, restarts, then verifies all `default/indexes.conf` app indexes are empty. Prefer token auth (`SPLUNK_TOKEN`/`AUTH_TOKEN`) sourced from Cursor MCP config; use `SPLUNK_AUTH` only as fallback. See `docs/project_test_design.md` for the full contract.

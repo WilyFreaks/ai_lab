@@ -11,6 +11,8 @@ bin/
 └── live_log.py      # continuous real-time data generation + scenario trigger
 ```
 
+**Resume after a break:** Human checklist and paths → `docs/project_ai_lab.md` → *Handoff* → *Resume after a break*. **`live_log.py`** owns **`scenario_happening_probability`** during scenario windows (missing/invalid → **1**). After editing generators or **`default/ai_lab_scenarios.conf`**, restart **`live_log.py`** / **`backfill_log.py`** (or Splunk) if those processes are already running.
+
 ## Sample Template Formats
 
 Sample files under `samples/` are source-specific templates and are **not limited to JSON files**.
@@ -127,16 +129,17 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
 8. For sources that emit NDJSON, each line must be valid JSON and should only include fields authorized by the corresponding sample template/README.
 9. The `{{timestamp}}` placeholder (when present) must be generated as a **timezone-aware, ISO-8601 string with a numeric offset**, using the region’s IANA zone (`Asia/Tokyo` for `jp`, `Australia/Sydney` for `au`) so offsets/DST are correct for each instant. See **Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601** above.
 10. **Do not** embed Splunk routing metadata (`index`, `sourcetype`, `source`, `host`) in payloads unless the sample template/README calls for it. Splunk file monitor stanzas in `default/inputs.conf` are the source of truth for `index=`, `sourcetype=`, and monitor-level `host=` / `source=` (when configured).
-11. For telemetry link pairs, enforce directional packet conservation using the bidirectional interface lookup (`lookups/router_if_connected_bidirectional.csv`, fallback `lookups/router_if_connections_bidirectional.csv`): receiver `ifInPktsRate` must not exceed connected peer `ifOutPktsRate` in either direction (loss is allowed; packet creation is not).
-12. Telemetry packet drop-rate model requirement: for each linked direction, keep drop rate below 1% in generated baseline data (equivalently, keep inbound rate in the range `0.99 * ifOutPktsRate` to `ifOutPktsRate` when `ifOutPktsRate > 0`).
+11. For telemetry link pairs, enforce directional packet conservation using the bidirectional interface lookup (`lookups/router_if_connected_bidirectional.csv`, fallback `lookups/router_if_connections_bidirectional.csv`): receiver `ifInPktsRate` must not exceed connected peer `ifOutPktsRate` in either direction (loss is allowed; packet creation is not). Optional key `telemetry#cnc_interface_counter_json#directional_min_receive_fraction` (default `0.99` when unset) sets the minimum peer inbound as a fraction of outbound; scenario overlays may set it to `0` so only the `ifIn <= ifOut` cap applies and large intentional gaps (e.g. scenario 1) are not clamped upward.
+12. Telemetry packet drop-rate model requirement: for each linked direction, keep drop rate below 1% in generated **baseline** data (equivalently, keep inbound rate in the range `directional_min_receive_fraction * ifOutPktsRate` to `ifOutPktsRate` when `ifOutPktsRate > 0` and that fraction is `0.99`). During active scenario windows, scenario config may lower that fraction to allow larger modeled loss on specific links.
 13. `scenario_happening_probability` is a common per-source runtime key using this pattern: `<index>#<sourcetype>#scenario_happening_probability`.
 14. During active scenario windows in live generation, evaluate this probability per source/event to decide whether that source uses scenario-overridden values or baseline values (`0` never happens, `1` always happens, clamped to `0..1`).
 15. If `scenario_happening_probability` is missing or invalid for a source, treat it as `1` (always happens).
-16. When a backfill run actually starts (after gate checks), write `backfill_run_started_time` (epoch seconds, wall clock) to `local/ai_lab_scenarios.conf`. On completion, write `backfill_completed = true` and `backfill_completed_time` (epoch seconds). The `workshopregion` command exposes `backfill_duration` as completed−started seconds when backfill is complete.
-17. TWAMP CSV placeholders may be slice-scoped (for example `slice1001_ul_firstpktSeq`, `slice1001_ul_lastpktSeq`, `slice1001_ul_rxpkts`). For each slice/session, packet sequence continuity must be maintained so:
+16. **Note:** For **`cnc_service_health_json`**, you normally **omit** `telemetry#cnc_service_health_json#scenario_happening_probability` in **`[scenario_1]`** — missing/invalid values default to **`1`**, so **`SERVICE_DEGRADED`** / score **50** apply on every tick. Set a fractional probability only when you want stochastic baseline fallback (contrast with **`telemetry#cnc_srte_path_json#scenario_happening_probability`**, where fractional values are intentional).
+17. When a backfill run actually starts (after gate checks), write `backfill_run_started_time` (epoch seconds, wall clock) to `local/ai_lab_scenarios.conf`. On completion, write `backfill_completed = true` and `backfill_completed_time` (epoch seconds). The `workshopregion` command exposes `backfill_duration` as completed−started seconds when backfill is complete.
+18. TWAMP CSV placeholders may be slice-scoped (for example `slice1001_ul_firstpktSeq`, `slice1001_ul_lastpktSeq`, `slice1001_ul_rxpkts`). For each slice/session, packet sequence continuity must be maintained so:
    - no-loss expectation: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
    - next-event continuity: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
-18. Runtime sequence continuity must survive restarts by persisting local state under `[baseline]` in `local/ai_lab_scenarios.conf` (for example `sequence_last_value` and TWAMP per-slice/per-session UL packet sequence state).
+19. Runtime sequence continuity must survive restarts by persisting local state under `[baseline]` in `local/ai_lab_scenarios.conf` (for example `sequence_last_value` and TWAMP per-slice/per-session UL packet sequence state).
 
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
@@ -215,6 +218,7 @@ This contract applies when generating `index=twamp sourcetype=pca_twamp_csv` tog
   - `expected_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
   - no-loss case: `ul_rxpkts = expected_rxpkts`
   - loss case: `ul_rxpkts = max(0, expected_rxpkts - ul_lostpkts)`
+- After `apply_twamp_ul_packet_sequence` computes `*_rxpkts` from `*_rxpkts_expected` and `*_rxpkts_drop_rate`, it sets `*_lostpkts = max(0, expected - rx)` and `*_lostperc = round(100 * lost / expected)` (**integer percent 0–100**, **`0` if expected is `0`**), overwriting CSV placeholders so exported loss columns match sequence math and scenario dashboard 0–100% loss charts.
 - Persist TWAMP sequence state in `local/ai_lab_scenarios.conf` runtime keys so restart does not reset packet sequence continuity.
 
 ### Baseline verification (scripts + saved searches)
@@ -324,7 +328,7 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
 ## Scenario Activation Path
 
 - Dashboard view (`scenario_control`) executes custom search command `scenariocontrol`.
-- Command script `bin/scenario_control.py` writes scenario runtime values to `local/ai_lab_scenarios.conf`.
+- Command script `bin/scenario_control.py` reads effective config (default overlaid by `local/`) for `action=status` / `action=get`, and writes scenario runtime values to `local/ai_lab_scenarios.conf` for `action=set` (omit `action` to keep backward compatibility with the set path when `active` is passed).
 - Activation behavior:
   - Enable: set `<scenario>_activated` to current epoch time
   - Disable: set `<scenario>_activated` to `0`

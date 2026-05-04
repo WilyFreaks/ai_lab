@@ -146,18 +146,30 @@ def index_telemetry_placeholders(placeholders):
     return idx
 
 
-def enforce_telemetry_directional_conservation(replacements, placeholder_index, links):
-    # Enforce packet-loss-only model (no packet creation in transit) and
-    # bound modeled drop rate under 1% per link direction:
-    #   0 <= (ifOut - ifIn_peer) / ifOut < 0.01
-    # For non-positive ifOut, force ifIn to match ifOut.
+def telemetry_directional_min_receive_fraction(cfg, section):
+    pb = "telemetry#cnc_interface_counter_json#"
+    v = parse_float(cfg, section, f"{pb}directional_min_receive_fraction", default=None)
+    if v is None:
+        return 0.99
+    return max(0.0, min(1.0, v))
+
+
+def enforce_telemetry_directional_conservation(
+    replacements, placeholder_index, links, cfg, section
+):
+    # Enforce packet-loss-only model (no packet creation in transit). Baseline:
+    # bound modeled drop rate under 1% per link direction via
+    # telemetry#cnc_interface_counter_json#directional_min_receive_fraction = 0.99.
+    # Scenario overlays may set that fraction to 0 to allow large intentional gaps.
+    min_frac = telemetry_directional_min_receive_fraction(cfg, section)
+
     def _bounded_inbound(out_val, in_val):
         if out_val <= 0:
             return out_val
-        lower = out_val * 0.99
+        lower = out_val * min_frac
         if in_val > out_val:
             return out_val
-        if in_val < lower:
+        if min_frac > 0 and in_val < lower:
             return lower
         return in_val
 
@@ -551,6 +563,17 @@ def apply_twamp_ul_packet_sequence(
             replacements[drop_rate_key] = drop_rate
             replacements[rx_key] = rx_pkts
             replacements[rxbytes_key] = rx_pkts * 546
+            lostpkts_key = f"{prefix}_{direction}_lostpkts"
+            lostperc_key = f"{prefix}_{direction}_lostperc"
+            lost = max(0, int(expected_rx) - int(rx_pkts))
+            replacements[lostpkts_key] = lost
+            if expected_rx > 0:
+                # Integer percent 0-100 on the wire (dashboards use 0-100 loss% charts).
+                replacements[lostperc_key] = int(
+                    round(100.0 * float(lost) / float(expected_rx))
+                )
+            else:
+                replacements[lostperc_key] = 0
             twamp_ul_last_state[state_key] = last_pkt
 
 
@@ -772,7 +795,7 @@ def generate_stream(
                 )
             if telemetry_links:
                 enforce_telemetry_directional_conservation(
-                    replacements, telemetry_placeholder_index, telemetry_links
+                    replacements, telemetry_placeholder_index, telemetry_links, cfg, section
                 )
             apply_twamp_ul_packet_sequence(
                 replacements, stream, twamp_ul_last_state, cfg, section, local_dt

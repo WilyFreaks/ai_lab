@@ -23,6 +23,8 @@ Example:
 
 The same suffix supports optional tuning keys as for other streams (for example `.daily_min`, `.daily_max`, `.peak_rate_HH`, `.weekend_multiplier`, `.noise_stdev`, `.outlier_*`). See `default/ai_lab_scenarios.conf` for the full set.
 
+**Directional pairing (generators):** `telemetry#cnc_interface_counter_json#directional_min_receive_fraction` (default `0.99` in baseline) controls post-render clamping so peer `ifIn` stays within one minus that fraction of the connected `ifOut` (no invented packets). Scenario faults may set it to `0` so large intentional gaps (e.g. scenario 1 on R5→R7) are preserved.
+
 ## Metric placeholders in this sample
 
 These are the only `{{…}}` names used in `sample.json` besides `timestamp`:

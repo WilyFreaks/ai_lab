@@ -18,6 +18,13 @@ else:
             print(f"[Read error: {e}]")
         print("\n---\n")
 
+print("RESUME AFTER A BREAK (see docs/project_ai_lab.md -> Resume after a break):")
+print("- Reset -> mandatory bash scripts/test_smoke.sh; generation gate opens after workshop region lock + baseline_generation_enabled")
+print("- local/ai_lab_scenarios.conf is runtime/test-owned; agent changes target default/ and docs only")
+print("- live_log.py: scenario_happening_probability missing/invalid -> 1; no need to set cnc_service_health_json probability in [scenario_1] for full degradation each tick")
+print("- TWAMP: *_lostperc 0-100 integer percent; UL sequence continuity; scenario_1 loss correlated with telemetry for VLAN 1002/1003")
+print("- Restart workers or Splunk after generator/conf edits if processes were already running")
+print("")
 print("CURRENT IMPLEMENTATION FOCUS:")
 print("- Scenario dashboards (e.g. scenario_1_au.xml): edit under local/data/ui/views/; on explicit request ('copy local dashboard to default') full-copy to default/data/ui/views/; Splunk prefers local at runtime when both exist")
 print("- TWAMP baseline verification: saved searches twamp_event_count_test, twamp_dmean_test, twamp_jmean_test (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")

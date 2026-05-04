@@ -6,6 +6,17 @@ description: Validate ai_lab baseline/live generation with saved-search-first ch
 
 Use this skill when validating runtime generation behavior for `ai_lab`.
 
+## When you return (short handoff)
+
+Use this block when the operator is exhausted or returning after a long gap — **before** deep-diving code.
+
+- Read **`docs/project_ai_lab.md`** → *Resume after a break* for paths, reset gate, and credentials pointers.
+- If the user asks “where am I”, read **`docs/daily_activity_timeline.md`** first and report the latest **Resume anchor**.
+- **`scenario_happening_probability`:** evaluated in **`live_log.py`** during active scenario windows; **omitted or invalid → 1**. **`[scenario_1]`** does **not** need `telemetry#cnc_service_health_json#scenario_happening_probability` for deterministic degraded service-health rows.
+- **TWAMP:** `*_lostperc` = **0–100 integer percent**; rates = **pps**; correlate loss with `cnc_interface_counter_json` for VLAN **1002/1003** in `scenario_1`.
+- **After reset:** `scripts/test_smoke.sh` is mandatory before other tests; **post-generation:** `scripts/test_baseline.sh` (not immediately after reset with empty indexes).
+- Do **not** mutate **`local/`** from automation; treat as Splunk/test-owned.
+
 ## Core policy
 
 - Use saved searches in app `ai_lab` for app-level verification.
@@ -65,7 +76,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 - TWAMP UL packet sequence continuity is mandatory across backfill/live/restart:
   - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
   - no-loss check: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
-- During `scenario_1`, TWAMP packet-loss behavior must correlate with `cnc_interface_counter_json` packet-rate gap behavior for affected VLANs (1002/1003), not drift independently.
+- During `scenario_1`, TWAMP loss for **slice1002/slice1003** uses **`[scenario_1]`** `*_rxpkts_drop_rate = 0.3` (**ul/dl/rt**); generators derive `*_lostpkts` and `*_lostperc` (integer **percent 0–100**) from expected vs received counts so packet-loss columns align with `cnc_interface_counter_json` gap behavior for VLANs 1002/1003.
 - Index intent:
   - `ran`/`fwa` are reserved for other scenarios.
   - `alerts`/`episode` are derived from scheduled searches (not direct generator streams).
@@ -87,6 +98,13 @@ Use this when validating `index=telemetry sourcetype=cnc_srte_path_json`:
 2. Confirm event separation is correct (no multi-object merge in a single event).
 3. Confirm host metadata extraction works per event (`host` should reflect payload `vlan` values like `cnc_vlan1001..1004`).
 4. During active `scenario_1`, confirm impacted VLAN path ratio behavior follows `telemetry#cnc_srte_path_json#scenario_happening_probability` in a recent window.
+
+## Service health verification addendum
+
+Use this when validating `index=telemetry sourcetype=cnc_service_health_json` during **`scenario_1`**:
+
+1. Omit **`telemetry#cnc_service_health_json#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
+2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health_test` / saved-search contract).
 
 ## Imported dashboard data-source audit
 

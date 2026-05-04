@@ -109,6 +109,7 @@ scenario_1_fault_duration = 0
 - In `[scenario_*]`, define only values that must change during the fault.
 - If a key is not defined in `[scenario_*]`, generator behavior falls back to baseline.
 - For Scenario 1 specifically, ThousandEyes metrics can remain unchanged while telemetry/TWAMP and CNC-path *fields* (for example `cnc_srte_path_json`) carry the fault signal.
+- **`cnc_service_health_json`**: during **`scenario_1`**, degraded status/score placeholders apply each tick without setting `telemetry#cnc_service_health_json#scenario_happening_probability` — **`live_log.py`** defaults that key to **`1`** when omitted (see `docs/project_scenario_1.md`).
 
 ## Sample Directory Structure
 

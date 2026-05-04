@@ -1,6 +1,6 @@
-<form version="1.1" theme="light">
+<form version="1.1" script="scenario_control_status.js" theme="light">
   <label>Scenario Control</label>
-  <description>Enable sets &lt;scenario&gt;_activated to the current epoch time; disable sets it to 0 in local/ai_lab_scenarios.conf. Choose values below, then click Submit to run the command once.</description>
+  <description>Changing the scenario reloads the saved activation, fault start, and fault duration from local/ai_lab_scenarios.conf (read-only status). Submit applies your edits: Enable sets &lt;scenario&gt;_activated to the current epoch time; Disable sets it to 0.</description>
   <row>
     <panel>
       <html>
@@ -35,7 +35,7 @@
     <panel>
       <table>
         <search>
-          <query>| scenariocontrol scenario="$form.scenario$" active="$form.active$" fault_start="$form.fault_start$" fault_duration="$form.fault_duration$"</query>
+          <query>| scenariocontrol action=set scenario="$form.scenario$" active="$form.active$" fault_start="$form.fault_start$" fault_duration="$form.fault_duration$"</query>
         </search>
         <option name="count">10</option>
       </table>

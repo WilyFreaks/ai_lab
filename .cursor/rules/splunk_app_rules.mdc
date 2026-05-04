@@ -15,6 +15,15 @@ Session resume ("where i am" / "where am i" / "resume my work"):
 - Always read `docs/daily_activity_timeline.md` as the first action when the user asks where they are or wants to resume the project.
 - Report the current session's resume anchor and the most recent activity summary.
 
+When you return tired or after a long break (minimal re-orientation — no extra files to open):
+- **Handoff one-pager:** `docs/project_ai_lab.md` → subsection *Resume after a break*.
+- **`local/`:** do not edit or seed `local/ai_lab_scenarios.conf` from agents; ship changes in `default/` and docs only.
+- **Reset discipline:** every full reset → immediately `bash scripts/test_smoke.sh` before generation or baseline tests.
+- **Live scenario math:** `scenario_happening_probability` is evaluated in `live_log.py` only; **missing or invalid → treated as 1** (always apply scenario keys that tick). Do **not** add `telemetry#cnc_service_health_json#scenario_happening_probability = 1` in `[scenario_1]` unless you want an explicit override — it is redundant with the default.
+- **TWAMP wire:** `*_lostperc` is **integer percent 0–100**, not millionths; packet-rate fields are **pps**; UL sequence continuity rules apply (see `docs/project_scenario_1.md`, `samples/twamp/pca_twamp_csv/README.md`).
+- **After changing generators or `default/ai_lab_scenarios.conf`:** workshop hosts may need to **restart** `live_log.py` / `backfill_log.py` (or Splunk) so running workers reload behavior — see `docs/project_script_design.md` (*launcher / workers*).
+- **Journal:** update `docs/daily_activity_timeline.md` **only** when the user explicitly asks (same rule when tired).
+
 When modifying Splunk configuration:
 - Inspect existing files under default/
 - Follow existing stanza naming patterns
@@ -42,6 +51,8 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - TWAMP CSV wire format: **integer-only** metric cells after generation (see `samples/twamp/pca_twamp_csv/README.md` and `format_pca_twamp_csv_metric` / `normalize_pca_twamp_csv_replacements` in `bin/backfill_log.py` / `bin/live_log.py`).
 - TWAMP delay/jitter on the wire: **`noise_stdev × ε`** per slice per event (one shared standard-normal **ε** per slice so integer delay/jitter columns move together); tune `twamp#pca_twamp_csv#default.noise_stdev` in `default/ai_lab_scenarios.conf`. Detail: `docs/project_script_design.md` (*TWAMP + Telemetry Correlation Contract*).
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
+- TWAMP `*_lostperc` on the wire: integer **percent 0–100** (from lost vs expected counts under scenario loss), not millionths; align dashboards/tests to that scale.
+- Scenario 1 `cnc_service_health_json`: **`[scenario_1]`** overrides degraded **sr_policy** placeholders; **`scenario_happening_probability`** need not be set — it **defaults to 1** when missing (see `docs/project_scenario_1.md`).
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):
 - This file is the project daily journal, but is updated **only when the user explicitly requests** an update to `docs/daily_activity_timeline.md` (no proactive edits).

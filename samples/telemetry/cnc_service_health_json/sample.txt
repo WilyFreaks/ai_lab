@@ -124,7 +124,7 @@
             "category": "sr_policy",
             "device": "R9-NCS540",
             "health_status": "{{impacted_sre_policy_health_status}}",
-            "health_score": 100
+            "health_score": {{impacted_sr_policy_health_score}}
         },
         {
             "category": "pcep_session_health",
@@ -195,7 +195,7 @@
             "category": "sr_policy",
             "device": "R9-NCS540",
             "health_status": "{{impacted_sre_policy_health_status}}",
-            "health_score": 100
+            "health_score": {{impacted_sr_policy_health_score}}
         },
         {
             "category": "pcep_session_health",

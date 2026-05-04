@@ -7,7 +7,23 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-05 (Tue)
+
+- Session 3 (carryover from 2026-05-04) around **00:00-06:57 JST** in this chat
+- Main activities:
+  - Dropped redundant `telemetry#cnc_service_health_json#scenario_happening_probability` from `[scenario_1]` in `default/ai_lab_scenarios.conf` (matches **`live_log.py`** default **1.0** when missing); refreshed scenario/service-health docs and sample README
+  - Aligned requirements: TWAMP **`*_lostperc`** as **integer percent 0–100**; **`scenario_happening_probability`** semantics across rules, `.cursor/skills/ai-lab-runtime-validation/SKILL.md`, hook scripts, and project docs
+  - Added **Resume after a break** handoff blocks to `.cursor/rules/splunk_app_rules.mdc`, skill, `context-splunk-skills.sh`, `context-project-docs.sh`, `docs/project_ai_lab.md`, `docs/project_script_design.md`, and `docs/project_test_design.md`
+  - Closed out Session 3 in this journal with explicit next anchor
+- Resume anchor:
+  - **Continue scenario activation implementations** — `scenario_control` / `scenariocontrol`, **`scenario_1`** fault timing keys, live **`live_log.py`** behavior during active windows, and end-to-end validation that telemetry / TWAMP / SR-TE respond when a scenario is enabled.
+
 ## 2026-05-04 (Mon)
+
+- Session 3 around **11:00-23:59 JST** in this chat (part 1; **continued 2026-05-05** — see carryover block there for close-out and resume anchor)
+- Main activities:
+  - Resumed project work after pushing `main` to GitHub and optional `origin` URL note (`WilyFreaks` vs `wilyfreaks`)
+  - Requested a new journal session; continuing from the prior close-out focus on **scenario activation** (dashboard migration treated complete)
 
 - Session 2 around **17:00-22:00 JST** in this chat (closed; end time approximate)
 - Main activities:
@@ -327,7 +343,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-04: ~701 minutes (2 sessions), ~115,000 estimated tokens
+- 2026-05-05: ~417 minutes (1 session), ~48,000 estimated tokens
+- 2026-05-04: ~1,480 minutes (3 sessions), ~165,000 estimated tokens
 - 2026-05-03: ~513 minutes (6 sessions), ~185,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
 - 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
@@ -343,7 +360,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-04 | ~701 minutes (2 sessions) | ~115,000 |
+| 2026-05-05 | ~417 minutes (1 session) | ~48,000 |
+| 2026-05-04 | ~1,480 minutes (3 sessions) | ~165,000 |
 | 2026-05-03 | ~513 minutes (6 sessions) | ~185,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
 | 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |

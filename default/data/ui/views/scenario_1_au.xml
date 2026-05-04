@@ -452,7 +452,7 @@
 | rename host_name as router1_name if_name as interface1 
 | table _time router1_name interface1 ifInPktsRate ifOutPktsRate 
 | bin span=1m _time 
-| stats sum(ifInPktsRate) as ifInPktsRate1 sum(ifOutPktsRate) as ifOutPktsRate1 by _time router1_name interface1 
+| stats avg(ifInPktsRate) as ifInPktsRate1 avg(ifOutPktsRate) as ifOutPktsRate1 by _time router1_name interface1 
 | join router1_name interface1 
     [ inputlookup router_if_connections.csv 
     | appendpipe 
@@ -472,10 +472,11 @@
     | rename host_name as router2_name if_name as interface2 
     | table _time router2_name interface2 ifInPktsRate ifOutPktsRate 
     | bin span=1m _time 
-    | stats sum(ifInPktsRate) as ifInPktsRate2 sum(ifOutPktsRate) as ifOutPktsRate2 by _time router2_name interface2] 
+    | stats avg(ifInPktsRate) as ifInPktsRate2 avg(ifOutPktsRate) as ifOutPktsRate2 by _time router2_name interface2] 
 | eval path=router1.":".interface1."_".router2.":".interface2 
+| eval directional_gap=round(ifOutPktsRate1 - ifInPktsRate2, 2) 
 | search (router1_name=* OR router2_name=*) AND path="*$ROUTER$*" 
-| timechart span=1m useother=f limit=30 avg(ifOutPktsRate1) as ifOutPktsRate sum(ifInPktsRate2) as ifInPktsRate by path</query>
+| timechart span=1m useother=f limit=30 avg(ifOutPktsRate1) as ifOut_router1_side avg(ifInPktsRate2) as ifIn_router2_side avg(directional_gap) as gap_ifOut_minus_ifIn by path</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -486,14 +487,14 @@
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
         <option name="charting.axisTitleX.visibility">collapsed</option>
         <option name="charting.axisTitleY.visibility">collapsed</option>
-        <option name="charting.axisTitleY2.visibility">collapsed</option>
+        <option name="charting.axisTitleY2.visibility">visible</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
         <option name="charting.axisY.abbreviation">none</option>
         <option name="charting.axisY.scale">linear</option>
         <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">0</option>
-        <option name="charting.axisY2.scale">inherit</option>
+        <option name="charting.axisY2.enabled">1</option>
+        <option name="charting.axisY2.scale">linear</option>
         <option name="charting.chart">line</option>
         <option name="charting.chart.bubbleMaximumSize">50</option>
         <option name="charting.chart.bubbleMinimumSize">10</option>
@@ -503,12 +504,13 @@
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">default</option>
         <option name="charting.chart.style">shiny</option>
+        <option name="charting.chart.overlayFields">gap_ifOut_minus_ifIn</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
         <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
         <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
         <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">none</option>
+        <option name="charting.legend.placement">bottom</option>
         <option name="charting.lineWidth">2</option>
         <option name="height">627</option>
         <option name="refresh.display">progressbar</option>

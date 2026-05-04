@@ -31,7 +31,7 @@ UL placeholders:
 | `{{slice1001_ul_lostperiods}}` | Uplink one-way (source to destination) count of loss periods | `0` |
 | `{{slice1001_ul_lostburstmin}}` | Uplink one-way (source to destination) minimum burst length of consecutive lost packets | `0` |
 | `{{slice1001_ul_lostburstmax}}` | Uplink one-way (source to destination) maximum burst length of consecutive lost packets | `0` |
-| `{{slice1001_ul_lostperc}}` | Uplink one-way (source to destination) packet loss ratio (export scale; often basis points) | `0` |
+| `{{slice1001_ul_lostperc}}` | Uplink one-way packet loss (**integer percent 0–100**; generators set from `*_rxpkts_expected`, `*_rxpkts_drop_rate`, and derived `*_rxpkts`) | `0` |
 | `{{slice1001_ul_mos}}` | Uplink one-way (source to destination) Mean Opinion Score (MOS) quality estimate | `4409286` |
 | `{{slice1001_ul_r}}` | Uplink one-way (source to destination) R-factor quality score | `93200000` |
 | `{{slice1001_ul_tosmin}}` | Uplink one-way (source to destination) minimum observed IP ToS/DSCP value | `0` |
@@ -89,7 +89,7 @@ DL placeholders:
 | `{{slice1001_dl_lostperiods}}` | Downlink one-way (destination to source) count of loss periods | `0` |
 | `{{slice1001_dl_lostburstmin}}` | Downlink one-way (destination to source) minimum burst length of consecutive lost packets | `0` |
 | `{{slice1001_dl_lostburstmax}}` | Downlink one-way (destination to source) maximum burst length of consecutive lost packets | `0` |
-| `{{slice1001_dl_lostperc}}` | Downlink one-way (destination to source) packet loss ratio (export scale; often basis points) | `0` |
+| `{{slice1001_dl_lostperc}}` | Downlink one-way packet loss (**integer percent 0–100**; same derivation as UL) | `0` |
 | `{{slice1001_dl_mos}}` | Downlink one-way (destination to source) Mean Opinion Score (MOS) quality estimate | `4409286` |
 | `{{slice1001_dl_r}}` | Downlink one-way (destination to source) R-factor quality score | `93200000` |
 | `{{slice1001_dl_tosmin}}` | Downlink one-way (destination to source) minimum observed IP ToS/DSCP value | `0` |
@@ -184,6 +184,8 @@ Packet sequence contract per slice (applies to `ul_*`, `dl_*`, and `rt_*`):
 - `<dir>_rxpkts = <dir>_rxpkts_expected * (1 - <dir>_rxpkts_drop_rate)`.
 - `<dir>_rxbytes = <dir>_rxpkts * 546` (effective payload size per packet for this workshop model; **generators compute this**—do not rely on separate `*_rxbytes` keys in `ai_lab_scenarios.conf` unless you add them as explicit placeholders).
 - `<dir>_lastpktSeq = <dir>_firstpktSeq + <dir>_rxpkts_expected` (use expected count, not `<dir>_rxpkts`, to model packet drop).
+- `<dir>_lostpkts` and `<dir>_lostperc` are recomputed from expected, drop rate, and derived `<dir>_rxpkts` (generators overwrite template/conf placeholders for these).
+- `<dir>_lostperc` on the wire is an **integer percent 0–100** (`round(100 * lost / expected)`), aligned with workshop dashboards that chart loss on a 0–100% axis.
 - Continuity expectation: next event `<dir>_firstpktSeq = previous <dir>_lastpktSeq + 1`.
 
 **Conf vs `sample.csv`:** The shipped template lists `{{slice1001_ul_rxpkts}}` (and DL/RT) but not `{{slice1001_ul_rxpkts_expected}}`. Expected counts and drop rates are defined only under keys like `twamp#pca_twamp_csv#slice1001_ul_rxpkts_expected`; `backfill_log.py` / `live_log.py` **read those keys inside `apply_twamp_ul_packet_sequence`** and then overwrite `*_rxpkts` / `*_rxbytes` per the formulas above.
