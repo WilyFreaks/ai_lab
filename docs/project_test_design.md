@@ -136,7 +136,7 @@ Execution sequencing (important):
    - after reset, generation is still gated (`baseline_generation_enabled=false` until region lock path runs)
    - you must lock/select region first (for example via Workshop Introduction Submit, or `| workshopregion action="set" region="<au|jp>"`)
    - only after this step should `backfill_log.py`/`live_log.py` populate datasets
-4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated.
+4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated. This entrypoint runs `scripts/test_backfill.sh`, including TWAMP assertions (`twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`); optional env `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` adjusts the minute-bucket expectation for `twamp_event_count_test`.
 5. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
 6. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
 
@@ -158,6 +158,9 @@ Saved-search contract for baseline/live verification:
   - `thousandeyes_response_time_sec_test`
   - `cnc_srte_path_test`
   - `cnc_service_health_test`
+  - `twamp_event_count_test`
+  - `twamp_dmean_test`
+  - `twamp_jmean_test`
 - Live verification window:
   - use a recent bounded window (recommended `earliest=-5m latest=now`) when confirming active `live_log.py` generation.
 
@@ -171,6 +174,9 @@ Saved-search quality intent for backfill checks:
 - `cnc_interface_ifInPktsRate_test`, `cnc_interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
   - values should fluctuate gradually, unless an explicitly activated scenario fault window expects abrupt change
+- `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` (see `scripts/test_backfill.sh`):
+  - minute buckets with TWAMP events in the last 5 minutes (nominal ~5; partial-window edges may be lower)
+  - average `ul`/`dl`/`rt` `dmean` and `jmean` within aggregated `daily_min`/`daily_max` from `default/ai_lab_scenarios.conf`, with tolerance from per-metric or default TWAMP `noise_stdev`
 
 ---
 

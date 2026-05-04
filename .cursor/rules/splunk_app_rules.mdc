@@ -30,6 +30,9 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - Keep weekend/weekday transition behavior smooth.
 - Avoid abrupt value jumps at boundary times (notably Sunday 22:00-23:59 JST).
 - Use interpolation windows around Fri→Sat and Sun→Mon transitions.
+- For TWAMP (`pca_twamp_csv`) correlated with `cnc_interface_counter_json`, treat packet-rate fields as packets-per-second (pps) and keep cross-source packet-loss behavior aligned per tick during scenario windows.
+- TWAMP CSV wire format: **integer-only** metric cells after generation (see `samples/twamp/pca_twamp_csv/README.md` and `format_pca_twamp_csv_metric` / `normalize_pca_twamp_csv_replacements` in `bin/backfill_log.py` / `bin/live_log.py`).
+- Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):
 - This file is the project daily journal, but is updated **only when the user explicitly requests** an update to `docs/daily_activity_timeline.md` (no proactive edits).
@@ -81,6 +84,10 @@ Saved-search validation rules (Splunk test/verification):
   - `thousandeyes_response_time_sec_test`
   - `cnc_srte_path_test`
   - `cnc_service_health_test`
+  - `twamp_event_count_test` (minute buckets with TWAMP events in last 5m; asserted in `scripts/test_backfill.sh`)
+  - `twamp_dmean_test` (avg `ul`/`dl`/`rt` delay means vs `default/ai_lab_scenarios.conf` bounds; asserted in `scripts/test_backfill.sh`)
+  - `twamp_jmean_test` (avg `ul`/`dl`/`rt` jitter means vs conf bounds; asserted in `scripts/test_backfill.sh`)
+- Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ.
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
 

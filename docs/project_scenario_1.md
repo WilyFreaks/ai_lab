@@ -40,3 +40,12 @@ fault_duration = 0       # minutes how long to keep the fault, 0 means the fault
   - `R9` lower than `R7`
   - downstream routers smaller uplift
 - Represent link loss explicitly using interface pair mismatch on faulted direction (e.g., `R7 ifOut` vs `R5 ifIn`).
+
+## TWAMP Correlation Decisions (Scenario 1)
+
+- TWAMP loss behavior must be correlated with `cnc_interface_counter_json` directional packet-rate gaps for affected VLANs (`1002`, `1003`) during the same tick window.
+- Do not model TWAMP loss independently when scenario loss is active; derive TWAMP `ul_rxpkts`/`ul_lostpkts` from the same per-tick loss context used for telemetry directional gap behavior.
+- TWAMP UL packet sequence continuity must hold per slice/session:
+  - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
+  - no-loss expectation: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
+- For workshop assumptions, packet-rate style fields are interpreted as packets per second (pps); window-level expected packets are computed as `pps * window_seconds`.

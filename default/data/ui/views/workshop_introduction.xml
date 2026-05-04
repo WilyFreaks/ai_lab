@@ -39,6 +39,9 @@
               <set token="status_enabled">$result.baseline_generation_enabled$</set>
               <set token="status_backfill_start">$result.backfill_start_time$</set>
               <set token="status_backfill_completed">$result.backfill_completed$</set>
+              <set token="status_backfill_duration">$result.backfill_duration$</set>
+              <set token="status_backfill_completed_time">$result.backfill_completed_time$</set>
+              <set token="status_backfill_run_started_time">$result.backfill_run_started_time$</set>
               <set token="region_locked">true</set>
               <unset token="region_unlocked"></unset>
             </condition>

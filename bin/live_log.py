@@ -19,51 +19,133 @@ LOOKUPS_DIR = os.path.join(APP_ROOT, "lookups")
 
 PLACEHOLDER_RE = re.compile(r"\{\{([A-Za-z0-9_]+)\}\}")
 
+# TWAMP slice placeholders that inherit twamp#pca_twamp_csv#default.noise_stdev (delay/jitter only).
+_TWAMP_DELAY_JITTER_NAME = re.compile(
+    r"^slice\d+_(ul|dl|rt)_("
+    r"dmin|dmax|dmean|dStdDev|dp25|dp50|dp75|dp95|dpLo|dpMi|dpHi|"
+    r"jmin|jmax|jmean|jStdDev|jp25|jp50|jp75|jp95|jpLo|jpMi|jpHi|"
+    r"dvmax|dvmean|dvp25|dvp50|dvp75|dvp95|dvpLo|dvpMi|dvpHi"
+    r")$",
+    re.I,
+)
+
+
+def stream_default_metric_prefix(prefix):
+    parts = prefix.split("#", 2)
+    if len(parts) != 3:
+        return None
+    return f"{parts[0]}#{parts[1]}#default"
+
+
+def resolve_noise_stdev(cfg, section, prefix):
+    own = f"{prefix}.noise_stdev"
+    if cfg.has_option(section, own):
+        return parse_float(cfg, section, own, default=0.0) or 0.0
+    parts = prefix.split("#", 2)
+    if len(parts) == 3 and parts[0] == "twamp" and parts[1] == "pca_twamp_csv":
+        if _TWAMP_DELAY_JITTER_NAME.match(parts[2]):
+            dp = stream_default_metric_prefix(prefix)
+            if dp:
+                return parse_float(cfg, section, f"{dp}.noise_stdev", default=0.0) or 0.0
+    return 0.0
+
+
+def format_pca_twamp_csv_metric(_placeholder, value):
+    """PCA TWAMP CSV exports use integer cells (lab style); round after metric_value + noise."""
+    try:
+        return int(round(float(value)))
+    except (TypeError, ValueError):
+        return value
+
+
+_PCA_TWAMP_TIME_KEYS = frozenset({"startTime", "timestamp"})
+
+
+def normalize_pca_twamp_csv_replacements(replacements):
+    """
+    PCA TWAMP CSV cells are integer-only on the wire. Coerce numeric strings,
+    floats, and any leftover metric outputs before templating.
+    """
+    for key, value in list(replacements.items()):
+        if key in _PCA_TWAMP_TIME_KEYS:
+            continue
+        if isinstance(value, bool):
+            continue
+        if type(value) is int:
+            continue
+        if isinstance(value, float):
+            replacements[key] = int(round(value))
+            continue
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                continue
+            try:
+                replacements[key] = int(round(float(s)))
+            except ValueError:
+                pass
+
+
 REGION_TZ = {
     "au": "Australia/Sydney",
     "jp": "Asia/Tokyo",
 }
 
 LIVE_CURSOR_KEY = "live_last_tick_epoch"
+SEQUENCE_LAST_KEY = "sequence_last_value"
+TWAMP_UL_LAST_STATE_KEY = "twamp_ul_lastpktseq_state_json"
+TWAMP_UL_FIRSTPKTSEQ_SEED = 5_000_000
+# Cap how many minute ticks we process per scheduler pass when catching up (avoids a tight
+# CPU loop if live_log was stopped for days). Override with AI_LAB_LIVE_CATCHUP_BATCH_MINUTES.
+LIVE_CATCHUP_BATCH_MINUTES = max(
+    1, int(os.environ.get("AI_LAB_LIVE_CATCHUP_BATCH_MINUTES", "120"))
+)
 
-STREAMS = [
-    {
-        "index": "thousandeyes",
-        "sourcetype": "cisco:thousandeyes:metric",
-        "sample": os.path.join(
-            SAMPLES_DIR, "thousandeyes", "cisco:thousandeyes:metric", "sample.json"
-        ),
-        "spool_dir": os.path.join(
-            SPOOL_ROOT, "thousandeyes", "cisco_thousandeyes_metric"
-        ),
-    },
-    {
-        "index": "telemetry",
-        "sourcetype": "cnc_interface_counter_json",
-        "sample": os.path.join(
-            SAMPLES_DIR, "telemetry", "cnc_interface_counter_json", "sample.json"
-        ),
-        "spool_dir": os.path.join(
-            SPOOL_ROOT, "telemetry", "cnc_interface_counter_json"
-        ),
-    },
-    {
-        "index": "telemetry",
-        "sourcetype": "cnc_srte_path_json",
-        "sample": os.path.join(
-            SAMPLES_DIR, "telemetry", "cnc_srte_path_json", "sample.txt"
-        ),
-        "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_srte_path_json"),
-    },
-    {
-        "index": "telemetry",
-        "sourcetype": "cnc_service_health_json",
-        "sample": os.path.join(
-            SAMPLES_DIR, "telemetry", "cnc_service_health_json", "sample.txt"
-        ),
-        "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_service_health_json"),
-    },
-]
+def build_streams():
+    return [
+        {
+            "index": "thousandeyes",
+            "sourcetype": "cisco:thousandeyes:metric",
+            "sample": os.path.join(
+                SAMPLES_DIR, "thousandeyes", "cisco:thousandeyes:metric", "sample.json"
+            ),
+            "spool_dir": os.path.join(
+                SPOOL_ROOT, "thousandeyes", "cisco_thousandeyes_metric"
+            ),
+        },
+        {
+            "index": "telemetry",
+            "sourcetype": "cnc_interface_counter_json",
+            "sample": os.path.join(
+                SAMPLES_DIR, "telemetry", "cnc_interface_counter_json", "sample.json"
+            ),
+            "spool_dir": os.path.join(
+                SPOOL_ROOT, "telemetry", "cnc_interface_counter_json"
+            ),
+        },
+        {
+            "index": "telemetry",
+            "sourcetype": "cnc_srte_path_json",
+            "sample": os.path.join(
+                SAMPLES_DIR, "telemetry", "cnc_srte_path_json", "sample.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_srte_path_json"),
+        },
+        {
+            "index": "telemetry",
+            "sourcetype": "cnc_service_health_json",
+            "sample": os.path.join(
+                SAMPLES_DIR, "telemetry", "cnc_service_health_json", "sample.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_service_health_json"),
+        },
+        {
+            "index": "twamp",
+            "sourcetype": "pca_twamp_csv",
+            "sample": os.path.join(SAMPLES_DIR, "twamp", "pca_twamp_csv", "sample.csv"),
+            "spool_dir": os.path.join(SPOOL_ROOT, "twamp", "pca_twamp_csv"),
+        },
+    ]
 
 
 def telemetry_link_lookup_path():
@@ -192,17 +274,10 @@ def get_region_tz(cfg):
     return ZoneInfo(tz_name), region or "unknown"
 
 
-def format_domain_timestamp(local_dt, region):
-    wall = local_dt.strftime("%Y-%m-%dT%H:%M:%S")
-    if region == "jp":
-        return f"{wall} JST"
-    if region == "au":
-        abbr = local_dt.tzname() or ""
-        if abbr:
-            return f"{wall} {abbr}"
-        return f"{wall} AEST"
-    tzabbr = (local_dt.tzname() or "UTC").strip()
-    return f"{wall} {tzabbr}"
+def format_domain_timestamp(local_dt, _region):
+    # ISO-style wall time with numeric offset (+0900 / +1000 / +1100) so Splunk strptime
+    # matches reliably (CSV TWAMP had no TIME_FORMAT and mis-parsed "AEST" as ~1h fast).
+    return local_dt.strftime("%Y-%m-%dT%H:%M:%S%z")
 
 
 def parse_float(cfg, section, key, default=None):
@@ -226,6 +301,82 @@ def parse_int(cfg, section, key, default=None):
         return int(float(cfg.get(section, key)))
     except Exception:
         return default
+
+
+def resolve_start_sequence():
+    local_cfg = read_local_conf()
+    return max(0, parse_int(local_cfg, "baseline", SEQUENCE_LAST_KEY, default=0) or 0)
+
+
+def persist_last_sequence(value):
+    local_cfg = read_local_conf()
+    if not local_cfg.has_section("baseline"):
+        local_cfg.add_section("baseline")
+    local_cfg.set("baseline", SEQUENCE_LAST_KEY, str(max(0, int(value))))
+    write_local_conf(local_cfg)
+
+
+def safe_int(value, default=None):
+    try:
+        return int(float(value))
+    except Exception:
+        return default
+
+
+def safe_float(value, default=None):
+    try:
+        return float(value)
+    except Exception:
+        return default
+
+
+def twamp_slice_prefixes(replacements):
+    prefixes = set()
+    for key in replacements:
+        for direction in ("ul", "dl", "rt"):
+            suffix = f"_{direction}_firstpktSeq"
+            if key.endswith(suffix):
+                prefixes.add(key[: -len(suffix)])
+                break
+    return sorted(p for p in prefixes if p)
+
+
+def resolve_twamp_ul_last_state():
+    local_cfg = read_local_conf()
+    raw = local_cfg.get("baseline", TWAMP_UL_LAST_STATE_KEY, fallback="").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out = {}
+    for key, value in parsed.items():
+        seq = safe_int(value, default=None)
+        if seq is None:
+            continue
+        out[str(key)] = max(0, seq)
+    return out
+
+
+def persist_twamp_ul_last_state(state):
+    normalized = {}
+    for key, value in (state or {}).items():
+        seq = safe_int(value, default=None)
+        if seq is None:
+            continue
+        normalized[str(key)] = max(0, seq)
+    local_cfg = read_local_conf()
+    if not local_cfg.has_section("baseline"):
+        local_cfg.add_section("baseline")
+    local_cfg.set(
+        "baseline",
+        TWAMP_UL_LAST_STATE_KEY,
+        json.dumps(normalized, separators=(",", ":")),
+    )
+    write_local_conf(local_cfg)
 
 
 def weekend_multiplier(local_dt, configured):
@@ -288,11 +439,87 @@ def metric_value(cfg, section, prefix, local_dt):
         if omin is not None and omax is not None:
             value = random.uniform(min(omin, omax), max(omin, omax))
 
-    noise = parse_float(cfg, section, f"{prefix}.noise_stdev", default=0.0) or 0.0
+    noise = resolve_noise_stdev(cfg, section, prefix)
     if noise > 0:
         value += random.gauss(0.0, noise)
 
     return value
+
+
+def apply_twamp_ul_packet_sequence(
+    replacements, stream, twamp_ul_last_state, cfg, section, local_dt
+):
+    stream_key = f"{stream['index']}#{stream['sourcetype']}"
+    prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+    session_name = str(replacements.get("session_name", "")).strip()
+    prefixes = twamp_slice_prefixes(replacements)
+    if not prefixes:
+        return
+
+    for prefix in prefixes:
+        for direction in ("ul", "dl", "rt"):
+            first_key = f"{prefix}_{direction}_firstpktSeq"
+            last_key = f"{prefix}_{direction}_lastpktSeq"
+            rx_key = f"{prefix}_{direction}_rxpkts"
+            expected_key = f"{prefix}_{direction}_rxpkts_expected"
+            drop_rate_key = f"{prefix}_{direction}_rxpkts_drop_rate"
+            rxbytes_key = f"{prefix}_{direction}_rxbytes"
+
+            required = (first_key, last_key, rx_key)
+            if not all(field in replacements for field in required):
+                continue
+
+            state_key_parts = [stream_key, prefix, direction]
+            if session_name:
+                state_key_parts.insert(1, session_name)
+            state_key = ":".join(state_key_parts)
+
+            prev_last = twamp_ul_last_state.get(state_key)
+            if prev_last is None:
+                prev_last = TWAMP_UL_FIRSTPKTSEQ_SEED - 1
+
+            expected_rx = safe_int(replacements.get(expected_key), default=None)
+            if expected_rx is None:
+                mv = metric_value(cfg, section, f"{prefix_base}{expected_key}", local_dt)
+                if mv is not None:
+                    expected_rx = int(round(mv))
+            if expected_rx is None:
+                expected_rx = safe_int(replacements.get(rx_key), default=None)
+            if expected_rx is None:
+                seeded_first = safe_int(replacements.get(first_key), default=None)
+                seeded_last = safe_int(replacements.get(last_key), default=None)
+                if (
+                    seeded_first is not None
+                    and seeded_last is not None
+                    and seeded_last >= seeded_first
+                ):
+                    expected_rx = seeded_last - seeded_first
+                else:
+                    expected_rx = 0
+            expected_rx = max(0, int(expected_rx))
+
+            dr_raw = replacements.get(drop_rate_key)
+            if dr_raw is None or str(dr_raw).strip() == "":
+                mv_dr = metric_value(cfg, section, f"{prefix_base}{drop_rate_key}", local_dt)
+                drop_rate = float(mv_dr) if mv_dr is not None else 0.0
+            else:
+                drop_rate = safe_float(dr_raw, default=0.0)
+                if drop_rate is None:
+                    drop_rate = 0.0
+            drop_rate = max(0.0, min(1.0, float(drop_rate)))
+
+            first_pkt = int(prev_last) + 1
+            last_pkt = first_pkt + expected_rx
+            rx_pkts = int(round(expected_rx * (1.0 - drop_rate)))
+            rx_pkts = max(0, min(expected_rx, rx_pkts))
+
+            replacements[first_key] = first_pkt
+            replacements[last_key] = last_pkt
+            replacements[expected_key] = expected_rx
+            replacements[drop_rate_key] = drop_rate
+            replacements[rx_key] = rx_pkts
+            replacements[rxbytes_key] = rx_pkts * 546
+            twamp_ul_last_state[state_key] = last_pkt
 
 
 def telemetry_rate_max_step(cfg, section, prefix):
@@ -329,10 +556,24 @@ def coerce_placeholder(
 ):
     if placeholder == "timestamp":
         return format_domain_timestamp(local_dt, region)
+    if placeholder == "startTime":
+        return format_domain_timestamp(local_dt, region)
     if placeholder == "sequence":
         return sequence
     if placeholder == "sourcetype":
         return stream["sourcetype"]
+    if placeholder == "intervalms":
+        ib = f"{stream['index']}#{stream['sourcetype']}#"
+        eis = parse_int(cfg, section, f"{ib}event_interval_sec", default=None)
+        if eis and eis > 0:
+            return eis * 1000
+        raw_value = cfg.get(section, prefix, fallback=None)
+        if raw_value is not None:
+            try:
+                return int(float(str(raw_value).strip()))
+            except Exception:
+                pass
+        return 0
 
     value = metric_value(cfg, section, prefix, local_dt)
     if value is not None:
@@ -343,13 +584,21 @@ def coerce_placeholder(
             telemetry_rate_state[prefix] = value
         if placeholder in ("availability", "http_status_code"):
             return int(round(value))
+        if stream.get("sourcetype") == "pca_twamp_csv":
+            return format_pca_twamp_csv_metric(placeholder, value)
         return round(value, 6)
 
     # Fallback for non-numeric template values (for example JSON fragments used in .txt samples).
     raw_value = cfg.get(section, prefix, fallback=None)
     if raw_value is None:
         return 0
-    return str(raw_value).strip()
+    s = str(raw_value).strip()
+    if stream.get("sourcetype") == "pca_twamp_csv":
+        try:
+            return int(round(float(s)))
+        except ValueError:
+            return s
+    return s
 
 
 def scenario_happening_probability(cfg, section, prefix_base):
@@ -362,16 +611,46 @@ def sample_extension(sample_path):
     return ext or ".txt"
 
 
+def csv_header_and_body(full_text, sample_path):
+    """
+    Split a CSV sample into the single header line (written once per output file)
+    and the remaining template body (rendered for each event).
+    """
+    text = full_text.replace("\r\n", "\n").replace("\r", "\n")
+    if "\n" not in text:
+        raise ValueError(
+            f"CSV sample must contain a header line and body: {sample_path}"
+        )
+    header_line, body = text.split("\n", 1)
+    if not body.strip():
+        raise ValueError(
+            f"CSV sample must include at least one data line after header: {sample_path}"
+        )
+    return header_line, body
+
+
 def render_template(template_text, replacements, sample_path):
+    ext = sample_extension(sample_path)
+
+    def _format_csv_number(n):
+        if isinstance(n, bool):
+            return str(n)
+        if isinstance(n, int):
+            return str(n)
+        if isinstance(n, float):
+            return str(int(round(n)))
+        return str(n)
+
     def _sub(match):
         key = match.group(1)
         value = replacements.get(key, "")
+        if ext == ".csv" and isinstance(value, (int, float)):
+            return _format_csv_number(value)
         if isinstance(value, (int, float)):
             return str(value)
         return str(value)
 
     rendered = PLACEHOLDER_RE.sub(_sub, template_text)
-    ext = sample_extension(sample_path)
     if ext == ".json":
         # Keep NDJSON compact output for JSON templates.
         return [json.dumps(json.loads(rendered), separators=(",", ":"))]
@@ -440,12 +719,36 @@ def minute_due_for_interval(ts, interval_min):
     return (minute_of_hour % interval_min) == 0
 
 
-def generate_single_event(cfg, stream, ts, tzinfo, region, sequence, telemetry_rate_state):
+def event_timestamps_for_tick(tick_ts, interval_min, event_interval_sec):
+    """
+    When event_interval_sec is unset: one event at tick_ts (minute cursor), unchanged behavior.
+    When set: N events ending at tick_ts, spaced by event_interval_sec, covering the interval window
+    (N = max(1, (interval_min * 60) // event_interval_sec)).
+    """
+    interval_min = max(1, int(interval_min or 1))
+    if not event_interval_sec or event_interval_sec <= 0:
+        return [tick_ts]
+    span_sec = interval_min * 60
+    n = span_sec // int(event_interval_sec)
+    if n <= 0:
+        n = 1
+    return [tick_ts - (n - 1 - i) * int(event_interval_sec) for i in range(n)]
+
+
+def generate_single_event(
+    cfg, stream, ts, tzinfo, region, sequence, telemetry_rate_state, twamp_ul_last_state
+):
     section = "baseline"
     prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
 
     with open(stream["sample"], "r") as f:
-        template_text = f.read()
+        full_text = f.read()
+
+    ext = sample_extension(stream["sample"])
+    if ext == ".csv":
+        _, template_text = csv_header_and_body(full_text, stream["sample"])
+    else:
+        template_text = full_text
 
     placeholders = sorted(set(PLACEHOLDER_RE.findall(template_text)))
     local_dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(tzinfo)
@@ -469,11 +772,16 @@ def generate_single_event(cfg, stream, ts, tzinfo, region, sequence, telemetry_r
         links = load_telemetry_bidirectional_links()
         if links:
             enforce_telemetry_directional_conservation(replacements, placeholder_index, links)
+    apply_twamp_ul_packet_sequence(
+        replacements, stream, twamp_ul_last_state, cfg, section, local_dt
+    )
+    if stream.get("sourcetype") == "pca_twamp_csv":
+        normalize_pca_twamp_csv_replacements(replacements)
 
     return render_template(template_text, replacements, stream["sample"])
 
 
-def write_stream_events(stream, events):
+def write_stream_events(stream, events, csv_header_line=None):
     if not events:
         return None
     os.makedirs(stream["spool_dir"], exist_ok=True)
@@ -482,8 +790,12 @@ def write_stream_events(stream, events):
         stream["spool_dir"],
         f"live_{int(time.time() * 1_000_000)}_{os.getpid()}_{stream['index']}_{stream['sourcetype'].replace(':', '_')}{output_ext}",
     )
+    wrote_header = False
     with open(output_path, "w") as out:
         for payload in events:
+            if csv_header_line is not None and not wrote_header:
+                out.write(csv_header_line + "\n")
+                wrote_header = True
             out.write(payload)
             if not payload.endswith("\n"):
                 out.write("\n")
@@ -522,7 +834,7 @@ def process_tick(tick_ts, sequence_state):
 
     emitted = 0
     per_stream_counts = {}
-    for stream in STREAMS:
+    for stream in build_streams():
         prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
         stream_cfg = effective_cfg
         if active_scenarios:
@@ -536,26 +848,44 @@ def process_tick(tick_ts, sequence_state):
         interval = max(interval or 1, 1)
         if not minute_due_for_interval(tick_ts, interval):
             continue
-        sequence_state["seq"] += 1
-        event_objs = generate_single_event(
-            stream_cfg,
-            stream,
-            tick_ts,
-            tzinfo,
-            region,
-            sequence_state["seq"],
-            sequence_state["telemetry_rate_state"],
+        event_interval_sec = parse_int(
+            stream_cfg, "baseline", f"{prefix_base}event_interval_sec", default=None
         )
-        event_count = len(event_objs)
-        path = write_stream_events(stream, event_objs)
+        if event_interval_sec is not None and event_interval_sec <= 0:
+            event_interval_sec = None
+        timestamps = event_timestamps_for_tick(tick_ts, interval, event_interval_sec)
+        all_event_objs = []
+        csv_header_line = None
+        if sample_extension(stream["sample"]) == ".csv":
+            with open(stream["sample"], "r") as sf:
+                csv_header_line, _ = csv_header_and_body(sf.read(), stream["sample"])
+        for ts in timestamps:
+            sequence_state["seq"] += 1
+            part = generate_single_event(
+                stream_cfg,
+                stream,
+                ts,
+                tzinfo,
+                region,
+                sequence_state["seq"],
+                sequence_state["telemetry_rate_state"],
+                sequence_state["twamp_ul_last_state"],
+            )
+            all_event_objs.extend(part)
+        event_count = len(all_event_objs)
+        path = write_stream_events(stream, all_event_objs, csv_header_line=csv_header_line)
         emitted += event_count
         per_stream_counts[f"{stream['index']}#{stream['sourcetype']}"] = (
             per_stream_counts.get(f"{stream['index']}#{stream['sourcetype']}", 0)
             + event_count
         )
+        eis_note = (
+            f" event_interval_sec={event_interval_sec}" if event_interval_sec else ""
+        )
         print(
             f"live_log: wrote {event_count} events to {path} "
-            f"(tick={tick_ts} index={stream['index']} sourcetype={stream['sourcetype']} interval={interval})",
+            f"(tick={tick_ts} index={stream['index']} sourcetype={stream['sourcetype']} interval={interval}"
+            f"{eis_note})",
             flush=True,
         )
 
@@ -577,9 +907,10 @@ def main():
         return
 
     tzinfo, region = get_region_tz(base_cfg)
+    start_sequence = resolve_start_sequence()
     print(
         f"live_log: starting minute scheduler start_tick={start_tick} "
-        f"region={region} tz={tzinfo.key} reason={start_reason}",
+        f"region={region} tz={tzinfo.key} reason={start_reason} start_sequence={start_sequence}",
         flush=True,
     )
     write_generation_log(
@@ -588,10 +919,15 @@ def main():
         region=region,
         timezone=tzinfo.key,
         start_reason=start_reason,
+        start_sequence=start_sequence,
     )
 
     cursor = int(start_tick)
-    sequence_state = {"seq": 0, "telemetry_rate_state": {}}
+    sequence_state = {
+        "seq": int(start_sequence),
+        "telemetry_rate_state": {},
+        "twamp_ul_last_state": resolve_twamp_ul_last_state(),
+    }
 
     while True:
         now_tick = (int(time.time()) // 60) * 60
@@ -603,7 +939,10 @@ def main():
         active_seen = set()
         stream_totals = {}
         batch_start = cursor
-        while cursor <= now_tick:
+        ticks_this_batch = 0
+        while (
+            cursor <= now_tick and ticks_this_batch < LIVE_CATCHUP_BATCH_MINUTES
+        ):
             emitted, active_scenarios, per_stream_counts = process_tick(
                 cursor, sequence_state
             )
@@ -614,11 +953,14 @@ def main():
                 stream_totals[key] = stream_totals.get(key, 0) + count
             persist_live_cursor(cursor)
             cursor += 60
+            ticks_this_batch += 1
+        persist_last_sequence(sequence_state["seq"])
+        persist_twamp_ul_last_state(sequence_state["twamp_ul_last_state"])
 
         write_generation_log(
             "tick_batch_processed",
             batch_start=batch_start,
-            batch_end=now_tick,
+            batch_end=cursor - 60,
             emitted_events=total_emitted,
             active_scenarios=sorted(active_seen),
             stream_totals=stream_totals,
@@ -628,6 +970,14 @@ def main():
                 f"live_log: tick batch {batch_start}->{now_tick} emitted no events",
                 flush=True,
             )
+        # Still behind wall clock: spread catch-up across passes so we do not peg one core.
+        if cursor <= now_tick:
+            time.sleep(
+                float(os.environ.get("AI_LAB_LIVE_CATCHUP_COOLDOWN_SEC", "0.05"))
+            )
+            continue
+
+        time.sleep(next_minute_sleep_seconds())
 
 
 if __name__ == "__main__":

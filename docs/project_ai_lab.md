@@ -64,6 +64,11 @@ Routing uses **SR-TE (Segment Routing - Traffic Engineering)**, not ECMP. Path c
 **TE sourcetypes used:** `cisco:thousandeyes:metric`, `cisco:thousandeyes:alerts` (path-vis excluded — CNC routers don't respond to ICMP).
 **TWAMP agents:** Only on R2 and R9 (budget constraint — not on intermediate routers).
 
+TWAMP/PCA interpretation note:
+
+- In this workshop model, TWAMP CSV packet-rate style fields from PCA telemetry are treated as packets per second (pps).
+- Record generation cadence (for example 1 minute or 10 seconds) is the sampling/report interval and does not redefine the rate unit itself.
+
 ## Splunk storage model (workshop)
 
 Indexes are defined in `default/indexes.conf`. Current intent:
@@ -117,7 +122,7 @@ Key project behavior that must remain stable across changes:
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.<ext>` — keep payload structure aligned with the README/template contract; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
 - **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
-- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `cnc_interface_ifOutPktsRate_test`, `cnc_interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`, `cnc_srte_path_test`, `cnc_service_health_test`). Use a recent window (recommended last 5 minutes) when validating active live generation.
+- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `cnc_interface_ifOutPktsRate_test`, `cnc_interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`, `cnc_srte_path_test`, `cnc_service_health_test`, `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`). Use a recent window (recommended last 5 minutes) when validating active live generation. Baseline data-quality checks run via `scripts/test_baseline.sh` → `scripts/test_backfill.sh`, which include the TWAMP saved searches above.
 - **Credentials for CLI/tests** (workshop): same as below; do not commit real production secrets. Tests expect `SPLUNK_AUTH=admin:password` in the environment.
 
 ---

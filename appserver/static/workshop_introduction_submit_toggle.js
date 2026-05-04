@@ -116,6 +116,9 @@ require([
         if (row.backfill_completed !== undefined) {
             setToken("status_backfill_completed", row.backfill_completed);
         }
+        setToken("status_backfill_duration", row.backfill_duration == null ? "" : String(row.backfill_duration));
+        setToken("status_backfill_completed_time", row.backfill_completed_time == null ? "" : String(row.backfill_completed_time));
+        setToken("status_backfill_run_started_time", row.backfill_run_started_time == null ? "" : String(row.backfill_run_started_time));
     }
 
     /** Hide fieldset + submit strip until we know region_ready (reduces load flicker). */

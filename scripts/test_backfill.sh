@@ -465,6 +465,229 @@ PY
   echo "PASS: $label"
 }
 
+assert_twamp_minute_bucket_count() {
+  local label="$1"
+  local min_ok="${TWAMP_MINUTE_BUCKET_MIN:-3}"
+  local max_ok="${TWAMP_MINUTE_BUCKET_MAX:-6}"
+  local tmp_csv
+  tmp_csv="$(mktemp)"
+
+  if ! run_search_csv "| savedsearch twamp_event_count_test" >"$tmp_csv"; then
+    rm -f "$tmp_csv"
+    fail "$label query failed"
+  fi
+
+  if ! python3 - "$tmp_csv" "$min_ok" "$max_ok" <<'PY'
+import csv
+import io
+import sys
+
+csv_path, min_ok, max_ok = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
+header_idx = None
+for i, line in enumerate(raw_lines):
+    probe = line.replace('"', "").strip().lower()
+    if "minute_buckets" in probe and "," in probe:
+        header_idx = i
+        break
+    if "event_count" in probe and "," in probe:
+        header_idx = i
+        break
+
+if header_idx is None:
+    for i, line in enumerate(raw_lines):
+        if "_time" not in line.replace('"', "").lower() and "," in line and sum(1 for c in line if c == ",") <= 2:
+            probe = line.replace('"', "").strip().lower()
+            if "count" in probe:
+                header_idx = i
+                break
+
+if header_idx is None:
+    raise SystemExit("no csv header row for twamp_event_count_test")
+
+reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
+rows = list(reader)
+if not rows:
+    raise SystemExit("no rows from twamp_event_count_test")
+
+row = rows[0]
+val = None
+for key in (
+    "minute_buckets_with_data",
+    "minute_buckets",
+    "event_count",
+    "count",
+):
+    if key in row and row[key] not in (None, ""):
+        val = int(float(row[key]))
+        break
+if val is None:
+    for k, v in row.items():
+        if v in (None, ""):
+            continue
+        if k.lower() in ("preview", "time"):
+            continue
+        try:
+            val = int(float(v))
+            break
+        except ValueError:
+            continue
+
+if val is None:
+    raise SystemExit(f"could not parse minute bucket count from row={row}")
+
+if val < min_ok or val > max_ok:
+    raise SystemExit(
+        f"minute_buckets_with_data={val} expected between {min_ok} and {max_ok} (5m window, partial edges OK)"
+    )
+PY
+  then
+    rm -f "$tmp_csv"
+    fail "$label failed"
+  fi
+
+  rm -f "$tmp_csv"
+  echo "PASS: $label"
+}
+
+assert_twamp_directional_avg_metric() {
+  local label="$1"
+  local savedsearch="$2"
+  local metric_leaf="$3"
+  local value_column="$4"
+  local tmp_csv
+  tmp_csv="$(mktemp)"
+
+  if ! run_search_csv "| savedsearch $savedsearch" >"$tmp_csv"; then
+    rm -f "$tmp_csv"
+    fail "$label query failed"
+  fi
+
+  if ! python3 - "$SCENARIO_CONF" "$tmp_csv" "$metric_leaf" "$value_column" <<'PY'
+import csv
+import io
+import re
+import sys
+
+conf_path, csv_path, metric_leaf, value_column = sys.argv[1:5]
+
+def parse_default_noise(path):
+    key = "twamp#pca_twamp_csv#default.noise_stdev"
+    with open(path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            if k.strip() == key:
+                try:
+                    return float(v.strip().split()[0])
+                except ValueError:
+                    return 0.0
+    return 0.0
+
+def aggregate_bounds(path, direction):
+    pat = re.compile(
+        rf"^twamp#pca_twamp_csv#slice\d+_{direction}_{re.escape(metric_leaf)}\.daily_(min|max)\s*=\s*(\S+)"
+    )
+    mins = []
+    maxs = []
+    specific_noise = []
+    noise_key_end = f"_{direction}_{metric_leaf}.noise_stdev"
+    with open(path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k = k.strip()
+            v = v.strip().split()[0]
+            m = pat.match(k)
+            if m:
+                side, num = m.group(1), m.group(2)
+                try:
+                    fv = float(num)
+                except ValueError:
+                    continue
+                if side == "min":
+                    mins.append(fv)
+                else:
+                    maxs.append(fv)
+            if k.endswith(noise_key_end):
+                try:
+                    specific_noise.append(float(v))
+                except ValueError:
+                    pass
+    if not mins or not maxs:
+        raise SystemExit(f"missing twamp {metric_leaf} bounds for direction={direction}")
+    lo, hi = min(mins), max(maxs)
+    dn = parse_default_noise(path)
+    noise = max(specific_noise) if specific_noise else dn
+    tol = max(noise * 4.0, 1e-6)
+    return lo - tol, hi + tol
+
+bounds = {
+    "ul": aggregate_bounds(conf_path, "ul"),
+    "dl": aggregate_bounds(conf_path, "dl"),
+    "rt": aggregate_bounds(conf_path, "rt"),
+}
+
+raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
+header_idx = None
+for i, line in enumerate(raw_lines):
+    probe = line.replace('"', "").strip()
+    if "direction" in probe.lower() and value_column in probe and "," in probe:
+        header_idx = i
+        break
+
+if header_idx is None:
+    for i, line in enumerate(raw_lines):
+        if "direction" in line.replace('"', "").lower() and "," in line:
+            header_idx = i
+            break
+
+if header_idx is None:
+    raise SystemExit("no csv header for twamp directional avg search")
+
+reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
+rows = [r for r in reader if r.get("direction")]
+if len(rows) < 3:
+    raise SystemExit(f"expected 3 direction rows, got {len(rows)}")
+
+violations = []
+for row in rows:
+    d = str(row.get("direction", "")).strip().lower()
+    raw = row.get(value_column, "")
+    if not d or raw in (None, ""):
+        continue
+    try:
+        val = float(raw)
+    except ValueError:
+        violations.append((d, raw, "non-numeric"))
+        continue
+    if d not in bounds:
+        continue
+    lo, hi = bounds[d]
+    if val < lo or val > hi:
+        violations.append((d, val, f"outside [{lo:.6f},{hi:.6f}]"))
+
+if violations:
+    v = violations[0]
+    raise SystemExit(f"twamp {metric_leaf} violations={len(violations)} sample={v}")
+
+for d in ("ul", "dl", "rt"):
+    if not any(str(r.get("direction", "")).strip().lower() == d for r in rows):
+        raise SystemExit(f"missing direction {d} in saved search output")
+PY
+  then
+    rm -f "$tmp_csv"
+    fail "$label failed"
+  fi
+
+  rm -f "$tmp_csv"
+  echo "PASS: $label"
+}
+
 if [[ ! -x "$SPLUNK_BIN" ]]; then
   fail "Splunk CLI not found at $SPLUNK_BIN"
 fi
@@ -563,6 +786,21 @@ assert_count_eq \
   "cnc_service_health_test baseline has no SERVICE_DEGRADED rows" \
   "| savedsearch cnc_service_health_test | search generated_data=\"*SERVICE_DEGRADED*\" | stats count as count" \
   0
+
+assert_twamp_minute_bucket_count \
+  "twamp_event_count_test minute buckets in 5m window (expect ~5; edges may be lower)"
+
+assert_twamp_directional_avg_metric \
+  "twamp_dmean_test averages within configured daily_min/daily_max per direction" \
+  "twamp_dmean_test" \
+  "dmean" \
+  "avg_dmean"
+
+assert_twamp_directional_avg_metric \
+  "twamp_jmean_test averages within configured daily_min/daily_max per direction" \
+  "twamp_jmean_test" \
+  "jmean" \
+  "avg_jmean"
 
 assert_savedsearch_time_aware_range \
   "thousandeyes_response_time_sec_test values follow day/hour config bounds" \

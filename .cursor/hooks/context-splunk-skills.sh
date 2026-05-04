@@ -47,4 +47,9 @@ print("- Preferred auth for scripted checks: token from ~/.cursor/mcp.json (mcpS
 print("- Saved-search sync policy: full-copy local/savedsearches.conf -> default/savedsearches.conf; do not merge unless explicitly requested")
 print("- Index intent: ran/fwa are reserved for other scenarios; alerts/episode are scheduled-search derived indexes")
 print("- If user says scenario dashboard will be manually imported, do not propose dashboard design changes unless explicitly requested")
+print("- Baseline script chain: test_baseline.sh -> test_backfill.sh (telemetry + TWAMP saved-search assertions; TWAMP minute-bucket limits: TWAMP_MINUTE_BUCKET_MIN / TWAMP_MINUTE_BUCKET_MAX)")
+print("- TWAMP saved searches (app ai_lab): twamp_event_count_test, twamp_dmean_test, twamp_jmean_test (5m window in SPL; see default/savedsearches.conf)")
+print("- TWAMP/PCA assumption: packet-rate fields are treated as packets-per-second (pps) unless user states another unit")
+print("- TWAMP UL sequence rule: next ul_firstpktSeq = previous ul_lastpktSeq + 1; no-loss check uses ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1")
+print("- Scenario 1 focus: correlate TWAMP packet-loss behavior with cnc_interface_counter_json directional packet-rate gap behavior for VLAN 1002/1003")
 PY

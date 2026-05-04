@@ -22,6 +22,15 @@ Sample files under `samples/` are source-specific templates and are **not limite
 - Generator parsing/rendering may use source-specific handlers so each source can load/render its template safely.
 - Current implemented streams use `.json` and `.txt` templates, and generated spool payload format follows the sample extension (`.json` -> NDJSON, `.csv` -> CSV text, `.xml` -> XML text, `.txt` -> plain text).
 
+### CSV templates (`*.csv`)
+
+For CSV samples (for example `twamp` / `pca_twamp_csv`), `backfill_log.py` and `live_log.py` treat the template as **one header row plus a body**:
+
+- **First line** of the sample file is the **column header**. It is written **only once** at the beginning of each spool output file so Splunk’s CSV extraction (`INDEXED_EXTRACTIONS = csv`, `TIMESTAMP_FIELDS`, etc.) sees a single header for the file.
+- **All lines after the first** are the **body template** (may be multiple rows per event). That body is rendered **for every event** (each time step); new output is appended **without** repeating the header line.
+
+Placeholders `{{...}}` must appear only in the body; the header line should be fixed column names only. The TWAMP contract is documented in `samples/twamp/pca_twamp_csv/README.md`.
+
 ## Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601
 
 Workshop data should treat timestamps as a **first-class, timezone-explicit** domain clock (not “Splunk’s indexer local time by accident”).
@@ -105,15 +114,16 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
 **Responsibilities:**
 1. Read `backfill_start_time` and `backfill_days` from conf
 2. If `backfill_completed = true`, exit immediately (already done)
-3. Generate synthetic events at configured intervals for the window:
-   `(backfill_start_time - backfill_days)` → `backfill_start_time`
+3. Generate synthetic events for the window `(backfill_start_time - backfill_days)` → `backfill_start_time` in **one run** (one spool file per configured stream in that invocation). Timestamp step per event: **`<<index>>#<<sourcetype>>#interval`** × 60 seconds **unless** **`<<index>>#<<sourcetype>>#event_interval_sec`** is set — then step in seconds is **`event_interval_sec`** across the whole backfill span.
 4. Write generated events in bulk spool files under app spool paths:
    - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`
    - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`
    - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`
+   - `var/spool/ai_lab/telemetry/cnc_service_health_json/`
+   - `var/spool/ai_lab/twamp/pca_twamp_csv/`
 5. Template source files may use `json`, `xml`, `csv`, or `txt` under `samples/.../` (for example `sample.json` or `sample.txt`), and must follow each source template contract documented in `samples/.../README.md` when present.
 6. Loader logic must first inspect the template file extension and route to the matching parser/renderer behavior for that format.
-7. Output wire format must follow sample extension: `.json` templates emit NDJSON lines; `.csv`/`.xml`/`.txt` templates emit the corresponding text payload format.
+7. Output wire format must follow sample extension: `.json` templates emit NDJSON lines; `.csv`/`.xml`/`.txt` templates emit the corresponding text payload format. For `.csv` specifically, follow **CSV templates (`*.csv`)** (single header line at file start; body rendered per event).
 8. For sources that emit NDJSON, each line must be valid JSON and should only include fields authorized by the corresponding sample template/README.
 9. The `{{timestamp}}` placeholder (when present) must be generated as a **timezone-aware, ISO-8601 string with a numeric offset**, using the region’s IANA zone (`Asia/Tokyo` for `jp`, `Australia/Sydney` for `au`) so offsets/DST are correct for each instant. See **Domain timestamps (`{{timestamp}}`) — IANA + ISO-8601** above.
 10. **Do not** embed Splunk routing metadata (`index`, `sourcetype`, `source`, `host`) in payloads unless the sample template/README calls for it. Splunk file monitor stanzas in `default/inputs.conf` are the source of truth for `index=`, `sourcetype=`, and monitor-level `host=` / `source=` (when configured).
@@ -122,7 +132,11 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
 13. `scenario_happening_probability` is a common per-source runtime key using this pattern: `<index>#<sourcetype>#scenario_happening_probability`.
 14. During active scenario windows in live generation, evaluate this probability per source/event to decide whether that source uses scenario-overridden values or baseline values (`0` never happens, `1` always happens, clamped to `0..1`).
 15. If `scenario_happening_probability` is missing or invalid for a source, treat it as `1` (always happens).
-16. On completion, write `backfill_completed = true` to `local/ai_lab_scenarios.conf`
+16. When a backfill run actually starts (after gate checks), write `backfill_run_started_time` (epoch seconds, wall clock) to `local/ai_lab_scenarios.conf`. On completion, write `backfill_completed = true` and `backfill_completed_time` (epoch seconds). The `workshopregion` command exposes `backfill_duration` as completed−started seconds when backfill is complete.
+17. TWAMP CSV placeholders may be slice-scoped (for example `slice1001_ul_firstpktSeq`, `slice1001_ul_lastpktSeq`, `slice1001_ul_rxpkts`). For each slice/session, packet sequence continuity must be maintained so:
+   - no-loss expectation: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
+   - next-event continuity: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
+18. Runtime sequence continuity must survive restarts by persisting local state under `[baseline]` in `local/ai_lab_scenarios.conf` (for example `sequence_last_value` and TWAMP per-slice/per-session UL packet sequence state).
 
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
@@ -144,9 +158,10 @@ This is mandatory to avoid duplicate or missing data.
    - Baseline values are the default.
    - Active scenario values overwrite corresponding baseline keys during the scenario fault window.
    - This includes overwrite-capable timing keys such as `<source>#interval`.
-4. Generate synthetic events and write to spool files for monitor ingestion only when the current minute matches each source's effective interval schedule.
+4. Generate synthetic events and write to spool files for monitor ingestion only when the current minute matches each source's effective interval schedule (CSV outputs use the same one-header-per-file rule as backfill; see **CSV templates (`*.csv`)**).
    - Example: `interval=5` emits at minute `0,5,10,...,55`.
    - If scenario override sets `interval=30`, emit only at minute `0,30` while override is active.
+   - Optional **`<<index>>#<<sourcetype>>#event_interval_sec`** (seconds): when set, each eligible tick emits **multiple** events: `N = max(1, (interval×60) // event_interval_sec)` timestamps ending at the tick, spaced by `event_interval_sec`. When unset, emit **one** event per eligible tick (timestamp = tick). Scenario stanzas may override this key like other `index#sourcetype#*` keys.
    - Guardrail: do not emit events with a domain timestamp later than current runtime time (no future-dated logs). If scheduler/loop drift occurs, clamp generation cursor to `now`.
 5. Read scenario runtime controls from `[scenarios]` in `local/ai_lab_scenarios.conf`
 6. Treat `<scenario>_activated` as activation epoch (`0` means inactive)
@@ -166,6 +181,7 @@ Implementation note (phase 1 baseline mode):
 
 - `live_log.py` persists minute cursor state in `local/ai_lab_scenarios.conf`:
   - `[baseline] live_last_tick_epoch = <epoch_seconds>`
+- `live_log.py` also resumes sequence continuity from persisted local state (including TWAMP UL packet sequence state) so counters continue after backfill handoff and after restarts.
 - First run: starts from minute-aligned `backfill_start_time`.
 - Subsequent runs/restarts: resume from `live_last_tick_epoch + 60` and catch up minute ticks up to now.
 
@@ -183,6 +199,44 @@ Implementation note (phase 1 baseline mode):
 - Preferred transition windows:
   - ramp-up to weekend: Friday 18:00 -> Saturday 00:00 (region local time)
   - ramp-down to weekday: Sunday 18:00 -> Monday 00:00 (region local time)
+
+## TWAMP + Telemetry Correlation Contract
+
+This contract applies when generating `index=twamp sourcetype=pca_twamp_csv` together with `index=telemetry sourcetype=cnc_interface_counter_json`.
+
+- Packet-rate interpretation: treat packet-rate style fields as packets per second (pps). Sampling cadence (for example 1 minute or 10 seconds) is a reporting interval, not the unit definition.
+- **Splunk emit schedule (minutes):** `twamp#pca_twamp_csv#interval` in `[baseline]` is the generator **emit period in minutes** — it gates how often `live_log.py` considers writing new `pca_twamp_csv` events on the 1-minute orchestrator (`minute % interval == 0`). `backfill_log.py` uses the same keys for timestamp stride **unless** `event_interval_sec` applies (see below).
+- **Optional `event_interval_sec`:** `<<index>>#<<sourcetype>>#event_interval_sec` in seconds. When set, `live_log.py` emits **multiple** rows per eligible tick; `backfill_log.py` steps synthetic timestamps by `event_interval_sec` through the backfill window. When unset, behavior is one event per **`interval`** minutes (live) and **`interval`×60** seconds between backfill events. Detail: `samples/twamp/pca_twamp_csv/README.md` (*Splunk generation cadence vs PCA row window*).
+- **In-record window (PCA CSV fields):** The TWAMP `sample.csv` carries an **`Interval`** column (seconds; shipped template uses `10`). The **`intervalms`** column is filled via placeholder `{{intervalms}}`, resolved from config key **`twamp#pca_twamp_csv#intervalms`** (milliseconds, e.g. `10000` for 10 s). Keep **`intervalms`** aligned with **`Interval`** (`intervalms = Interval * 1000`) when both describe the same window. Relate **`Packet Rate` (pps)** to **`*_rxpkts_expected`** with the same **`window_seconds`** (typically `Interval` or `intervalms/1000`): expected count ≈ **`Packet Rate * window_seconds`** before drop-rate adjustment. Documented in detail under `samples/twamp/pca_twamp_csv/README.md` (*Splunk generation cadence vs PCA row window*).
+- Use a shared per-tick/per-slice loss context during scenario windows so TWAMP loss and telemetry directional packet-rate gaps move together.
+- Sequence continuity (per TWAMP slice/session) must hold across backfill, live generation, and restarts:
+  - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
+  - `expected_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
+  - no-loss case: `ul_rxpkts = expected_rxpkts`
+  - loss case: `ul_rxpkts = max(0, expected_rxpkts - ul_lostpkts)`
+- Persist TWAMP sequence state in `local/ai_lab_scenarios.conf` runtime keys so restart does not reset packet sequence continuity.
+
+### Baseline verification (scripts + saved searches)
+
+- `scripts/test_baseline.sh` runs `scripts/test_backfill.sh`, which invokes saved searches `twamp_event_count_test` (minute buckets in the last 5m), `twamp_dmean_test`, and `twamp_jmean_test` against `index=twamp` / `pca_twamp_csv`, comparing rolling averages to `default/ai_lab_scenarios.conf` `daily_min` / `daily_max` (with noise tolerance). See `docs/project_test_design.md` and `default/savedsearches.conf`.
+
+### TWAMP peak-rate fallback strategy
+
+To avoid massive per-placeholder config growth for `pca_twamp_csv`, support a global fallback peak curve:
+
+- `twamp#pca_twamp_csv#default.peak_rate_00` ... `twamp#pca_twamp_csv#default.peak_rate_23`
+
+Recommended precedence for TWAMP peak-rate lookup:
+
+1. `twamp#pca_twamp_csv#<placeholder>.peak_rate_<HH>` (most specific)
+2. `twamp#pca_twamp_csv#<group>.peak_rate_<HH>` (optional group level; for example `ul`, `dl`, `rt`)
+3. `twamp#pca_twamp_csv#default.peak_rate_<HH>` (global fallback)
+
+Design intent:
+
+- Keep baseline config compact by default.
+- Allow targeted per-field overrides only where needed.
+- Prefer using peak-rate curves on a small set of TWAMP driver metrics, then derive dependent metrics in code, rather than defining hourly peaks for every TWAMP placeholder.
 
 ## Region Timezone Alignment (peak_rate_*)
 
@@ -219,8 +273,10 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
   → `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry`
 - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`  
   → `index=telemetry`, `sourcetype=cnc_srte_path_json`, base monitor host is `cnc_srte_path`, and per-event host metadata is overridden from payload `vlan` via `props.conf` + `transforms.conf` index-time transform
-
-**Monitors and TailReader / CRC:** each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
+- `var/spool/ai_lab/telemetry/cnc_service_health_json/`  
+  → `index=telemetry`, `sourcetype=cnc_service_health_json`, `host=cnc_service_health`, `source=ai_lab:script:telemetry`
+- `var/spool/ai_lab/twamp/pca_twamp_csv/`  
+  → `index=twamp`, `sourcetype=pca_twamp_csv`, `host=twamp_pca`, `source=ai_lab:script:twamp` each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
 
 **Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. Population strategy is TBD, but it will not be fed by the NDJSON spool pipeline.
 
@@ -229,6 +285,12 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
 ---
 
 ## State in local/ai_lab_scenarios.conf
+
+Runtime keys written by generators / commands (non-exhaustive):
+
+- `backfill_run_started_time` — wall-clock epoch when `backfill_log.py` began the current run (not the synthetic data anchor).
+- `backfill_completed_time` — wall-clock epoch when backfill finished successfully.
+- `backfill_completed` — `true` after a successful full run.
 
 ```ini
 ```

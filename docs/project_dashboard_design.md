@@ -73,7 +73,7 @@ At load, the JS module (`workshop_introduction_submit_toggle.js`) runs once:
 3. On result, calls `syncFromRow(row)` which sets:
    - `region_locked=true` + unset `region_unlocked` (if `region_ready=true`)
    - `region_unlocked=true` + unset `region_locked` (if `region_ready=false`)
-   - `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed`
+   - `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed`, `status_backfill_duration`, `status_backfill_completed_time`, `status_backfill_run_started_time`
 4. Calls `applyVisibilityFromReady()` which reads `status_region_ready` and calls `setControlHidden(true/false)`
 
 **No baseline Simple XML `<search>` is used.** All initial state is driven by JS.
@@ -89,6 +89,9 @@ At load, the JS module (`workshop_introduction_submit_toggle.js`) runs once:
 | `status_enabled` | Display | JS `syncFromRow`, XML `<done>` |
 | `status_backfill_start` | Display | JS `syncFromRow`, XML `<done>` |
 | `status_backfill_completed` | Display | JS `syncFromRow`, XML `<done>` |
+| `status_backfill_duration` | Backfill wall-clock duration (seconds), when complete | JS `syncFromRow`, XML `<done>` |
+| `status_backfill_completed_time` | Epoch when backfill finished | JS `syncFromRow`, XML `<done>` |
+| `status_backfill_run_started_time` | Epoch when backfill run started | JS `syncFromRow`, XML `<done>` |
 | `region` | Form input token (dropdown) | Form selection, XML `<done>` |
 
 Key design constraint: JS does **not** set the `region` form token on load. This prevents the save row (`depends="$region_unlocked$"`) from triggering the save search before the user explicitly selects and submits.
@@ -119,7 +122,7 @@ On form Submit (unlocked state):
 
 The `<done>` block updates all tokens:
 
-- `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed` from result fields
+- `status_region`, `status_region_ready`, `status_enabled`, `status_backfill_start`, `status_backfill_completed`, `status_backfill_duration`, `status_backfill_completed_time`, `status_backfill_run_started_time` from result fields
 - `region_locked=true`, unset `region_unlocked` → transitions dashboard to locked state
 
 ### Locked state backfill status panel
@@ -195,10 +198,11 @@ Supported actions:
 - `action=get`
   - returns configured region snapshot (same family as status)
 - `action=status`
-  - returns configured persisted region (`region`, may be blank), `region_ready`, and readiness/generation state
+  - returns configured persisted region (`region`, may be blank), `region_ready`, readiness/generation state, and backfill timing including wall-clock `backfill_run_started_time`, `backfill_completed_time`, and `backfill_duration` (seconds) when backfill has completed
 - `action=set region=<au|jp>`
   - writes region to local conf, sets generation gate to true, and triggers launcher
-  - returns same field schema as `action=status` plus `region_ready: "true"` (always true on successful set)
+  - returns the same core field family as `action=status` plus `launcher_triggered`, `launcher_message`, `initial_backfill`, and `region_ready: "true"` on success
+  - includes backfill wall-clock fields when present in conf: `backfill_run_started_time`, `backfill_completed_time` (epochs), their `*_local` formatted variants, and `backfill_duration` (seconds) once `backfill_completed` is `true`
 
 `effective_region` fallback (previously defaulted to `au` when unset) has been removed. If no valid region is persisted, `region` is empty and `region_ready` is `false`.
 
@@ -271,6 +275,7 @@ Validation data source policy:
   - `cnc_interface_ifOutPktsRate_test`
   - `cnc_interface_ifInPktsRate_test`
   - `thousandeyes_response_time_sec_test`
+  - `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` (TWAMP `pca_twamp_csv` health and delay/jitter bands)
 - For "live is active now" checks, use a bounded recent window (recommended last 5 minutes).
 
 Initial panel intent:
@@ -279,6 +284,7 @@ Initial panel intent:
 2. Interface outbound packet-rate trend (`cnc_interface_ifOutPktsRate_test`)
 3. Interface inbound packet-rate trend (`cnc_interface_ifInPktsRate_test`)
 4. ThousandEyes response-time trend (`thousandeyes_response_time_sec_test`)
+5. TWAMP ingest cadence and delay/jitter sanity (`twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`)
 
 ---
 

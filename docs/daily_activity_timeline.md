@@ -7,9 +7,34 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-04 (Mon)
+
+- Session 1 around **10:00-16:41 JST** in this chat
+- Main activities:
+  - Confirmed TWAMP (`pca_twamp_csv`) pipeline: integer-only wire cells via `format_pca_twamp_csv_metric`, `normalize_pca_twamp_csv_replacements`, and CSV/coerce fallbacks in `bin/backfill_log.py` / `bin/live_log.py`
+  - Shipped TWAMP baseline saved searches in `default/savedsearches.conf` (`twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`) and wired assertions into `scripts/test_backfill.sh` (and thus `scripts/test_baseline.sh`)
+  - Ran workshop reset + `scripts/test_smoke.sh`; documented post–region-lock validation path
+  - Updated `.cursor/rules/splunk_app_rules.mdc`, `.cursor/skills/ai-lab-runtime-validation/SKILL.md`, hook context scripts, and project docs (`project_ai_lab.md`, `project_test_design.md`, `project_script_design.md`, `project_dashboard_design.md`) with TWAMP verification and test contracts
+  - **Milestone:** TWAMP data generation is in place (generators + ingest + saved-search checks); workshop can index live TWAMP traffic after region lock
+- Resume anchor:
+  - Next: update the dashboard to show the workshop data.
+
 ## 2026-05-03 (Sun)
 
-- Session 5 around **16:11-16:59 JST** in this chat
+- Session 6 around **18:00-20:16 JST** in this chat
+- Main activities:
+  - Resumed from TWAMP generation work and identified minute-interval scheduler constraint vs desired 10-second TWAMP cadence
+  - Implemented sequence continuity persistence across backfill/live/restart in `bin/backfill_log.py` and `bin/live_log.py`
+  - Implemented TWAMP UL packet sequence placeholder logic (`ul_firstpktSeq`, `ul_lastpktSeq`, `ul_rxpkts`) with deterministic continuity and restart-safe runtime state
+  - Updated TWAMP sample README and script-design docs with slice-scoped placeholder pattern and packet-sequence math expectations
+  - Clarified TWAMP packet-rate unit handling and aligned workshop assumption to packets-per-second (pps) for PCA-derived packet-rate style fields
+  - Captured explicit pause anchor for next implementation focus
+  - Updated persistent guidance across `.cursor/rules/splunk_app_rules.mdc`, `.cursor/skills/ai-lab-runtime-validation/SKILL.md`, and startup hook context scripts with TWAMP + telemetry correlation requirements
+  - Updated project design docs (`docs/project_ai_lab.md`, `docs/project_script_design.md`, `docs/project_scenario_1.md`) with scenario_1 correlation and sequence/loss contracts
+- Resume anchor:
+  - Next: generate TWAMP data correlated with `cnc_interface_counter_json` values and implement/validate scenario_1 packet-loss coupling behavior for affected VLANs.
+
+- Session 5 around **16:11-17:59 JST** in this chat
 - Main activities:
   - Verified index/data-source coverage status and confirmed current intent split (`ran`/`fwa` reserved for other scenario streams; `alerts`/`episode` scheduled-search derived)
   - Updated project governance artifacts with newly learned policies across `.cursor/rules/splunk_app_rules.mdc`, `.cursor/skills/ai-lab-runtime-validation/SKILL.md`, and startup hook context scripts
@@ -292,7 +317,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-03: ~377 minutes (5 sessions), ~147,000 estimated tokens
+- 2026-05-04: ~401 minutes (1 session), ~40,000 estimated tokens
+- 2026-05-03: ~513 minutes (6 sessions), ~185,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
 - 2026-05-01: ~388 minutes (4 sessions), ~44,500 estimated tokens
 - 2026-04-30: ~301 minutes (1 session), ~55,000 estimated tokens
@@ -307,7 +333,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-03 | ~377 minutes (5 sessions) | ~147,000 |
+| 2026-05-04 | ~401 minutes (1 session) | ~40,000 |
+| 2026-05-03 | ~513 minutes (6 sessions) | ~185,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |
 | 2026-05-01 | ~388 minutes (4 sessions) | ~44,500 |
 | 2026-04-30 | ~301 minutes (1 session) | ~55,000 |

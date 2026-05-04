@@ -95,6 +95,30 @@ def _backfill_times(cfg, region):
     }
 
 
+def _backfill_wall_clock_fields(cfg, region_for_local_fmt):
+    """
+    Fields populated by backfill_log: run start / completion wall times and duration (seconds).
+    """
+    rs = cfg.get("baseline", "backfill_run_started_time", fallback="").strip()
+    ce = cfg.get("baseline", "backfill_completed_time", fallback="").strip()
+    started = parse_int(rs, default=None)
+    completed = parse_int(ce, default=None)
+    out = {
+        "backfill_run_started_time": rs,
+        "backfill_run_started_time_local": _format_local_time(started, region_for_local_fmt),
+        "backfill_completed_time": ce,
+        "backfill_completed_time_local": _format_local_time(completed, region_for_local_fmt),
+        "backfill_duration": "",
+    }
+    if (
+        cfg.get("baseline", "backfill_completed", fallback="").strip().lower() == "true"
+        and started is not None
+        and completed is not None
+    ):
+        out["backfill_duration"] = str(max(0, completed - started))
+    return out
+
+
 def _backfill_completed_if_set(cfg):
     if cfg.has_section("baseline") and cfg.has_option("baseline", "backfill_completed"):
         return cfg.get("baseline", "backfill_completed", fallback="").strip()
@@ -180,6 +204,7 @@ def main():
             # Local-time fields use REGION_TZ; unknown / unpersisted region -> UTC (_format_local_time).
             tz_region = configured_region if region_ready else ""
             backfill_times = _backfill_times(cfg, tz_region)
+            wall = _backfill_wall_clock_fields(cfg, tz_region)
             row = {
                 "status": "ok",
                 "action": action,
@@ -191,7 +216,11 @@ def main():
                 "backfill_start_time_local": backfill_times["backfill_start_time_local"],
                 "backfill_head_time": backfill_times["backfill_head_time"],
                 "backfill_head_time_local": backfill_times["backfill_head_time_local"],
-                "config_path": LOCAL_CONF if os.path.exists(LOCAL_CONF) else DEFAULT_CONF,
+                "backfill_run_started_time": wall["backfill_run_started_time"],
+                "backfill_run_started_time_local": wall["backfill_run_started_time_local"],
+                "backfill_completed_time": wall["backfill_completed_time"],
+                "backfill_completed_time_local": wall["backfill_completed_time_local"],
+                "backfill_duration": wall["backfill_duration"],
             }
             backfill_completed = _backfill_completed_if_set(cfg)
             if backfill_completed is not None:
@@ -219,6 +248,7 @@ def main():
         launched, launch_message = maybe_launch_generation()
         effective_cfg = load_effective_config()
         backfill_times = _backfill_times(effective_cfg, region)
+        wall = _backfill_wall_clock_fields(effective_cfg, region)
         row = {
             "status": "ok",
             "action": "set",
@@ -232,7 +262,11 @@ def main():
             "backfill_start_time_local": backfill_times["backfill_start_time_local"],
             "backfill_head_time": backfill_times["backfill_head_time"],
             "backfill_head_time_local": backfill_times["backfill_head_time_local"],
-
+            "backfill_run_started_time": wall["backfill_run_started_time"],
+            "backfill_run_started_time_local": wall["backfill_run_started_time_local"],
+            "backfill_completed_time": wall["backfill_completed_time"],
+            "backfill_completed_time_local": wall["backfill_completed_time_local"],
+            "backfill_duration": wall["backfill_duration"],
         }
         backfill_completed = _backfill_completed_if_set(effective_cfg)
         if backfill_completed is not None:

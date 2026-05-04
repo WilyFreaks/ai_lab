@@ -45,3 +45,21 @@ export = none
 owner = admin
 version = 9.4.2
 modtime = 1777791402.541870000
+
+[savedsearches/twamp_event_count_test]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1777879140.512210000
+
+[savedsearches/twamp_dmean_test]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1777879241.239985000
+
+[savedsearches/twamp_jmean_test]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1777879306.486249000
