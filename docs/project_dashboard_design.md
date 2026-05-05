@@ -234,11 +234,19 @@ View file: `default/data/ui/views/scenario_control.xml`
 
 Design constraints:
 
-- Uses form submit mode (`submitButton="true"`) to avoid writes on page load
-- Input token names omit `form.` prefix (required for deferred submit behavior)
-- Write operation runs only after submit via `scenariocontrol action=set ...`
-- On load and when the scenario dropdown changes, `appserver/static/scenario_control_status.js` runs `| scenariocontrol action=status scenario=...` and syncs **Activation** / **Fault start** / **Fault duration** from effective config (default overlaid by `local/`)
-- Scenario-specific dashboard links are rendered dynamically from runtime scenario state, and only for enabled scenarios.
+- XML-first implementation (no required custom JS bootstrap for region).
+- Region bootstrap search on load:
+  - `| workshopregion action="status" | eval region_lower=lower(coalesce(region, "")) | table region_lower`
+  - `search/done` sets `region` (and optionally `form.region`) via `<condition match="true()">`.
+- Fieldset uses `submitButton="true" autoRun="true"`:
+  - Allows bootstrap searches to run at open time.
+  - Write search is still submit-gated by using submitted tokens and row dependency.
+- Write operation:
+  - `| scenariocontrol action=set scenario="$scenario$" active="$active$" fault_start="$fault_start$" fault_duration="$fault_duration$"`
+  - Row gated by `depends="$scenario$"` to keep pre-submit table hidden.
+- Monitoring link is region-driven from token:
+  - `/app/ai_lab/scenario_1_$region$`
+- To avoid accidental repeated enable actions in the UI flow, unset `active` in write-search `<done>` after a successful submit.
 
 This pattern is reused in workshop-introduction save flow.
 

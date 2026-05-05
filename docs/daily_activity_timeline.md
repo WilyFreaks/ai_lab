@@ -9,6 +9,34 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-05 (Tue)
 
+- Session 6 around **20:43-22:31 JST** in this chat
+- Main activities:
+  - Completed `scenario_control` dashboard stabilization and removed the custom JS error path so the view loads cleanly
+  - Finalized Simple XML behavior for scenario control: hide pre-submit result panel, bootstrap region via `workshopregion action="status"`, and use dynamic region link (`/app/ai_lab/scenario_1_$region$`)
+  - Fixed baseline validation regressions in `scripts/test_backfill.sh` (`twamp_dmean_test`/`twamp_jmean_test` wide CSV parsing and ThousandEyes baseline-only bounds handling), then re-ran `scripts/test_baseline.sh` to full pass
+  - Updated `bin/scenario_control.py` so repeated Enable does not overwrite non-zero `<scenario>_activated`, while Disable still sets it to `0`
+  - Refreshed project governance artifacts (rules/skills/hooks/docs) to capture the finalized dashboard and scenario-control implementation decisions
+- Resume anchor:
+  - **Implement syslog and ios data**.
+
+- Session 5 around **18:36-19:10 JST** in this chat
+- Main activities:
+  - Resumed workshop work after a break and continued scenario generation validation
+  - Recovered Splunk service when `splunkd` was down and confirmed ports `8000`/`8089` were listening again
+  - Fixed `cnc_service_health_json` sample placeholder scope so degraded `sr_policy` placeholders apply to both report rows for VLAN `1002` and `1003`, while keeping VLAN `1001` baseline
+- Resume anchor:
+  - **After machine restart, examine the data for scenario_1**.
+
+- Session 4 around **12:00-13:45 JST** in this chat
+- Main activities:
+  - Investigated `scenario_1` runtime behavior after activation (telemetry R5->R7 gap and TWAMP loss expectations)
+  - Patched `bin/live_log.py` to explicitly reload effective config each tick and clear telemetry smoothing state when config files change
+  - Synced local packaging artifacts into default on request (`scenario_1_au.xml`, `savedsearches.conf`) and completed a full workshop reset plus mandatory smoke checks
+  - Updated `scripts/reset_workshop_state.sh` to sync local dashboards/saved searches into default before destructive reset steps, and documented that behavior in `docs/project_script_design.md`
+  - Patched `scripts/test_backfill.sh` TWAMP minute-bucket parser to support current saved-search CSV shape
+- Resume anchor:
+  - **Examine the data for scenario_1**.
+
 - Session 3 (carryover from 2026-05-04) around **00:00-06:57 JST** in this chat
 - Main activities:
   - Dropped redundant `telemetry#cnc_service_health_json#scenario_happening_probability` from `[scenario_1]` in `default/ai_lab_scenarios.conf` (matches **`live_log.py`** default **1.0** when missing); refreshed scenario/service-health docs and sample README
@@ -343,7 +371,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-05: ~417 minutes (1 session), ~48,000 estimated tokens
+- 2026-05-05: ~664 minutes (4 sessions), ~99,000 estimated tokens
 - 2026-05-04: ~1,480 minutes (3 sessions), ~165,000 estimated tokens
 - 2026-05-03: ~513 minutes (6 sessions), ~185,000 estimated tokens
 - 2026-05-02: ~15 minutes (1 sessions), ~5,000 estimated tokens
@@ -360,7 +388,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-05 | ~417 minutes (1 session) | ~48,000 |
+| 2026-05-05 | ~664 minutes (4 sessions) | ~99,000 |
 | 2026-05-04 | ~1,480 minutes (3 sessions) | ~165,000 |
 | 2026-05-03 | ~513 minutes (6 sessions) | ~185,000 |
 | 2026-05-02 | ~15 minutes (1 sessions) | ~5,000 |

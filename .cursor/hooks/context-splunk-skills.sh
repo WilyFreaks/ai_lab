@@ -61,4 +61,6 @@ print("- TWAMP UL sequence rule: next ul_firstpktSeq = previous ul_lastpktSeq + 
 print("- TWAMP *_lostperc wire scale: integer percent 0-100 (lost vs expected), not millionths")
 print("- Scenario 1 focus: correlate TWAMP packet-loss behavior with cnc_interface_counter_json directional packet-rate gap behavior for VLAN 1002/1003")
 print("- Scenario 1 service health: omit `telemetry#cnc_service_health_json#scenario_happening_probability` in `[scenario_1]` unless you want stochastic baseline fallback; missing key defaults to 1 (see `docs/project_scenario_1.md`)")
+print("- scenario_control.xml: bootstrap region token via XML search (`workshopregion action=status`); dashboard link uses /app/ai_lab/scenario_1_$region$")
+print("- scenariocontrol command: repeated Enable must not overwrite non-zero <scenario>_activated; Disable sets it to 0")
 PY

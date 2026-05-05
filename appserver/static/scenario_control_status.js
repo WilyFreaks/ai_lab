@@ -12,10 +12,31 @@ require([
     "use strict";
 
     var logPrefix = "[scenario_control_status]";
-    var defaultTokenModelun = mvc.Components.getInstance("default", { create: true });
-    var submittedTokenModelun = mvc.Components.getInstance("submitted", { create: true });
+
+    function safeGetComponent(id, create) {
+        try {
+            if (mvc && mvc.Components && typeof mvc.Components.get === "function") {
+                var c = mvc.Components.get(id);
+                if (c) {
+                    return c;
+                }
+            }
+            if (create && mvc && mvc.Components && typeof mvc.Components.getInstance === "function") {
+                return mvc.Components.getInstance(id, { create: true });
+            }
+        } catch (e) {
+            console.warn(logPrefix, "safeGetComponent failed", id, e);
+        }
+        return null;
+    }
+
+    var defaultTokenModelun = safeGetComponent("default", true);
+    var submittedTokenModelun = safeGetComponent("submitted", true);
 
     function scenarioToken() {
+        if (!defaultTokenModelun || typeof defaultTokenModelun.get !== "function") {
+            return "scenario_1";
+        }
         var v =
             defaultTokenModelun.get("form.scenario") ||
             defaultTokenModelun.get("scenario");
@@ -68,12 +89,16 @@ require([
         var fs = row.fault_start == null ? "0" : String(row.fault_start);
         var fd = row.fault_duration == null ? "0" : String(row.fault_duration);
 
-        defaultTokenModelun.set("form.active", act);
-        defaultTokenModelun.set("form.fault_start", fs);
-        defaultTokenModelun.set("form.fault_duration", fd);
-        submittedTokenModelun.set("form.active", act);
-        submittedTokenModelun.set("form.fault_start", fs);
-        submittedTokenModelun.set("form.fault_duration", fd);
+        if (defaultTokenModelun && typeof defaultTokenModelun.set === "function") {
+            defaultTokenModelun.set("form.active", act);
+            defaultTokenModelun.set("form.fault_start", fs);
+            defaultTokenModelun.set("form.fault_duration", fd);
+        }
+        if (submittedTokenModelun && typeof submittedTokenModelun.set === "function") {
+            submittedTokenModelun.set("form.active", act);
+            submittedTokenModelun.set("form.fault_start", fs);
+            submittedTokenModelun.set("form.fault_duration", fd);
+        }
 
         console.log(logPrefix, "synced form from config", {
             active: act,
@@ -83,22 +108,49 @@ require([
         });
     }
 
-    var statusSearch = new SearchManager({
-        id: "scenario_status_dm",
-        preview: false,
-        cache: false,
-        autostart: false,
-        search: '| scenariocontrol action=status scenario="scenario_1"'
-    });
+    var statusSearch = safeGetComponent("scenario_status_dm", false);
+    if (!statusSearch) {
+        try {
+            statusSearch = new SearchManager({
+                id: "scenario_status_dm",
+                preview: false,
+                cache: false,
+                autostart: false,
+                search: '| scenariocontrol action=status scenario="scenario_1"'
+            });
+        } catch (e) {
+            console.warn(logPrefix, "failed to create SearchManager", e);
+            statusSearch = null;
+        }
+    }
 
     function runStatusSearch() {
+        if (!statusSearch || typeof statusSearch.set !== "function") {
+            console.warn(logPrefix, "status search unavailable");
+            return;
+        }
         var sc = scenarioToken().replace(/"/g, "");
-        statusSearch.set(
-            "search",
-            '| scenariocontrol action=status scenario="' + sc + '"'
-        );
+        try {
+            statusSearch.set(
+                "search",
+                '| scenariocontrol action=status scenario="' + sc + '"'
+            );
+        } catch (e) {
+            console.warn(logPrefix, "failed to set search", e);
+            return;
+        }
 
-        var results = statusSearch.data("results", { count: 50, offset: 0 });
+        var results = null;
+        try {
+            results = statusSearch.data("results", { count: 50, offset: 0 });
+        } catch (e) {
+            console.warn(logPrefix, "failed to create results model", e);
+            return;
+        }
+        if (!results) {
+            console.warn(logPrefix, "results model unavailable");
+            return;
+        }
 
         function finish() {
             if (!results.hasData()) {
@@ -113,22 +165,38 @@ require([
             applyRow(row);
         }
 
-        results.off("data");
-        results.once("data", finish);
-        statusSearch.off("search:error");
-        statusSearch.once("search:error", function(err) {
-            console.warn(logPrefix, "search:error", err);
-        });
-        statusSearch.startSearch();
+        if (typeof results.off === "function") {
+            results.off("data");
+        }
+        if (typeof results.once === "function") {
+            results.once("data", finish);
+        }
+        if (typeof statusSearch.off === "function") {
+            statusSearch.off("search:error");
+        }
+        if (typeof statusSearch.once === "function") {
+            statusSearch.once("search:error", function(err) {
+                console.warn(logPrefix, "search:error", err);
+            });
+        }
+        if (typeof statusSearch.startSearch === "function") {
+            statusSearch.startSearch();
+        }
     }
 
-    defaultTokenModelun.on("change:form.scenario", function() {
-        runStatusSearch();
-    });
-
-    mvc.utils.onEachReady(function() {
-        setTimeout(function() {
+    if (defaultTokenModelun && typeof defaultTokenModelun.on === "function") {
+        defaultTokenModelun.on("change:form.scenario", function() {
             runStatusSearch();
+        });
+    }
+
+    $(document).ready(function() {
+        setTimeout(function() {
+            try {
+                runStatusSearch();
+            } catch (e) {
+                console.warn(logPrefix, "initial run failed", e);
+            }
         }, 150);
     });
 });

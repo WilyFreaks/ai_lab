@@ -1,26 +1,28 @@
-<form version="1.1" script="scenario_control_status.js" theme="light">
+<form version="1.1" theme="light">
   <label>Scenario Control</label>
   <description>Changing the scenario reloads the saved activation, fault start, and fault duration from local/ai_lab_scenarios.conf (read-only status). Submit applies your edits: Enable sets &lt;scenario&gt;_activated to the current epoch time; Disable sets it to 0.</description>
-  <row>
-    <panel>
-      <html>
-        <p style="margin:0 0 0.5em 0"><strong>Fault Start</strong> (minutes): Minutes after scenario activation (the saved &lt;scenario&gt;_activated epoch) before the simulated fault begins. Stored as &lt;scenario&gt;_fault_start in local/ai_lab_scenarios.conf. Use 0 to start the fault window at activation time.</p>
-        <p style="margin:0"><strong>Fault Duration</strong> (minutes): How long the fault window stays active after it starts. Stored as &lt;scenario&gt;_fault_duration. Use 0 to keep the fault in effect until the scenario is deactivated (lab default behavior).</p>
-      </html>
-    </panel>
-  </row>
-  <fieldset submitButton="true">
-    <!-- Token names must omit the `form.` prefix so Submit defers searches until click. -->
+  <init>
+    <unset token="region_show_au"></unset>
+    <unset token="region_show_jp"></unset>
+  </init>
+  <search id="region_status_bootstrap">
+    <query>| workshopregion action="status" | eval region_lower=lower(coalesce(region, "")) | table region_lower</query>
+    <done>
+      <condition match="true()">
+        <set token="region">$result.region_lower$</set>
+        <set token="form.region">$result.region_lower$</set>
+      </condition>
+    </done>
+  </search>
+  <fieldset submitButton="true" autoRun="true">
     <input type="dropdown" token="scenario">
       <label>Scenario</label>
       <choice value="scenario_1">scenario_1</choice>
-      <default>scenario_1</default>
     </input>
     <input type="dropdown" token="active">
       <label>Activation</label>
       <choice value="1">Enable (set epoch)</choice>
       <choice value="0">Disable (set 0)</choice>
-      <default>1</default>
     </input>
     <input type="text" token="fault_start">
       <label>Fault Start (minutes)</label>
@@ -33,48 +35,38 @@
   </fieldset>
   <row>
     <panel>
+      <html>
+        <p style="margin:0 0 0.5em 0">
+          <strong>Fault Start</strong> (minutes): Minutes after scenario activation (the saved &lt;scenario&gt;_activated epoch) before the simulated fault begins. Stored as &lt;scenario&gt;_fault_start in local/ai_lab_scenarios.conf. Use 0 to start the fault window at activation time.</p>
+        <p style="margin:0">
+          <strong>Fault Duration</strong> (minutes): How long the fault window stays active after it starts. Stored as &lt;scenario&gt;_fault_duration. Use 0 to keep the fault in effect until the scenario is deactivated (lab default behavior).</p>
+      </html>
+    </panel>
+  </row>
+  <row depends="$scenario$">
+    <panel>
       <table>
         <search>
-          <query>| scenariocontrol action=set scenario="$form.scenario$" active="$form.active$" fault_start="$form.fault_start$" fault_duration="$form.fault_duration$"</query>
+          <done>
+            <unset token="active"></unset>
+          </done>
+          <query>| scenariocontrol action=set scenario="$scenario$" active="$active$" fault_start="$fault_start$" fault_duration="$fault_duration$"
+| eval activated_local_time = strftime(activated, "%F %T %Z")
+| fields status message scenario active activated_local_time fault_start fault_duration</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
         </search>
         <option name="count">10</option>
+        <option name="refresh.display">progressbar</option>
       </table>
     </panel>
   </row>
   <row>
     <panel>
-      <single>
-        <title>Open Monitoring Dashboard (AU)</title>
-        <search>
-          <query>| makeresults | eval text="Central Victoria, AU"</query>
-          <earliest>-1m</earliest>
-          <latest>now</latest>
-        </search>
-        <option name="field">text</option>
-        <option name="drilldown">all</option>
-        <option name="height">51</option>
-        <option name="refresh.display">progressbar</option>
-        <drilldown>
-          <link target="_blank">/app/ai_lab/scenario_1_au</link>
-        </drilldown>
-      </single>
-    </panel>
-    <panel>
-      <single>
-        <title>Open Monitoring Dashboard (JP)</title>
-        <search>
-          <query>| makeresults | eval text="Western Japan, JP"</query>
-          <earliest>-1m</earliest>
-          <latest>now</latest>
-        </search>
-        <option name="field">text</option>
-        <option name="drilldown">all</option>
-        <option name="height">51</option>
-        <option name="refresh.display">progressbar</option>
-        <drilldown>
-          <link target="_blank">/app/ai_lab/scenario_1_jp</link>
-        </drilldown>
-      </single>
+      <title>Workshop Dashboards</title>
+      <html>
+        <a href="/app/ai_lab/scenario_1_$region$">#1 Backbone Network Status</a>
+      </html>
     </panel>
   </row>
 </form>

@@ -116,7 +116,18 @@ def main():
         if not cfg.has_section("scenarios"):
             cfg.add_section("scenarios")
 
-        activated = str(int(time.time())) if active == "1" else "0"
+        existing_activated_raw = cfg.get("scenarios", f"{scenario}_activated", fallback="0").strip()
+        try:
+            existing_activated_int = int(float(existing_activated_raw))
+        except (TypeError, ValueError):
+            existing_activated_int = 0
+
+        if active == "1":
+            # Preserve an already-active scenario timestamp so repeated submits do not
+            # retrigger or shift the active fault window start.
+            activated = str(existing_activated_int) if existing_activated_int > 0 else str(int(time.time()))
+        else:
+            activated = "0"
         cfg.set("scenarios", f"{scenario}_activated", activated)
 
         if fault_start is not None and fault_start != "":

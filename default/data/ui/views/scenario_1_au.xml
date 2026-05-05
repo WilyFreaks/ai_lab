@@ -31,29 +31,39 @@
           <query>index=telemetry sourcetype=cnc_srte_path_json 
 | table _time host sr_policy_results{}.hops{} 
 | rename sr_policy_results{}.hops{} as hops 
-| eval hops_string=mvjoin(hops, ",") 
+| eval hops_string = mvjoin(hops, ",") 
 | sort 0 host, _time 
 | streamstats count as seq by host 
 | eventstats last(hops_string) as latest_hops by host 
 | eventstats dc(hops_string) as unique_routes by host 
 | eval route_changed=if(unique_routes&gt;1, "YES", "NO") 
 | where seq=1 
-| eval hops_org=hops 
-| eval hop_index=mvrange(0, mvcount(hops)) 
-| eval hops_with_index=mvzip(hop_index, hops, ":::") 
+| eval hops_org = hops 
+| eval hop_index = mvrange(0, mvcount(hops)) 
+| eval hops_with_index = mvzip(hop_index, hops, ":::") 
 | mvexpand hops_with_index 
 | rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$" 
 | table host router_name hop_index route_changed unique_routes 
 | lookup au_router_areas.csv router_name 
-| eval description="Tx&lt;br&gt;Rx", tooltip="", pathColor=if(path="cnc_vlan1001","red","green") 
-| eval customIcon="router.png", markerSize=70, pathWeight=3 
+| eval customIcon = "router.png", markerSize = 70, pathWeight = 3 
 | rename host as path 
-| eval pathColor=if(path="cnc_vlan1002" OR path="cnc_vlan1003","red","green") 
-| eval markerPriority=if(path="cnc_vlan1002" OR path="cnc_vlan1003",2,1) 
+| rex field=path "cnc_vlan(?&lt;slice&gt;\d+)" 
+| join type=left slice 
+    [ search index=telemetry sourcetype=cnc_service_health_json 
+    | spath subservice_health{} 
+    | mvexpand subservice_health{} 
+    | spath input=subservice_health{} 
+    | search category=sr_policy 
+    | stats last(health_score) as health_score last(health_status) as health_status by vpn_name device 
+    | eval status=replace(health_status, "SERVICE_","") 
+    | rex field=vpn_name "^NSS-5G_Slice_Vlan(?&lt;slice&gt;\d+)" 
+    | fields slice health_score ] 
+| eval pathColor = if(health_score&lt;=50, "red", "green") 
+| eval markerPriority = if(health_score&lt;=50, 2, 1) 
 | appendpipe 
-    [ stats count by router_name customIcon latitude longitude markerSize router area
+    [ stats count by router_name customIcon latitude longitude markerSize router area 
     | eval markerPriority=3 
-    | eval tooltip=router.": ".area
+    | eval tooltip=router.": ".area 
     | eval path=router_name 
     | fields - count ]</query>
           <earliest>$PERIOD.earliest$</earliest>
@@ -186,31 +196,32 @@
   </row>
   <row>
     <panel>
-      <title>TWAMP Metrics for Network Slice: Avg Delay, Jitter, and P95 Packet Loss %</title>
+      <title>TWAMP Metrics for Network Slice: P95 Delay, Jitter, and Avg Packet Loss %</title>
       <table>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv 
+| head 5
 | rename "Source Ip" as src_ip, "Destination Ip" as dest_ip, "Session Name" as session_name 
 | rex field=session_name "^(?&lt;src_host&gt;[^-]+)-(?&lt;dest_host&gt;[^_]+)_TWAMP_Slice(?&lt;slice&gt;[^_]+)" 
 | bin span=1h _time 
-| stats avg(rt_dmean) as delay avg(rt_jmean) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by _time session_name src_host src_ip Interface dest_host dest_ip slice
-| eval dl_lostperc=ifnull(dl_lostperc,1000000) 
-| eval ul_lostperc=ifnull(ul_lostperc,1000000) 
+| stats p95(rt_dp95) as delay p95(rt_jp95) as jitter avg(dl_lostperc) as dl_lostperc avg(ul_lostperc) as ul_lostperc by _time session_name src_host src_ip Interface dest_host dest_ip slice
+| eval dl_lostperc = ifnull(dl_lostperc,1000000) 
+| eval ul_lostperc = ifnull(ul_lostperc,1000000) 
 | stats avg(delay) as delay avg(jitter) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by session_name src_host src_ip Interface dest_host dest_ip slice
-| eval delay=round(delay,1), jitter=round(jitter,1), dl_lostperc=round(dl_lostperc/10000,1), ul_lostperc=round(ul_lostperc/10000,1) 
+| eval delay = round(delay, 2), jitter = round(jitter, 2), dl_lostperc = round(dl_lostperc, 2), ul_lostperc = round(ul_lostperc, 2) 
 | fields session_name slice delay jitter dl_lostperc ul_lostperc src_ip dest_ip 
 | join type=left slice 
     [ search index=telemetry sourcetype=cnc_srte_path_json
     | fields _time host sr_policy_results{}.hops{} 
     | rename sr_policy_results{}.hops{} as hops 
-    | eval src=mvindex(hops, 0), hop1=mvindex(hops, 1), hop2=mvindex(hops, 2), hop3=mvindex(hops, 3), dest=mvindex(hops, 4) 
+    | eval src = mvindex(hops, 0), hop1 = mvindex(hops, 1), hop2 = mvindex(hops, 2), hop3 = mvindex(hops, 3), dest = mvindex(hops, 4) 
     | stats count by _time host src hop1 hop2 hop3 dest 
-    | eval slice=substr(host, 9, 4) ] 
+    | eval slice = substr(host, 9, 4) ] 
 | fields session_name slice dl_lostperc ul_lostperc delay jitter src hop* dest 
 | eval slice = "Vlan".slice
 | sort slice 
-| rename session_name as Session slice as Slice, ul_lostperc as "Packet Loss S-&gt;R (%)", dl_lostperc as "Packet Loss R-&gt;S (%)", delay as "Delay (ms)", jitter as "Jitter (us)", src as Sender, hop* as Hop*, dest as Reflector 
-| table Session Slice "Packet Loss S-&gt;R (%)" "Packet Loss R-&gt;S (%)" "Delay (ms)" "Jitter (us)" Sender Hop* Reflector</query>
+| rename session_name as Session slice as Slice, ul_lostperc as "R2-&gt;R9 Packet Loss%", dl_lostperc as "R9-&gt;R2 Packet Loss%", delay as "Delay (ms)", jitter as "Jitter (us)", src as Reflector, hop* as Hop*, dest as Sender 
+| table Session Slice Reflector Hop* Sender "R9-&gt;R2 Packet Loss%" "R2-&gt;R9 Packet Loss%" "Delay (ms)" "Jitter (us)"</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <refresh>1m</refresh>
@@ -223,13 +234,13 @@
   </row>
   <row>
     <panel>
-      <title>Delay</title>
+      <title>Delay p95</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
 | eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| timechart span=1m avg(rt_dp95) as delay by session_name</query>
+| timechart span=1m p95(rt_dp95) as delay by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -271,13 +282,13 @@
       </chart>
     </panel>
     <panel>
-      <title>Jitter</title>
+      <title>Jitter p95</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
 | rename "Session Name" as session_name
 | eval session_name=replace(replace(session_name,"_ipv4_SF",""),"R2-R9_TWAMP_","")
-| timechart span=1m avg(rt_jp95) as jitter by session_name</query>
+| timechart span=1m p96(rt_jp95) as jitter by session_name</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -319,7 +330,7 @@
       </chart>
     </panel>
     <panel>
-      <title>Packet Loss% (DL)</title>
+      <title>R9-&gt;R2 Packet Loss%</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -368,7 +379,7 @@
       </chart>
     </panel>
     <panel>
-      <title>Packet Loss% (UL)</title>
+      <title>R2-&gt;R9 Packet Loss%</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -474,9 +485,10 @@
     | bin span=1m _time 
     | stats avg(ifInPktsRate) as ifInPktsRate2 avg(ifOutPktsRate) as ifOutPktsRate2 by _time router2_name interface2] 
 | eval path=router1.":".interface1."_".router2.":".interface2 
-| eval directional_gap=round(ifOutPktsRate1 - ifInPktsRate2, 2) 
 | search (router1_name=* OR router2_name=*) AND path="*$ROUTER$*" 
-| timechart span=1m useother=f limit=30 avg(ifOutPktsRate1) as ifOut_router1_side avg(ifInPktsRate2) as ifIn_router2_side avg(directional_gap) as gap_ifOut_minus_ifIn by path</query>
+| eval ifOutPktsRate1 = round(ifOutPktsRate1, 2) 
+| eval ifInPktsRate2 = round(ifInPktsRate2, 2) 
+| timechart span=1m useother=f limit=30 avg(ifOutPktsRate1) as ifOutPktsRate avg(ifInPktsRate2) as ifInPktsRate by path</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -487,14 +499,14 @@
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
         <option name="charting.axisTitleX.visibility">collapsed</option>
         <option name="charting.axisTitleY.visibility">collapsed</option>
-        <option name="charting.axisTitleY2.visibility">visible</option>
+        <option name="charting.axisTitleY2.visibility">collapsed</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
         <option name="charting.axisY.abbreviation">none</option>
         <option name="charting.axisY.scale">linear</option>
         <option name="charting.axisY2.abbreviation">none</option>
-        <option name="charting.axisY2.enabled">1</option>
-        <option name="charting.axisY2.scale">linear</option>
+        <option name="charting.axisY2.enabled">0</option>
+        <option name="charting.axisY2.scale">inherit</option>
         <option name="charting.chart">line</option>
         <option name="charting.chart.bubbleMaximumSize">50</option>
         <option name="charting.chart.bubbleMinimumSize">10</option>
@@ -504,13 +516,12 @@
         <option name="charting.chart.sliceCollapsingThreshold">0.01</option>
         <option name="charting.chart.stackMode">default</option>
         <option name="charting.chart.style">shiny</option>
-        <option name="charting.chart.overlayFields">gap_ifOut_minus_ifIn</option>
         <option name="charting.drilldown">none</option>
         <option name="charting.layout.splitSeries">0</option>
         <option name="charting.layout.splitSeries.allowIndependentYRanges">0</option>
         <option name="charting.legend.labelStyle.overflowMode">ellipsisMiddle</option>
         <option name="charting.legend.mode">standard</option>
-        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.legend.placement">none</option>
         <option name="charting.lineWidth">2</option>
         <option name="height">627</option>
         <option name="refresh.display">progressbar</option>

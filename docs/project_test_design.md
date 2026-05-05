@@ -197,8 +197,11 @@ Saved-search quality intent for backfill checks:
 
 ### scenario_control
 
-- Search runs only on submit.
-- Submit updates local scenario control keys.
+- Region bootstrap search (`workshopregion action="status"`) sets `region` token on load for dynamic dashboard link resolution.
+- Opening the dashboard must not mutate `<scenario>_activated`.
+- Submit updates local scenario control keys via `scenariocontrol action=set`.
+- Repeated **Enable** submit while already active must preserve existing non-zero `<scenario>_activated` value.
+- **Disable** submit must set `<scenario>_activated=0`.
 - Defaults and help text are rendered as intended.
 
 ### Imported dashboards (copied from other environments)

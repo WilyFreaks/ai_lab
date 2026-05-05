@@ -282,6 +282,26 @@ def write_local_conf(cfg):
         cfg.write(f)
 
 
+def conf_file_signature(path):
+    """
+    Return a lightweight file signature for change detection.
+    We use (mtime_ns, size) so long-running workers can detect config edits and
+    refresh tick-time behavior without requiring a process restart.
+    """
+    try:
+        st = os.stat(path)
+        return (st.st_mtime_ns, st.st_size)
+    except Exception:
+        return None
+
+
+def effective_conf_signature():
+    return (
+        conf_file_signature(DEFAULT_CONF),
+        conf_file_signature(LOCAL_CONF),
+    )
+
+
 def write_generation_log(event, **fields):
     os.makedirs(GEN_LOG_DIR, exist_ok=True)
     payload = {
@@ -629,16 +649,12 @@ def coerce_placeholder(
     value = metric_value(cfg, section, prefix, local_dt, twamp_eps)
     if value is not None:
         if placeholder.endswith("ifOutPktsRate") or placeholder.endswith("ifInPktsRate"):
-            # Baseline caps per-tick deltas for gradual curves. When directional_min_receive_fraction
-            # is 0 (scenario fault windows), skip smoothing so intentional R5/R7-style gaps show
-            # immediately alongside TWAMP, instead of ramping over many minutes.
-            if telemetry_directional_min_receive_fraction(cfg, section) <= 0:
-                telemetry_rate_state[prefix] = value
-            else:
-                max_step = telemetry_rate_max_step(cfg, section, prefix)
-                prev_value = telemetry_rate_state.get(prefix)
-                value = smooth_telemetry_rate(prev_value, value, max_step)
-                telemetry_rate_state[prefix] = value
+            # Keep packet-rate transitions gradual for both baseline and scenario windows so
+            # degraded-path reduction and bypass-path increase evolve smoothly over ticks.
+            max_step = telemetry_rate_max_step(cfg, section, prefix)
+            prev_value = telemetry_rate_state.get(prefix)
+            value = smooth_telemetry_rate(prev_value, value, max_step)
+            telemetry_rate_state[prefix] = value
         if placeholder in ("availability", "http_status_code"):
             return int(round(value))
         if stream.get("sourcetype") == "pca_twamp_csv":
@@ -887,8 +903,10 @@ def persist_live_cursor(tick_ts):
     write_local_conf(local_cfg)
 
 
-def process_tick(tick_ts, sequence_state):
-    base_cfg = read_effective_conf()
+def process_tick(tick_ts, sequence_state, base_cfg=None):
+    # Reload from disk per tick unless caller provides an already-refreshed config.
+    if base_cfg is None:
+        base_cfg = read_effective_conf()
     if not base_cfg.has_section("baseline"):
         return 0, [], {}
 
@@ -991,6 +1009,7 @@ def main():
         "telemetry_rate_state": {},
         "twamp_ul_last_state": resolve_twamp_ul_last_state(),
     }
+    last_effective_conf_sig = effective_conf_signature()
 
     while True:
         now_tick = (int(time.time()) // 60) * 60
@@ -1006,8 +1025,21 @@ def main():
         while (
             cursor <= now_tick and ticks_this_batch < LIVE_CATCHUP_BATCH_MINUTES
         ):
+            base_cfg = read_effective_conf()
+            conf_sig = effective_conf_signature()
+            if conf_sig != last_effective_conf_sig:
+                # Apply config edits immediately: drop smoothing carry-over so new
+                # per-interface rates and scenario overrides are reflected next tick.
+                sequence_state["telemetry_rate_state"] = {}
+                last_effective_conf_sig = conf_sig
+                write_generation_log(
+                    "effective_conf_changed",
+                    tick=cursor,
+                    default_conf_sig=str(conf_sig[0]),
+                    local_conf_sig=str(conf_sig[1]),
+                )
             emitted, active_scenarios, per_stream_counts = process_tick(
-                cursor, sequence_state
+                cursor, sequence_state, base_cfg=base_cfg
             )
             total_emitted += emitted
             for name in active_scenarios:

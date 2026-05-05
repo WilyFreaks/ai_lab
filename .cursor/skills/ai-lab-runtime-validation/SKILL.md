@@ -106,6 +106,16 @@ Use this when validating `index=telemetry sourcetype=cnc_service_health_json` du
 1. Omit **`telemetry#cnc_service_health_json#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
 2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health_test` / saved-search contract).
 
+## Scenario control dashboard addendum
+
+Use this when validating `default/data/ui/views/scenario_control.xml` and `bin/scenario_control.py` behavior.
+
+1. Dashboard load should set `region` from `| workshopregion action="status"` (XML `search/done` path), and the monitoring link should resolve as `/app/ai_lab/scenario_1_$region$`.
+2. Opening `scenario_control` must **not** mutate `<scenario>_activated` by itself (no write on load).
+3. Submit-driven write path uses `| scenariocontrol action=set ...` with submitted tokens only.
+4. `active=1` on an already-active scenario must preserve existing non-zero `<scenario>_activated` (no timestamp reset on repeated enable).
+5. `active=0` must clear `<scenario>_activated` to `0`.
+
 ## Imported dashboard data-source audit
 
 Use this when a dashboard XML is copied from another Splunk environment.

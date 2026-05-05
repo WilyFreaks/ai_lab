@@ -15,6 +15,10 @@ SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
 SPLUNK_BIN="$SPLUNK_HOME/bin/splunk"
 INDEX_CONF="$APP_ROOT/default/indexes.conf"
 LOCAL_SCENARIO_CONF="$APP_ROOT/local/ai_lab_scenarios.conf"
+LOCAL_SAVEDSEARCHES_CONF="$APP_ROOT/local/savedsearches.conf"
+DEFAULT_SAVEDSEARCHES_CONF="$APP_ROOT/default/savedsearches.conf"
+LOCAL_VIEWS_DIR="$APP_ROOT/local/data/ui/views"
+DEFAULT_VIEWS_DIR="$APP_ROOT/default/data/ui/views"
 SPLUNK_DB="$SPLUNK_HOME/var/lib/splunk"
 SPOOL_ROOTS=(
   "$APP_ROOT/var/spool/ai_lab"
@@ -90,6 +94,7 @@ ensure_path_under_base() {
 }
 
 echo "Reset plan:"
+echo "- Sync local packaging artifacts into default (savedsearches + dashboards)"
 echo "- Stop ai_lab generator processes (backfill/live)"
 echo "- Confirm no orphan ai_lab generator python remains (launcher/backfill/live)"
 echo "- Stop Splunk"
@@ -183,6 +188,62 @@ assert_no_orphan_ai_lab_python() {
   fi
   echo "Confirmed: no orphan ai_lab generator python processes."
 }
+
+sync_local_packaging_artifacts() {
+  local synced_views=0
+  local local_view_files=()
+
+  echo "Syncing local packaging artifacts into default..."
+
+  if [[ -f "$LOCAL_SAVEDSEARCHES_CONF" ]]; then
+    if ! ensure_path_under_base "$LOCAL_SAVEDSEARCHES_CONF" "$APP_ROOT"; then
+      echo "ERROR: Refusing to read saved searches path outside app root: $LOCAL_SAVEDSEARCHES_CONF"
+      exit 1
+    fi
+    if ! ensure_path_under_base "$DEFAULT_SAVEDSEARCHES_CONF" "$APP_ROOT"; then
+      echo "ERROR: Refusing to write saved searches path outside app root: $DEFAULT_SAVEDSEARCHES_CONF"
+      exit 1
+    fi
+    mkdir -p "$(dirname "$DEFAULT_SAVEDSEARCHES_CONF")"
+    cp "$LOCAL_SAVEDSEARCHES_CONF" "$DEFAULT_SAVEDSEARCHES_CONF"
+    echo "  synced: $LOCAL_SAVEDSEARCHES_CONF -> $DEFAULT_SAVEDSEARCHES_CONF"
+  else
+    echo "  skip (not found): $LOCAL_SAVEDSEARCHES_CONF"
+  fi
+
+  if [[ -d "$LOCAL_VIEWS_DIR" ]]; then
+    if ! ensure_path_under_base "$LOCAL_VIEWS_DIR" "$APP_ROOT"; then
+      echo "ERROR: Refusing to read dashboard dir outside app root: $LOCAL_VIEWS_DIR"
+      exit 1
+    fi
+    if ! ensure_path_under_base "$DEFAULT_VIEWS_DIR" "$APP_ROOT"; then
+      echo "ERROR: Refusing to write dashboard dir outside app root: $DEFAULT_VIEWS_DIR"
+      exit 1
+    fi
+
+    mkdir -p "$DEFAULT_VIEWS_DIR"
+    shopt -s nullglob
+    local_view_files=("$LOCAL_VIEWS_DIR"/*.xml)
+    shopt -u nullglob
+
+    if [[ "${#local_view_files[@]}" -eq 0 ]]; then
+      echo "  skip (no local dashboard XML): $LOCAL_VIEWS_DIR"
+    else
+      for src in "${local_view_files[@]}"; do
+        local name dst
+        name="$(basename "$src")"
+        dst="$DEFAULT_VIEWS_DIR/$name"
+        cp "$src" "$dst"
+        synced_views=$((synced_views + 1))
+      done
+      echo "  synced dashboard XML files: $synced_views"
+    fi
+  else
+    echo "  skip (not found): $LOCAL_VIEWS_DIR"
+  fi
+}
+
+sync_local_packaging_artifacts
 
 echo "Stopping backfill/live generators..."
 stop_ai_lab_generators

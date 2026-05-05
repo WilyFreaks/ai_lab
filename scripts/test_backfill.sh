@@ -312,10 +312,18 @@ def parse_time(raw):
 
 def load_metric_params(path, selector):
     params = {}
+    section = None
     with open(path, "r", encoding="utf-8") as f:
         for raw in f:
             line = raw.strip()
-            if not line or line.startswith("#") or line.startswith("[") or "=" not in line:
+            if not line or line.startswith("#"):
+                continue
+            if line.startswith("[") and line.endswith("]"):
+                section = line[1:-1].strip().lower()
+                continue
+            if section != "baseline":
+                continue
+            if "=" not in line:
                 continue
             key, value = [x.strip() for x in line.split("=", 1)]
             if selector not in key:
@@ -486,21 +494,26 @@ csv_path, min_ok, max_ok = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
 raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
 header_idx = None
 for i, line in enumerate(raw_lines):
+    stripped = line.strip()
+    if not stripped:
+        continue
+    if stripped.startswith("WARNING:") or stripped.startswith("INFO:"):
+        continue
     probe = line.replace('"', "").strip().lower()
-    if "minute_buckets" in probe and "," in probe:
+    if "," not in probe:
+        continue
+    if "minute_buckets" in probe:
         header_idx = i
         break
-    if "event_count" in probe and "," in probe:
+    if "event_count" in probe:
         header_idx = i
         break
-
-if header_idx is None:
-    for i, line in enumerate(raw_lines):
-        if "_time" not in line.replace('"', "").lower() and "," in line and sum(1 for c in line if c == ",") <= 2:
-            probe = line.replace('"', "").strip().lower()
-            if "count" in probe:
-                header_idx = i
-                break
+    if "_time" in probe:
+        header_idx = i
+        break
+    if "session name" in probe:
+        header_idx = i
+        break
 
 if header_idx is None:
     raise SystemExit("no csv header row for twamp_event_count_test")
@@ -522,16 +535,22 @@ for key in (
         val = int(float(row[key]))
         break
 if val is None:
-    for k, v in row.items():
-        if v in (None, ""):
-            continue
-        if k.lower() in ("preview", "time"):
-            continue
-        try:
-            val = int(float(v))
-            break
-        except ValueError:
-            continue
+    # Fallback for pivoted chart output (e.g. count by _time "Session Name"):
+    # each non-_time column is a per-session count (often ~5 in a 5m window).
+    candidates = []
+    for r in rows:
+        for k, v in r.items():
+            if v in (None, ""):
+                continue
+            kl = (k or "").strip().lower()
+            if kl in ("_time", "time", "preview"):
+                continue
+            try:
+                candidates.append(int(float(v)))
+            except ValueError:
+                continue
+    if candidates:
+        val = max(candidates)
 
 if val is None:
     raise SystemExit(f"could not parse minute bucket count from row={row}")
@@ -580,15 +599,18 @@ def parse_default_noise(path):
                 continue
             k, v = line.split("=", 1)
             if k.strip() == key:
+                tokens = v.strip().split()
+                if not tokens:
+                    return 0.0
                 try:
-                    return float(v.strip().split()[0])
+                    return float(tokens[0])
                 except ValueError:
                     return 0.0
     return 0.0
 
 def aggregate_bounds(path, direction):
     pat = re.compile(
-        rf"^twamp#pca_twamp_csv#slice\d+_{direction}_{re.escape(metric_leaf)}\.daily_(min|max)\s*=\s*(\S+)"
+        rf"^twamp#pca_twamp_csv#slice\d+_{direction}_{re.escape(metric_leaf)}\.daily_(min|max)$"
     )
     mins = []
     maxs = []
@@ -601,12 +623,15 @@ def aggregate_bounds(path, direction):
                 continue
             k, v = line.split("=", 1)
             k = k.strip()
-            v = v.strip().split()[0]
+            tokens = v.strip().split()
+            if not tokens:
+                continue
+            v = tokens[0]
             m = pat.match(k)
             if m:
-                side, num = m.group(1), m.group(2)
+                side = m.group(1)
                 try:
-                    fv = float(num)
+                    fv = float(v)
                 except ValueError:
                     continue
                 if side == "min":
@@ -636,13 +661,24 @@ raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
 header_idx = None
 for i, line in enumerate(raw_lines):
     probe = line.replace('"', "").strip()
-    if "direction" in probe.lower() and value_column in probe and "," in probe:
+    lower = probe.lower()
+    if "," not in lower:
+        continue
+    # Legacy directional header.
+    if "direction" in lower and value_column in lower:
+        header_idx = i
+        break
+    # Current wide chart header (_time + avg(<dir>_<metric>): <session>...).
+    if "_time" in lower and f"avg(ul_{metric_leaf})" in lower:
         header_idx = i
         break
 
 if header_idx is None:
     for i, line in enumerate(raw_lines):
-        if "direction" in line.replace('"', "").lower() and "," in line:
+        lower = line.replace('"', "").strip().lower()
+        if "," not in lower:
+            continue
+        if "direction" in lower or "_time" in lower:
             header_idx = i
             break
 
@@ -650,33 +686,76 @@ if header_idx is None:
     raise SystemExit("no csv header for twamp directional avg search")
 
 reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
-rows = [r for r in reader if r.get("direction")]
-if len(rows) < 3:
-    raise SystemExit(f"expected 3 direction rows, got {len(rows)}")
+rows = list(reader)
+if not rows:
+    raise SystemExit("no rows returned from twamp saved search")
 
 violations = []
-for row in rows:
-    d = str(row.get("direction", "")).strip().lower()
-    raw = row.get(value_column, "")
-    if not d or raw in (None, ""):
-        continue
-    try:
-        val = float(raw)
-    except ValueError:
-        violations.append((d, raw, "non-numeric"))
-        continue
-    if d not in bounds:
-        continue
-    lo, hi = bounds[d]
-    if val < lo or val > hi:
-        violations.append((d, val, f"outside [{lo:.6f},{hi:.6f}]"))
+seen_dirs = set()
+
+# Legacy output shape:
+# direction,avg_dmean
+# ul,27.2
+# dl,22.4
+# rt,50.8
+if "direction" in (reader.fieldnames or []) and value_column in (reader.fieldnames or []):
+    directional_rows = [r for r in rows if r.get("direction")]
+    if len(directional_rows) < 3:
+        raise SystemExit(f"expected 3 direction rows, got {len(directional_rows)}")
+
+    for row in directional_rows:
+        d = str(row.get("direction", "")).strip().lower()
+        raw = row.get(value_column, "")
+        if not d or raw in (None, ""):
+            continue
+        seen_dirs.add(d)
+        try:
+            val = float(raw)
+        except ValueError:
+            violations.append((d, raw, "non-numeric"))
+            continue
+        if d not in bounds:
+            continue
+        lo, hi = bounds[d]
+        if val < lo or val > hi:
+            violations.append((d, val, f"outside [{lo:.6f},{hi:.6f}]"))
+else:
+    # Current wide chart shape:
+    # _time,avg(dl_dmean): <session>,avg(rt_dmean): <session>,avg(ul_dmean): <session>,...
+    fieldnames = reader.fieldnames or []
+    col_dir = {}
+    for col in fieldnames:
+        if not col:
+            continue
+        normalized = col.replace('"', "").strip().lower()
+        match = re.match(rf"^avg\((ul|dl|rt)_{re.escape(metric_leaf)}\)\s*:", normalized)
+        if match:
+            col_dir[col] = match.group(1)
+
+    if not col_dir:
+        raise SystemExit("no directional avg columns found in twamp saved search output")
+
+    for row in rows:
+        for col, d in col_dir.items():
+            raw = row.get(col, "")
+            if raw in (None, ""):
+                continue
+            seen_dirs.add(d)
+            try:
+                val = float(raw)
+            except ValueError:
+                violations.append((d, raw, "non-numeric"))
+                continue
+            lo, hi = bounds[d]
+            if val < lo or val > hi:
+                violations.append((d, val, f"outside [{lo:.6f},{hi:.6f}]"))
 
 if violations:
     v = violations[0]
     raise SystemExit(f"twamp {metric_leaf} violations={len(violations)} sample={v}")
 
 for d in ("ul", "dl", "rt"):
-    if not any(str(r.get("direction", "")).strip().lower() == d for r in rows):
+    if d not in seen_dirs:
         raise SystemExit(f"missing direction {d} in saved search output")
 PY
   then

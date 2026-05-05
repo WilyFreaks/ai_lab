@@ -330,5 +330,21 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
 - Dashboard view (`scenario_control`) executes custom search command `scenariocontrol`.
 - Command script `bin/scenario_control.py` reads effective config (default overlaid by `local/`) for `action=status` / `action=get`, and writes scenario runtime values to `local/ai_lab_scenarios.conf` for `action=set` (omit `action` to keep backward compatibility with the set path when `active` is passed).
 - Activation behavior:
-  - Enable: set `<scenario>_activated` to current epoch time
+  - Enable: if `<scenario>_activated` is already non-zero, preserve it; otherwise set to current epoch time
   - Disable: set `<scenario>_activated` to `0`
+
+## `reset_workshop_state.sh` packaging sync
+
+Before destructive reset actions, `scripts/reset_workshop_state.sh` now performs a packaging sync from `local/` to `default/` so workshop UI/search edits are preserved in Git-tracked defaults:
+
+- `local/savedsearches.conf` -> `default/savedsearches.conf` (full-file replacement when local file exists)
+- `local/data/ui/views/*.xml` -> `default/data/ui/views/<same-name>.xml` (per-file full replacement for each local dashboard XML)
+
+Then the script continues with the existing reset order:
+
+1. Stop app generator workers (`backfill_log.py` / `live_log.py`) and confirm no orphan `launcher.py`/`backfill_log.py`/`live_log.py`
+2. Stop Splunk
+3. Clean app spool under `var/spool/ai_lab`
+4. Remove app index data under `$SPLUNK_DB`
+5. Remove `local/ai_lab_scenarios.conf`
+6. Start Splunk and verify app indexes are empty

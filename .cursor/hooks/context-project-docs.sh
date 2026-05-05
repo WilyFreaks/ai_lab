@@ -29,4 +29,6 @@ print("CURRENT IMPLEMENTATION FOCUS:")
 print("- Scenario dashboards (e.g. scenario_1_au.xml): edit under local/data/ui/views/; on explicit request ('copy local dashboard to default') full-copy to default/data/ui/views/; Splunk prefers local at runtime when both exist")
 print("- TWAMP baseline verification: saved searches twamp_event_count_test, twamp_dmean_test, twamp_jmean_test (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")
 print("- TWAMP: shared per-slice noise for delay/jitter integer cells + pps packet-rate model; correlate with cnc_interface_counter_json in scenario_1 for VLANs 1002/1003")
+print("- scenario_control.xml: region token bootstrap is XML-based via workshopregion action=status; link resolves as /app/ai_lab/scenario_1_$region$")
+print("- scenariocontrol action=set: active=1 preserves existing non-zero <scenario>_activated; active=0 clears to 0")
 PY

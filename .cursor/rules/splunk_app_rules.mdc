@@ -87,6 +87,7 @@ Durations and summaries:
 
 `reset_workshop_state.sh` run rules:
 - For unattended runs, execute `./scripts/reset_workshop_state.sh --yes` (avoid interactive `Proceed? (yes/no)` waits).
+- Before running `reset_workshop_state.sh`, explicitly notify the user that the script will sync `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, then wait for user confirmation so they can cancel if needed.
 - Prefer token-based verification auth, not username/password.
 - Read the token from Cursor MCP config (`~/.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.
@@ -137,3 +138,17 @@ Splunk Simple XML `depends` and search execution:
 Splunk Simple XML `search/done` token action rule:
 - In dashboard `search` `done` handlers, prefer wrapping token actions under `<condition>` blocks (for example `<condition match="true()"> ... </condition>`), and place `<set>/<unset>` inside those conditions.
 - If editor warnings show `Invalid child="set" is not allowed in node="search-done"`, refactor direct `<set>/<unset>` siblings under `<done>` into `<condition>` blocks.
+
+`scenario_control.xml` implementation guardrails (confirmed working pattern):
+- Keep `scenario_control` as XML-first (no custom JS dependency for region bootstrap by default).
+- Bootstrap region token on load via:
+  - `<search id="region_status_bootstrap"> | workshopregion action="status" ... </search>`
+  - `<done><condition match="true()"><set token="region">...</set></condition></done>`
+- Keep `<fieldset submitButton="true" autoRun="true">` so bootstrap searches run on load, but gate write behavior with submitted tokens.
+- For scenario writes, use submitted tokens (`$scenario$`, `$active$`, `$fault_start$`, `$fault_duration$`) and gate the result row with `depends="$scenario$"`.
+- Keep dashboard link dynamic with runtime region token (`/app/ai_lab/scenario_1_$region$`).
+
+`scenariocontrol` command activation semantics:
+- `active=1` must **not** overwrite `<scenario>_activated` when it is already non-zero.
+- `active=1` sets current epoch only when existing activation is missing/invalid/zero.
+- `active=0` sets `<scenario>_activated=0`.
