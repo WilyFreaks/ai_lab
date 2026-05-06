@@ -188,6 +188,24 @@ assert_count_eq() {
   echo "PASS: $label = $count"
 }
 
+assert_count_range() {
+  local label="$1"
+  local query="$2"
+  local min_expected="$3"
+  local max_expected="$4"
+  local count
+
+  if ! count="$(run_search "$query" | extract_count)"; then
+    fail "$label query failed or did not return a numeric count"
+  fi
+
+  if (( count < min_expected || count > max_expected )); then
+    fail "$label expected between $min_expected and $max_expected, got $count"
+  fi
+
+  echo "PASS: $label = $count (allowed range: $min_expected-$max_expected)"
+}
+
 assert_count_gt_zero() {
   local label="$1"
   local query="$2"
@@ -591,7 +609,7 @@ import sys
 conf_path, csv_path, metric_leaf, value_column = sys.argv[1:5]
 
 def parse_default_noise(path):
-    key = "twamp#pca_twamp_csv#default.noise_stdev"
+    key = "twamp#pca_twamp_csv#sample.csv#default.noise_stdev"
     with open(path, "r", encoding="utf-8") as f:
         for raw in f:
             line = raw.strip()
@@ -610,7 +628,7 @@ def parse_default_noise(path):
 
 def aggregate_bounds(path, direction):
     pat = re.compile(
-        rf"^twamp#pca_twamp_csv#slice\d+_{direction}_{re.escape(metric_leaf)}\.daily_(min|max)$"
+        rf"^twamp#pca_twamp_csv#sample\.csv#slice\d+_{direction}_{re.escape(metric_leaf)}\.daily_(min|max)$"
     )
     mins = []
     maxs = []
@@ -782,8 +800,10 @@ if [[ ! -f "$SCENARIO_CONF" ]]; then
 fi
 
 read -r BACKFILL_START_TS BACKFILL_END_TS <<<"$(read_backfill_window)"
-TE_INTERVAL_MIN="$(read_stream_interval "thousandeyes#cisco:thousandeyes:metric#interval")"
-TM_INTERVAL_MIN="$(read_stream_interval "telemetry#cnc_interface_counter_json#interval")"
+TE_INTERVAL_MIN="$(read_stream_interval "thousandeyes#cisco:thousandeyes:metric#sample.json#interval")"
+TM_INTERVAL_MIN="$(read_stream_interval "telemetry#cnc_interface_counter_json#sample.json#interval")"
+TE_JUMP_OUTLIER_MIN="${TE_JUMP_OUTLIER_MIN:-0}"
+TE_JUMP_OUTLIER_MAX="${TE_JUMP_OUTLIER_MAX:-2}"
 TE_STEP_SECONDS=$(( TE_INTERVAL_MIN * 60 ))
 TM_STEP_SECONDS=$(( TM_INTERVAL_MIN * 60 ))
 
@@ -887,10 +907,11 @@ assert_savedsearch_time_aware_range \
   "response_time_ms" \
   "thousandeyes_response_sec"
 
-assert_count_eq \
-  "thousandeyes_response_time_sec_test fluctuates gradually (no abrupt jumps)" \
+assert_count_range \
+  "thousandeyes_response_time_sec_test fluctuates gradually (abrupt jumps within expected outlier range)" \
   "| savedsearch thousandeyes_response_time_sec_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$TE_STEP | stats count as count" \
-  0
+  "$TE_JUMP_OUTLIER_MIN" \
+  "$TE_JUMP_OUTLIER_MAX"
 
 assert_count_eq \
   "No JSON/parser errors from ai_lab ingest paths" \

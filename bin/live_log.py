@@ -19,7 +19,7 @@ LOOKUPS_DIR = os.path.join(APP_ROOT, "lookups")
 
 PLACEHOLDER_RE = re.compile(r"\{\{([A-Za-z0-9_]+)\}\}")
 
-# TWAMP slice placeholders that inherit twamp#pca_twamp_csv#default.noise_stdev (delay/jitter only).
+# TWAMP slice placeholders that inherit twamp#pca_twamp_csv#sample.csv#default.noise_stdev (delay/jitter only).
 _TWAMP_DELAY_JITTER_NAME = re.compile(
     r"^slice\d+_(ul|dl|rt)_("
     r"dmin|dmax|dmean|dStdDev|dp25|dp50|dp75|dp95|dpLo|dpMi|dpHi|"
@@ -48,19 +48,19 @@ def twamp_slice_noise_epsilons_for_placeholders(placeholders):
 
 
 def stream_default_metric_prefix(prefix):
-    parts = prefix.split("#", 2)
-    if len(parts) != 3:
+    parts = prefix.split("#", 3)
+    if len(parts) != 4:
         return None
-    return f"{parts[0]}#{parts[1]}#default"
+    return f"{parts[0]}#{parts[1]}#{parts[2]}#default"
 
 
 def resolve_noise_stdev(cfg, section, prefix):
     own = f"{prefix}.noise_stdev"
     if cfg.has_option(section, own):
         return parse_float(cfg, section, own, default=0.0) or 0.0
-    parts = prefix.split("#", 2)
-    if len(parts) == 3 and parts[0] == "twamp" and parts[1] == "pca_twamp_csv":
-        if _TWAMP_DELAY_JITTER_NAME.match(parts[2]):
+    parts = prefix.split("#", 3)
+    if len(parts) == 4 and parts[0] == "twamp" and parts[1] == "pca_twamp_csv":
+        if _TWAMP_DELAY_JITTER_NAME.match(parts[3]):
             dp = stream_default_metric_prefix(prefix)
             if dp:
                 return parse_float(cfg, section, f"{dp}.noise_stdev", default=0.0) or 0.0
@@ -111,6 +111,7 @@ REGION_TZ = {
 LIVE_CURSOR_KEY = "live_last_tick_epoch"
 SEQUENCE_LAST_KEY = "sequence_last_value"
 TWAMP_UL_LAST_STATE_KEY = "twamp_ul_lastpktseq_state_json"
+IOS_BFD_LAST_EMIT_STATE_KEY = "ios_bfd_last_emit_state_json"
 TWAMP_UL_FIRSTPKTSEQ_SEED = 5_000_000
 # Cap how many minute ticks we process per scheduler pass when catching up (avoids a tight
 # CPU loop if live_log was stopped for days). Override with AI_LAB_LIVE_CATCHUP_BATCH_MINUTES.
@@ -157,12 +158,27 @@ def build_streams():
             "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_service_health_json"),
         },
         {
+            "index": "ios",
+            "sourcetype": "cisco:ios",
+            "sample": os.path.join(
+                SAMPLES_DIR, "ios", "cisco:ios", "sample_bfd.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
+            # Emit this sequence once per scenario activation when reroute starts.
+            "scenario_reroute_start_once": "scenario_1",
+        },
+        {
             "index": "twamp",
             "sourcetype": "pca_twamp_csv",
             "sample": os.path.join(SAMPLES_DIR, "twamp", "pca_twamp_csv", "sample.csv"),
             "spool_dir": os.path.join(SPOOL_ROOT, "twamp", "pca_twamp_csv"),
         },
     ]
+
+
+def stream_prefix_base(stream):
+    sample_name = os.path.basename(stream["sample"])
+    return f"{stream['index']}#{stream['sourcetype']}#{sample_name}#"
 
 
 def telemetry_link_lookup_path():
@@ -214,7 +230,7 @@ def index_telemetry_placeholders(placeholders):
 
 def telemetry_directional_min_receive_fraction(cfg, section):
     """Minimum peer ifIn as a fraction of local ifOut after post-processing (0..1). Baseline uses 0.99 (<=1% drop); scenario may set 0 to allow large intentional gaps."""
-    pb = "telemetry#cnc_interface_counter_json#"
+    pb = "telemetry#cnc_interface_counter_json#sample.json#"
     v = parse_float(cfg, section, f"{pb}directional_min_receive_fraction", default=None)
     if v is None:
         return 0.99
@@ -429,6 +445,44 @@ def persist_twamp_ul_last_state(state):
     write_local_conf(local_cfg)
 
 
+def resolve_ios_bfd_last_emit_state():
+    local_cfg = read_local_conf()
+    raw = local_cfg.get("baseline", IOS_BFD_LAST_EMIT_STATE_KEY, fallback="").strip()
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    out = {}
+    for key, value in parsed.items():
+        activation = safe_int(value, default=None)
+        if activation is None or activation <= 0:
+            continue
+        out[str(key)] = int(activation)
+    return out
+
+
+def persist_ios_bfd_last_emit_state(state):
+    normalized = {}
+    for key, value in (state or {}).items():
+        activation = safe_int(value, default=None)
+        if activation is None or activation <= 0:
+            continue
+        normalized[str(key)] = int(activation)
+    local_cfg = read_local_conf()
+    if not local_cfg.has_section("baseline"):
+        local_cfg.add_section("baseline")
+    local_cfg.set(
+        "baseline",
+        IOS_BFD_LAST_EMIT_STATE_KEY,
+        json.dumps(normalized, separators=(",", ":")),
+    )
+    write_local_conf(local_cfg)
+
+
 def weekend_multiplier(local_dt, configured):
     if configured is None:
         return 1.0
@@ -503,7 +557,7 @@ def apply_twamp_ul_packet_sequence(
     replacements, stream, twamp_ul_last_state, cfg, section, local_dt
 ):
     stream_key = f"{stream['index']}#{stream['sourcetype']}"
-    prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+    prefix_base = stream_prefix_base(stream)
     session_name = str(replacements.get("session_name", "")).strip()
     prefixes = twamp_slice_prefixes(replacements)
     if not prefixes:
@@ -628,7 +682,7 @@ def coerce_placeholder(
     if placeholder == "sourcetype":
         return stream["sourcetype"]
     if placeholder == "intervalms":
-        ib = f"{stream['index']}#{stream['sourcetype']}#"
+        ib = stream_prefix_base(stream)
         eis = parse_int(cfg, section, f"{ib}event_interval_sec", default=None)
         if eis and eis > 0:
             return eis * 1000
@@ -800,7 +854,7 @@ def scenario_reroute_progress(cfg, scenario_name, tick_ts):
     ramp_minutes = parse_int(
         cfg,
         scenario_name,
-        "telemetry#cnc_interface_counter_json#reroute_ramp_minutes",
+        "telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes",
         default=None,
     )
     if ramp_minutes is None:
@@ -810,7 +864,7 @@ def scenario_reroute_progress(cfg, scenario_name, tick_ts):
         ramp_minutes = parse_int(
             cfg,
             scenario_name,
-            "telemetry#cnc_interface_counter_json#ramp_minutes",
+            "telemetry#cnc_interface_counter_json#sample.json#ramp_minutes",
             default=0,
         )
     ramp_minutes = ramp_minutes or 0
@@ -822,7 +876,7 @@ def scenario_reroute_progress(cfg, scenario_name, tick_ts):
     start_delay_minutes = parse_int(
         cfg,
         scenario_name,
-        "telemetry#cnc_interface_counter_json#reroute_start_minutes",
+        "telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes",
         default=None,
     )
     if start_delay_minutes is None:
@@ -833,6 +887,22 @@ def scenario_reroute_progress(cfg, scenario_name, tick_ts):
     ramp_start = start + (int(start_delay_minutes) * 60)
     elapsed_min = max(0.0, float(tick_ts - ramp_start) / 60.0)
     return max(0.0, min(1.0, elapsed_min / float(ramp_minutes)))
+
+
+def scenario_reroute_start_epoch(cfg, scenario_name):
+    start = scenario_start_epoch(cfg, scenario_name)
+    if start is None:
+        return None
+    start_delay_minutes = parse_int(
+        cfg,
+        scenario_name,
+        "telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes",
+        default=None,
+    )
+    if start_delay_minutes is None:
+        start_delay_minutes = parse_int(cfg, scenario_name, "reroute_start_minutes", default=0)
+    start_delay_minutes = max(0, start_delay_minutes or 0)
+    return start + (int(start_delay_minutes) * 60)
 
 
 SLICE_TELEMETRY_RATE_KEYS = {
@@ -893,7 +963,7 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
     if not base_cfg.has_section(section):
         return out_cfg
 
-    prefix_base = "telemetry#cnc_interface_counter_json#"
+    prefix_base = "telemetry#cnc_interface_counter_json#sample.json#"
     for scenario_name in active_scenarios:
         if not base_cfg.has_section(scenario_name):
             continue
@@ -901,7 +971,7 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
         reroute_pct = parse_float(
             base_cfg,
             scenario_name,
-            "telemetry#cnc_interface_counter_json#reroute_pct",
+            "telemetry#cnc_interface_counter_json#sample.json#reroute_pct",
             default=None,
         )
         if reroute_pct is None:
@@ -914,14 +984,14 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
         from_slices = parse_csv_list(
             base_cfg,
             scenario_name,
-            "telemetry#cnc_interface_counter_json#reroute_from_slice",
+            "telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice",
         )
         if not from_slices:
             from_slices = parse_csv_list(base_cfg, scenario_name, "reroute_from_slice")
         to_slices = parse_csv_list(
             base_cfg,
             scenario_name,
-            "telemetry#cnc_interface_counter_json#reroute_to_slice",
+            "telemetry#cnc_interface_counter_json#sample.json#reroute_to_slice",
         )
         if not to_slices:
             to_slices = parse_csv_list(base_cfg, scenario_name, "reroute_to_slice")
@@ -1019,7 +1089,7 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
         gap_pct = parse_float(
             base_cfg,
             scenario_name,
-            "telemetry#cnc_interface_counter_json#immediate_gap_pct",
+            "telemetry#cnc_interface_counter_json#sample.json#immediate_gap_pct",
             default=None,
         )
         if gap_pct is None:
@@ -1028,7 +1098,7 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
         if gap_pct > 0:
             out_suffix = base_cfg.get(
                 scenario_name,
-                "telemetry#cnc_interface_counter_json#immediate_gap_out_key",
+                "telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key",
                 fallback=None,
             )
             if not out_suffix:
@@ -1037,7 +1107,7 @@ def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tic
                 )
             in_suffix = base_cfg.get(
                 scenario_name,
-                "telemetry#cnc_interface_counter_json#immediate_gap_in_key",
+                "telemetry#cnc_interface_counter_json#sample.json#immediate_gap_in_key",
                 fallback=None,
             )
             if not in_suffix:
@@ -1078,7 +1148,7 @@ def apply_scenario_thousandeyes_back_to_baseline(
     if not base_cfg.has_section(section):
         return out_cfg
 
-    metric_prefix = "thousandeyes#cisco:thousandeyes:metric#response_time_ms"
+    metric_prefix = "thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms"
     key_main = metric_prefix
     key_min = f"{metric_prefix}.daily_min"
     key_max = f"{metric_prefix}.daily_max"
@@ -1147,7 +1217,7 @@ def generate_single_event(
     cfg, stream, ts, tzinfo, region, sequence, telemetry_rate_state, twamp_ul_last_state
 ):
     section = "baseline"
-    prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+    prefix_base = stream_prefix_base(stream)
 
     with open(stream["sample"], "r") as f:
         full_text = f.read()
@@ -1251,8 +1321,10 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
     emitted = 0
     per_stream_counts = {}
     for stream in build_streams():
-        prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+        prefix_base = stream_prefix_base(stream)
         stream_cfg = effective_cfg
+        custom_timestamps = None
+        bfd_emit_state_update = None
         if active_scenarios:
             probability = scenario_happening_probability(
                 effective_cfg, "baseline", prefix_base
@@ -1280,14 +1352,36 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
 
         interval = parse_int(stream_cfg, "baseline", f"{prefix_base}interval", default=1)
         interval = max(interval or 1, 1)
-        if not minute_due_for_interval(tick_ts, interval):
-            continue
         event_interval_sec = parse_int(
             stream_cfg, "baseline", f"{prefix_base}event_interval_sec", default=None
         )
         if event_interval_sec is not None and event_interval_sec <= 0:
             event_interval_sec = None
-        timestamps = event_timestamps_for_tick(tick_ts, interval, event_interval_sec)
+        scenario_once_name = stream.get("scenario_reroute_start_once")
+        if scenario_once_name:
+            if scenario_once_name not in active_scenarios:
+                continue
+            activation = parse_int(
+                base_cfg, "scenarios", f"{scenario_once_name}_activated", default=0
+            ) or 0
+            if activation <= 0:
+                continue
+            already_emitted = sequence_state["ios_bfd_last_emit_state"].get(
+                scenario_once_name
+            )
+            if already_emitted == activation:
+                continue
+            reroute_start_epoch = scenario_reroute_start_epoch(base_cfg, scenario_once_name)
+            if reroute_start_epoch is None or tick_ts < int(reroute_start_epoch):
+                continue
+            custom_timestamps = [int(reroute_start_epoch)]
+            bfd_emit_state_update = (scenario_once_name, activation)
+        elif not minute_due_for_interval(tick_ts, interval):
+            continue
+
+        timestamps = custom_timestamps or event_timestamps_for_tick(
+            tick_ts, interval, event_interval_sec
+        )
         all_event_objs = []
         csv_header_line = None
         if sample_extension(stream["sample"]) == ".csv":
@@ -1308,6 +1402,9 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
             all_event_objs.extend(part)
         event_count = len(all_event_objs)
         path = write_stream_events(stream, all_event_objs, csv_header_line=csv_header_line)
+        if bfd_emit_state_update:
+            scenario_name, activation = bfd_emit_state_update
+            sequence_state["ios_bfd_last_emit_state"][scenario_name] = int(activation)
         emitted += event_count
         per_stream_counts[f"{stream['index']}#{stream['sourcetype']}"] = (
             per_stream_counts.get(f"{stream['index']}#{stream['sourcetype']}", 0)
@@ -1361,6 +1458,7 @@ def main():
         "seq": int(start_sequence),
         "telemetry_rate_state": {},
         "twamp_ul_last_state": resolve_twamp_ul_last_state(),
+        "ios_bfd_last_emit_state": resolve_ios_bfd_last_emit_state(),
     }
     last_effective_conf_sig = effective_conf_signature()
 
@@ -1404,6 +1502,7 @@ def main():
             ticks_this_batch += 1
         persist_last_sequence(sequence_state["seq"])
         persist_twamp_ul_last_state(sequence_state["twamp_ul_last_state"])
+        persist_ios_bfd_last_emit_state(sequence_state["ios_bfd_last_emit_state"])
 
         write_generation_log(
             "tick_batch_processed",

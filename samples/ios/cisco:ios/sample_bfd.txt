@@ -1,0 +1,9 @@
+{{timestamp}} r7.5gsc.lab {{sequence}}: RP/0/RP0/CPU0: isis[1009]: %ROUTING-ISIS-5-ADJCHANGE : ISIS (CORE): Adjacency to R5-NCS55A2 (HundredGigE0/0/0/1) (L2) Down, BFD session DOWN 
+{{timestamp}} r7.5gsc.lab {{sequence}}: RP/0/RP0/CPU0: bfd_agent[308]: %L2-BFD-6-SESSION_STATE_DOWN : BFD session to neighbor 10.0.57.5 on interface HundredGigE0/0/0/1 has gone down. Reason: Control timer expired 
+{{timestamp}} r5.5gsc.lab {{sequence}}: LC/0/0/CPU0: bfd_agent[234]: %L2-BFD-6-SESSION_REMOVED : BFD session to neighbor 10.0.57.7 on interface HundredGigE0/0/2/0 has been removed 
+{{timestamp}} r5.5gsc.lab 42794: LC/0/0/CPU0: bfd_agent[234]: %L2-BFD-6-ADJACENCY_DELETE : Adjacency to neighbor 10.0.57.7 on interface HundredGigE0/0/2/0 was deleted
+{{timestamp}} r5.5gsc.lab {{sequence}}: RP/0/RP0/CPU0: isis[1009]: %ROUTING-ISIS-5-ADJCHANGE : ISIS (CORE): Adjacency to R7-NCS560 (HundredGigE0/0/2/0) (L2) Down, Interface state down 
+{{timestamp}} r5.5gsc.lab {{sequence}}: LC/0/0/CPU0:Mar 24 23:33:17.289 JST: fia_driver[134]: %PLATFORM-DPA-2-RX_FAULT : Interface HundredGigE0/0/2/0, Detected Remote Fault 
+{{timestamp}} r5.5gsc.lab {{sequence}}: LC/0/0/CPU0:Mar 24 23:33:17.064 JST: ifmgr[212]: %PKT_INFRA-LINK-5-CHANGED : Interface HundredGigE0/0/2/0, changed state to Administratively Down 
+{{timestamp}} r2.5gsc.lab {{sequence}}: RP/0/RP0/CPU0: xtc_agent[1300]: %OS-XTC-5-SR_POLICY_UPDOWN : SR policy 'srte_c_1002_ep_10.0.255.9' (color 1002, end-point 10.0.255.9) state changed to DOWN (no valid candidate-path) 
+{{timestamp}} r2.5gsc.lab {{sequence}}: RP/0/RP0/CPU0: xtc_agent[1300]: %OS-XTC-5-SR_POLICY_UPDOWN : SR policy 'srte_c_1003_ep_10.0.255.9' (color 1003, end-point 10.0.255.9) state changed to DOWN (no valid candidate-path)

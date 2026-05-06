@@ -12,7 +12,7 @@ Use this block when the operator is exhausted or returning after a long gap — 
 
 - Read **`docs/project_ai_lab.md`** → *Resume after a break* for paths, reset gate, and credentials pointers.
 - If the user asks “where am I”, read **`docs/daily_activity_timeline.md`** first and report the latest **Resume anchor**.
-- **`scenario_happening_probability`:** evaluated in **`live_log.py`** during active scenario windows; **omitted or invalid → 1**. **`[scenario_1]`** does **not** need `telemetry#cnc_service_health_json#scenario_happening_probability` for deterministic degraded service-health rows.
+- **`scenario_happening_probability`:** evaluated in **`live_log.py`** during active scenario windows; **omitted or invalid → 1**. **`[scenario_1]`** does **not** need `telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability` for deterministic degraded service-health rows.
 - **TWAMP:** `*_lostperc` = **0–100 integer percent**; rates = **pps**; correlate loss with `cnc_interface_counter_json` for VLAN **1002/1003** in `scenario_1`.
 - **After reset:** `scripts/test_smoke.sh` is mandatory before other tests; **post-generation:** `scripts/test_baseline.sh` (not immediately after reset with empty indexes).
 - Do **not** mutate **`local/`** from automation; treat as Splunk/test-owned.
@@ -52,8 +52,8 @@ Shipped in `default/savedsearches.conf` and asserted by `scripts/test_backfill.s
 | Saved search | Role |
 |--------------|------|
 | `twamp_event_count_test` | Last 5m: `bin span=1m _time` then count of minute buckets with ≥1 TWAMP event (`minute_buckets_with_data`). Nominal ~5; partial clock edges may yield fewer; script default range `3–6` unless overridden by `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX`. |
-| `twamp_dmean_test` | Last 5m: averages indexed `ul_dmean*`, `dl_dmean*`, `rt_dmean*` by direction; script checks each against aggregated `daily_min`/`daily_max` for `twamp#pca_twamp_csv#slice*_{ul|dl|rt}_dmean` plus noise tolerance. |
-| `twamp_jmean_test` | Same pattern for `*_jmean` fields vs conf keys `slice*_{ul|dl|rt}_jmean`. |
+| `twamp_dmean_test` | Last 5m: averages indexed `ul_dmean*`, `dl_dmean*`, `rt_dmean*` by direction; script checks each against aggregated `daily_min`/`daily_max` for `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_dmean` plus noise tolerance. |
+| `twamp_jmean_test` | Same pattern for `*_jmean` fields vs conf keys `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_jmean`. |
 
 Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wildcards in SPL.
 
@@ -66,27 +66,27 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 
 - `live_log.py` runs with a 1-minute scheduler tick.
 - Per-source event generation follows effective interval gating (`minute % interval == 0`).
-- Optional `<<index>#<sourcetype>#event_interval_sec` subdivides an eligible tick into multiple events (spaced in seconds); see `samples/twamp/pca_twamp_csv/README.md` and `docs/project_script_design.md`.
+- Optional `<<index>#<sourcetype>#<sample_file>#event_interval_sec` subdivides an eligible tick into multiple events (spaced in seconds); see `samples/twamp/pca_twamp_csv/README.md` and `docs/project_script_design.md`.
 - With no active scenario, baseline values and baseline intervals apply.
 - Restart continuity uses `baseline.live_last_tick_epoch` in `local/ai_lab_scenarios.conf`.
 - For `cnc_srte_path_json`, output wire format follows sample extension (`sample.txt` -> `.txt` spool payload), while `props.conf`/`transforms.conf` must still break and parse per-event JSON correctly.
-- `scenario_happening_probability` is per-source (`<index>#<sourcetype>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
+- `scenario_happening_probability` is per-source (`<index>#<sourcetype>#<sample_file>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
 - For TWAMP CSV (`pca_twamp_csv`), treat packet-rate fields as packets per second (pps) unless the user explicitly asks for a different unit model.
-- TWAMP delay/jitter integers still **fluctuate across ticks**: one standard-normal draw **per slice per event** scales `twamp#pca_twamp_csv#default.noise_stdev` for all noisy delay/jitter fields in that slice (see `docs/project_script_design.md`).
+- TWAMP delay/jitter integers still **fluctuate across ticks**: one standard-normal draw **per slice per event** scales `twamp#pca_twamp_csv#sample.csv#default.noise_stdev` for all noisy delay/jitter fields in that slice (see `docs/project_script_design.md`).
 - Scenario 1 telemetry reroute uses prefixed slice controls in `[scenario_1]`:
-  - `telemetry#cnc_interface_counter_json#reroute_from_slice`
-  - `telemetry#cnc_interface_counter_json#reroute_to_slice`
-  - `telemetry#cnc_interface_counter_json#reroute_pct`
-  - `telemetry#cnc_interface_counter_json#reroute_start_minutes`
-  - `telemetry#cnc_interface_counter_json#reroute_ramp_minutes`
+  - `telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice`
+  - `telemetry#cnc_interface_counter_json#sample.json#reroute_to_slice`
+  - `telemetry#cnc_interface_counter_json#sample.json#reroute_pct`
+  - `telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes`
+  - `telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes`
 - `reroute_pct` means conserved shift: traffic removed from from-slices is redistributed to to-slices (not healthy-link independent `+pct`).
 - Scenario 1 must show immediate `R5->R7` directional gap from activation via:
-  - `telemetry#cnc_interface_counter_json#immediate_gap_out_key`
-  - `telemetry#cnc_interface_counter_json#immediate_gap_in_key`
-  - `telemetry#cnc_interface_counter_json#immediate_gap_pct`
+  - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key`
+  - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_in_key`
+  - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_pct`
 - Scenario 1 ThousandEyes `response_time_ms` can return to baseline with:
-  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes`
-  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes`
+  - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes`
+  - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes`
 - TWAMP UL packet sequence continuity is mandatory across backfill/live/restart:
   - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
   - no-loss check: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
@@ -101,7 +101,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 2. Confirm generation gate is open (`region` locked, `baseline_generation_enabled=true`).
 3. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
 4. Run saved searches over `-5m` and verify non-zero recent data (including `index=twamp` when TWAMP is in scope).
-5. Run baseline quality tests via `scripts/test_baseline.sh` (includes TWAMP `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` via `test_backfill.sh`).
+5. Run baseline quality tests via `scripts/test_baseline.sh` (includes TWAMP `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` via `test_backfill.sh`; set `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` if ThousandEyes abrupt-jump allowance differs from default `0..2`).
 6. For TWAMP + telemetry scenario checks, validate in a recent window that TWAMP UL loss indicators and telemetry directional in/out packet gaps move together for VLAN 1002/1003 during `scenario_1`.
 
 ## SRTE-specific verification addendum
@@ -117,7 +117,7 @@ Use this when validating `index=telemetry sourcetype=cnc_srte_path_json`:
 
 Use this when validating `index=telemetry sourcetype=cnc_service_health_json` during **`scenario_1`**:
 
-1. Omit **`telemetry#cnc_service_health_json#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
+1. Omit **`telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
 2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health_test` / saved-search contract).
 
 ## Scenario control dashboard addendum

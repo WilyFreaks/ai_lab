@@ -8,10 +8,11 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 
 ## Key Conventions
 
-**Conf key naming:** `index#sourcetype#placeholder_name`
-- Example: `thousandeyes#cisco:thousandeyes:metric#response_time_ms = 150`
+**Conf key naming:** `index#sourcetype#sample_file#placeholder_name`
+- Example: `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms = 150`
 - Same name used in sample template placeholders: `{{response_time_ms}}`
 - This avoids any mapping table — direct substitution.
+- The first token is the Splunk **index** (for example `ios`, `syslog`, `telemetry`), not a vendor/domain label.
 
 **Placeholder syntax in sample templates:** `{{placeholder_name}}`
 
@@ -108,29 +109,30 @@ scenario_1_fault_duration = 0
 - Keep `[baseline]` as the single source of truth for normal-state values.
 - In `[scenario_*]`, define only values that must change during the fault.
 - If a key is not defined in `[scenario_*]`, generator behavior falls back to baseline.
+- Scenario behavior must be driven by explicit keys in `default/ai_lab_scenarios.conf`; do not run scenario-only generator behavior from hard-coded constants.
 - For Scenario 1 specifically:
   - TWAMP slices `1002/1003` carry immediate fault signal.
   - `cnc_interface_counter_json` uses explicit immediate-gap keys for `R5->R7`, plus slice-based reroute keys (from/to slices, percent, start delay, and ramp).
   - ThousandEyes metrics are scenario-overridden at activation, and `response_time_ms` may return to baseline via `back_to_baseline_start_minutes` + `back_to_baseline_ramp_minutes`.
-- **`cnc_service_health_json`**: during **`scenario_1`**, degraded status/score placeholders apply each tick without setting `telemetry#cnc_service_health_json#scenario_happening_probability` — **`live_log.py`** defaults that key to **`1`** when omitted (see `docs/project_scenario_1.md`).
+- **`cnc_service_health_json`**: during **`scenario_1`**, degraded status/score placeholders apply each tick without setting `telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability` — **`live_log.py`** defaults that key to **`1`** when omitted (see `docs/project_scenario_1.md`).
 
 ### Scenario 1 dynamic control keys (current pattern)
 
 Example keys in `[scenario_1]`:
 
 ```ini
-telemetry#cnc_interface_counter_json#immediate_gap_out_key = R5_HundredGigE0_0_2_0_ifOutPktsRate
-telemetry#cnc_interface_counter_json#immediate_gap_in_key = R7_HundredGigE0_0_0_1_ifInPktsRate
-telemetry#cnc_interface_counter_json#immediate_gap_pct = 30
+telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key = R5_HundredGigE0_0_2_0_ifOutPktsRate
+telemetry#cnc_interface_counter_json#sample.json#immediate_gap_in_key = R7_HundredGigE0_0_0_1_ifInPktsRate
+telemetry#cnc_interface_counter_json#sample.json#immediate_gap_pct = 30
 
-telemetry#cnc_interface_counter_json#reroute_from_slice = 1002,1003
-telemetry#cnc_interface_counter_json#reroute_to_slice = 1001,1004
-telemetry#cnc_interface_counter_json#reroute_pct = 50
-telemetry#cnc_interface_counter_json#reroute_start_minutes = 3
-telemetry#cnc_interface_counter_json#reroute_ramp_minutes = 7
+telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice = 1002,1003
+telemetry#cnc_interface_counter_json#sample.json#reroute_to_slice = 1001,1004
+telemetry#cnc_interface_counter_json#sample.json#reroute_pct = 50
+telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes = 3
+telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes = 7
 
-thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes = 3
-thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes = 7
+thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes = 3
+thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes = 7
 ```
 
 ### Router traffic range guidance (scenario_1 reroute path)

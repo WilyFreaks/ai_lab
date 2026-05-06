@@ -90,6 +90,11 @@ def build_streams():
     ]
 
 
+def stream_prefix_base(stream):
+    sample_name = os.path.basename(stream["sample"])
+    return f"{stream['index']}#{stream['sourcetype']}#{sample_name}#"
+
+
 def telemetry_link_lookup_path():
     # Prefer the newly introduced filename when present, but support the legacy one.
     preferred = os.path.join(LOOKUPS_DIR, "router_if_connected_bidirectional.csv")
@@ -147,7 +152,7 @@ def index_telemetry_placeholders(placeholders):
 
 
 def telemetry_directional_min_receive_fraction(cfg, section):
-    pb = "telemetry#cnc_interface_counter_json#"
+    pb = "telemetry#cnc_interface_counter_json#sample.json#"
     v = parse_float(cfg, section, f"{pb}directional_min_receive_fraction", default=None)
     if v is None:
         return 0.99
@@ -159,7 +164,7 @@ def enforce_telemetry_directional_conservation(
 ):
     # Enforce packet-loss-only model (no packet creation in transit). Baseline:
     # bound modeled drop rate under 1% per link direction via
-    # telemetry#cnc_interface_counter_json#directional_min_receive_fraction = 0.99.
+    # telemetry#cnc_interface_counter_json#sample.json#directional_min_receive_fraction = 0.99.
     # Scenario overlays may set that fraction to 0 to allow large intentional gaps.
     min_frac = telemetry_directional_min_receive_fraction(cfg, section)
 
@@ -372,7 +377,7 @@ def interpolated_hourly_peak_rate(cfg, section, prefix, local_dt):
     return current_rate + ((next_rate - current_rate) * minute_progress)
 
 
-# TWAMP slice placeholders that inherit twamp#pca_twamp_csv#default.noise_stdev (delay/jitter only).
+# TWAMP slice placeholders that inherit twamp#pca_twamp_csv#sample.csv#default.noise_stdev (delay/jitter only).
 _TWAMP_DELAY_JITTER_NAME = re.compile(
     r"^slice\d+_(ul|dl|rt)_("
     r"dmin|dmax|dmean|dStdDev|dp25|dp50|dp75|dp95|dpLo|dpMi|dpHi|"
@@ -401,19 +406,19 @@ def twamp_slice_noise_epsilons_for_placeholders(placeholders):
 
 
 def stream_default_metric_prefix(prefix):
-    parts = prefix.split("#", 2)
-    if len(parts) != 3:
+    parts = prefix.split("#", 3)
+    if len(parts) != 4:
         return None
-    return f"{parts[0]}#{parts[1]}#default"
+    return f"{parts[0]}#{parts[1]}#{parts[2]}#default"
 
 
 def resolve_noise_stdev(cfg, section, prefix):
     own = f"{prefix}.noise_stdev"
     if cfg.has_option(section, own):
         return parse_float(cfg, section, own, default=0.0) or 0.0
-    parts = prefix.split("#", 2)
-    if len(parts) == 3 and parts[0] == "twamp" and parts[1] == "pca_twamp_csv":
-        if _TWAMP_DELAY_JITTER_NAME.match(parts[2]):
+    parts = prefix.split("#", 3)
+    if len(parts) == 4 and parts[0] == "twamp" and parts[1] == "pca_twamp_csv":
+        if _TWAMP_DELAY_JITTER_NAME.match(parts[3]):
             dp = stream_default_metric_prefix(prefix)
             if dp:
                 return parse_float(cfg, section, f"{dp}.noise_stdev", default=0.0) or 0.0
@@ -493,7 +498,7 @@ def apply_twamp_ul_packet_sequence(
     replacements, stream, twamp_ul_last_state, cfg, section, local_dt
 ):
     stream_key = f"{stream['index']}#{stream['sourcetype']}"
-    prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+    prefix_base = stream_prefix_base(stream)
     session_name = str(replacements.get("session_name", "")).strip()
     prefixes = twamp_slice_prefixes(replacements)
     if not prefixes:
@@ -621,7 +626,7 @@ def coerce_placeholder(
     if placeholder == "sourcetype":
         return stream["sourcetype"]
     if placeholder == "intervalms":
-        ib = f"{stream['index']}#{stream['sourcetype']}#"
+        ib = stream_prefix_base(stream)
         eis = parse_int(cfg, section, f"{ib}event_interval_sec", default=None)
         if eis and eis > 0:
             return eis * 1000
@@ -722,7 +727,7 @@ def generate_stream(
     cfg, stream, start_ts, end_ts, tzinfo, region, sequence_start, twamp_ul_last_state
 ):
     section = "baseline"
-    prefix_base = f"{stream['index']}#{stream['sourcetype']}#"
+    prefix_base = stream_prefix_base(stream)
     interval = parse_int(cfg, section, f"{prefix_base}interval", default=1)
     interval = max(interval or 1, 1)
     event_interval_sec = parse_int(

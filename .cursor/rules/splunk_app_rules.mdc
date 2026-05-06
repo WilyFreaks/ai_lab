@@ -19,7 +19,7 @@ When you return tired or after a long break (minimal re-orientation — no extra
 - **Handoff one-pager:** `docs/project_ai_lab.md` → subsection *Resume after a break*.
 - **`local/`:** do not edit or seed `local/ai_lab_scenarios.conf` from agents; ship changes in `default/` and docs only.
 - **Reset discipline:** every full reset → immediately `bash scripts/test_smoke.sh` before generation or baseline tests.
-- **Live scenario math:** `scenario_happening_probability` is evaluated in `live_log.py` only; **missing or invalid → treated as 1** (always apply scenario keys that tick). Do **not** add `telemetry#cnc_service_health_json#scenario_happening_probability = 1` in `[scenario_1]` unless you want an explicit override — it is redundant with the default.
+- **Live scenario math:** `scenario_happening_probability` is evaluated in `live_log.py` only; **missing or invalid → treated as 1** (always apply scenario keys that tick). Do **not** add `telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability = 1` in `[scenario_1]` unless you want an explicit override — it is redundant with the default.
 - **TWAMP wire:** `*_lostperc` is **integer percent 0–100**, not millionths; packet-rate fields are **pps**; UL sequence continuity rules apply (see `docs/project_scenario_1.md`, `samples/twamp/pca_twamp_csv/README.md`).
 - **After changing generators or `default/ai_lab_scenarios.conf`:** workshop hosts may need to **restart** `live_log.py` / `backfill_log.py` (or Splunk) so running workers reload behavior — see `docs/project_script_design.md` (*launcher / workers*).
 - **Journal:** update `docs/daily_activity_timeline.md` **only** when the user explicitly asks (same rule when tired).
@@ -49,14 +49,14 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - Use interpolation windows around Fri→Sat and Sun→Mon transitions.
 - For TWAMP (`pca_twamp_csv`) correlated with `cnc_interface_counter_json`, treat packet-rate fields as packets-per-second (pps) and keep cross-source packet-loss behavior aligned per tick during scenario windows.
 - TWAMP CSV wire format: **integer-only** metric cells after generation (see `samples/twamp/pca_twamp_csv/README.md` and `format_pca_twamp_csv_metric` / `normalize_pca_twamp_csv_replacements` in `bin/backfill_log.py` / `bin/live_log.py`).
-- TWAMP delay/jitter on the wire: **`noise_stdev × ε`** per slice per event (one shared standard-normal **ε** per slice so integer delay/jitter columns move together); tune `twamp#pca_twamp_csv#default.noise_stdev` in `default/ai_lab_scenarios.conf`. Detail: `docs/project_script_design.md` (*TWAMP + Telemetry Correlation Contract*).
+- TWAMP delay/jitter on the wire: **`noise_stdev × ε`** per slice per event (one shared standard-normal **ε** per slice so integer delay/jitter columns move together); tune `twamp#pca_twamp_csv#sample.csv#default.noise_stdev` in `default/ai_lab_scenarios.conf`. Detail: `docs/project_script_design.md` (*TWAMP + Telemetry Correlation Contract*).
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 - TWAMP `*_lostperc` on the wire: integer **percent 0–100** (from lost vs expected counts under scenario loss), not millionths; align dashboards/tests to that scale.
 - Scenario 1 `cnc_service_health_json`: **`[scenario_1]`** overrides degraded **sr_policy** placeholders; **`scenario_happening_probability`** need not be set — it **defaults to 1** when missing (see `docs/project_scenario_1.md`).
-- Scenario 1 telemetry control keys are now slice-based: `telemetry#cnc_interface_counter_json#reroute_from_slice`, `...#reroute_to_slice`, `...#reroute_pct`, `...#reroute_start_minutes`, `...#reroute_ramp_minutes`.
+- Scenario 1 telemetry control keys are now slice-based: `telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice`, `...#reroute_to_slice`, `...#reroute_pct`, `...#reroute_start_minutes`, `...#reroute_ramp_minutes`.
 - `reroute_pct` semantics are conserved traffic shift (remove volume from from-slices and redistribute to to-slices), **not** independent `+pct` on healthy slices.
-- Scenario 1 must keep immediate directional gap on `R5->R7` via `telemetry#cnc_interface_counter_json#immediate_gap_out_key`, `...#immediate_gap_in_key`, `...#immediate_gap_pct` (applies from activation, independent of reroute delay/ramp).
-- Scenario 1 ThousandEyes `response_time_ms` supports timed recovery via `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
+- Scenario 1 must keep immediate directional gap on `R5->R7` via `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key`, `...#immediate_gap_in_key`, `...#immediate_gap_pct` (applies from activation, independent of reroute delay/ramp).
+- Scenario 1 ThousandEyes `response_time_ms` supports timed recovery via `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
 - Baseline reroute-path router traffic ranges must stay core-consistent (avoid single-digit outliers on `R8-R6`, `R6-R4`, `R4-R2`); see `docs/project_conf_design.md` and `docs/project_scenario_1.md`.
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):
@@ -113,7 +113,7 @@ Saved-search validation rules (Splunk test/verification):
   - `twamp_event_count_test` (minute buckets with TWAMP events in last 5m; asserted in `scripts/test_backfill.sh`)
   - `twamp_dmean_test` (avg `ul`/`dl`/`rt` delay means vs `default/ai_lab_scenarios.conf` bounds; asserted in `scripts/test_backfill.sh`)
   - `twamp_jmean_test` (avg `ul`/`dl`/`rt` jitter means vs conf bounds; asserted in `scripts/test_backfill.sh`)
-- Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ.
+- Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ. ThousandEyes abrupt-jump tolerance can be tuned with `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` (default `0..2`).
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
 

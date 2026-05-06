@@ -111,7 +111,7 @@
         <option name="leaflet_maps_app.maps-plus.layerControlCollapsed">1</option>
         <option name="leaflet_maps_app.maps-plus.mapCenterLat">-37.2</option>
         <option name="leaflet_maps_app.maps-plus.mapCenterLon">145.5</option>
-        <option name="leaflet_maps_app.maps-plus.mapCenterZoom">7</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterZoom">8</option>
         <option name="leaflet_maps_app.maps-plus.mapTile">https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png</option>
         <option name="leaflet_maps_app.maps-plus.maplibreStylePreset">liberty</option>
         <option name="leaflet_maps_app.maps-plus.maps-plus.allPopups">0</option>
@@ -127,7 +127,7 @@
         <option name="leaflet_maps_app.maps-plus.measureSecondaryAreaUnit">sqmiles</option>
         <option name="leaflet_maps_app.maps-plus.measureSecondaryLengthUnit">miles</option>
         <option name="leaflet_maps_app.maps-plus.measureTool">0</option>
-        <option name="leaflet_maps_app.maps-plus.minZoom">7</option>
+        <option name="leaflet_maps_app.maps-plus.minZoom">6</option>
         <option name="leaflet_maps_app.maps-plus.msColorMode">Light</option>
         <option name="leaflet_maps_app.maps-plus.multiplePopups">0</option>
         <option name="leaflet_maps_app.maps-plus.pathColorList">#0003F0,#D43C29,darkgreen,0xe2d400,darkred,#23A378</option>
@@ -192,6 +192,32 @@
           <colorPalette type="map">{"UP":#55C169,"DEGRADED":#CBA700}</colorPalette>
         </format>
       </table>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <title>ThousandEyes Google Monitor at R9</title>
+      <chart>
+        <search>
+          <query>index=thousandeyes
+| bin _time span=1m
+| stats avg(response_time_sec) by _time
+| join _time
+    [ search index=thousandeyes earliest=-24h
+    | table _time response_time_sec
+    | predict response_time_sec holdback=60 future_timespan=60 
+    | fields - response_time_sec prediction* ]
+| fields _time avg(response_time_sec) prediction* lower* upper*</query>
+          <earliest>$PERIOD.earliest$</earliest>
+          <latest>$PERIOD.latest$</latest>
+          <refresh>1m</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.drilldown">none</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="refresh.display">progressbar</option>
+      </chart>
     </panel>
   </row>
   <row>
@@ -497,12 +523,14 @@
         </search>
         <option name="charting.axisLabelsX.majorLabelStyle.overflowMode">ellipsisNone</option>
         <option name="charting.axisLabelsX.majorLabelStyle.rotation">0</option>
+        <option name="charting.axisLabelsY.majorUnit">2500</option>
         <option name="charting.axisTitleX.visibility">collapsed</option>
         <option name="charting.axisTitleY.visibility">collapsed</option>
         <option name="charting.axisTitleY2.visibility">collapsed</option>
         <option name="charting.axisX.abbreviation">none</option>
         <option name="charting.axisX.scale">linear</option>
         <option name="charting.axisY.abbreviation">none</option>
+        <option name="charting.axisY.maximumNumber">7500</option>
         <option name="charting.axisY.scale">linear</option>
         <option name="charting.axisY2.abbreviation">none</option>
         <option name="charting.axisY2.enabled">0</option>

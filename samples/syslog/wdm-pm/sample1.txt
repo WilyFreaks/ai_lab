@@ -1,0 +1,2 @@
+{{timestamp}} 172.20.201.130 : %OSPF-4-SYSLOG_SL_MSG_WARNING: OSPF-4-NEIGH_ERR: message repeated 1 times in last 14 sec 
+{{timestamp}} 172.20.201.130 : %OSPF-4-NEIGH_ERR:  ospf-UNDERLAY [9174] (default) Neighbor 172.19.9.2 not found, packet dropped
