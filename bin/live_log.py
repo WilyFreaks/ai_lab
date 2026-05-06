@@ -785,6 +785,341 @@ def effective_cfg_for_tick(base_cfg, tick_ts):
     return cfg, active
 
 
+def scenario_start_epoch(cfg, scenario_name):
+    if not cfg.has_section("scenarios"):
+        return None
+    activated = parse_int(cfg, "scenarios", f"{scenario_name}_activated", default=0) or 0
+    if activated <= 0:
+        return None
+    fault_start = parse_int(cfg, "scenarios", f"{scenario_name}_fault_start", default=0) or 0
+    return activated + (fault_start * 60)
+
+
+def scenario_reroute_progress(cfg, scenario_name, tick_ts):
+    # Primary key format (requested): prefixed telemetry scenario key.
+    ramp_minutes = parse_int(
+        cfg,
+        scenario_name,
+        "telemetry#cnc_interface_counter_json#reroute_ramp_minutes",
+        default=None,
+    )
+    if ramp_minutes is None:
+        # Backward compatibility for transitional unprefixed key.
+        ramp_minutes = parse_int(cfg, scenario_name, "reroute_ramp_minutes", default=None)
+    if ramp_minutes is None:
+        ramp_minutes = parse_int(
+            cfg,
+            scenario_name,
+            "telemetry#cnc_interface_counter_json#ramp_minutes",
+            default=0,
+        )
+    ramp_minutes = ramp_minutes or 0
+    if ramp_minutes <= 0:
+        return 1.0
+    start = scenario_start_epoch(cfg, scenario_name)
+    if start is None:
+        return 1.0
+    start_delay_minutes = parse_int(
+        cfg,
+        scenario_name,
+        "telemetry#cnc_interface_counter_json#reroute_start_minutes",
+        default=None,
+    )
+    if start_delay_minutes is None:
+        start_delay_minutes = parse_int(
+            cfg, scenario_name, "reroute_start_minutes", default=0
+        )
+    start_delay_minutes = max(0, start_delay_minutes or 0)
+    ramp_start = start + (int(start_delay_minutes) * 60)
+    elapsed_min = max(0.0, float(tick_ts - ramp_start) / 60.0)
+    return max(0.0, min(1.0, elapsed_min / float(ramp_minutes)))
+
+
+SLICE_TELEMETRY_RATE_KEYS = {
+    # Impacted path slices (R2<->R3<->R5<->R7)
+    "1002": [
+        "r2_hundredgige0_0_0_2_ifoutpktsrate",
+        "r3_hundredgige0_0_0_2_ifinpktsrate",
+        "r3_hundredgige0_0_0_2_ifoutpktsrate",
+        "r2_hundredgige0_0_0_2_ifinpktsrate",
+        "r3_hundredgige0_0_0_1_ifoutpktsrate",
+        "r5_hundredgige0_0_2_1_ifinpktsrate",
+        "r5_hundredgige0_0_2_1_ifoutpktsrate",
+        "r3_hundredgige0_0_0_1_ifinpktsrate",
+    ],
+    "1003": [
+        "r5_hundredgige0_0_2_0_ifoutpktsrate",
+        "r7_hundredgige0_0_0_1_ifinpktsrate",
+        "r7_hundredgige0_0_0_1_ifoutpktsrate",
+        "r5_hundredgige0_0_2_0_ifinpktsrate",
+    ],
+    # Reroute target slices (R2<->R4<->R6<->R7)
+    "1001": [
+        "r2_hundredgige0_0_0_0_ifoutpktsrate",
+        "r4_hundredgige0_0_2_1_ifinpktsrate",
+        "r4_hundredgige0_0_2_1_ifoutpktsrate",
+        "r2_hundredgige0_0_0_0_ifinpktsrate",
+    ],
+    "1004": [
+        "r4_hundredgige0_0_2_0_ifoutpktsrate",
+        "r6_hundredgige0_1_0_0_ifinpktsrate",
+        "r6_hundredgige0_1_0_0_ifoutpktsrate",
+        "r4_hundredgige0_0_2_0_ifinpktsrate",
+        "r6_hundredgige0_0_0_0_ifoutpktsrate",
+        "r7_hundredgige0_1_0_0_ifinpktsrate",
+        "r7_hundredgige0_1_0_0_ifoutpktsrate",
+        "r6_hundredgige0_0_0_0_ifinpktsrate",
+    ],
+}
+
+
+def parse_csv_list(cfg, section, key):
+    raw = cfg.get(section, key, fallback="")
+    if raw is None:
+        return []
+    return [item.strip() for item in str(raw).split(",") if item.strip()]
+
+
+def apply_scenario_telemetry_reroute(base_cfg, stream_cfg, active_scenarios, tick_ts):
+    """
+    Apply scenario-driven reroute to telemetry packet-rate keys using slice groups:
+    - reroute_from_slice: slices to reduce
+    - reroute_to_slice: slices to increase
+    - reroute_pct: target percent shift
+    - reroute_ramp_minutes: linear ramp duration
+    """
+    out_cfg = clone_cfg(stream_cfg)
+    section = "baseline"
+    if not base_cfg.has_section(section):
+        return out_cfg
+
+    prefix_base = "telemetry#cnc_interface_counter_json#"
+    for scenario_name in active_scenarios:
+        if not base_cfg.has_section(scenario_name):
+            continue
+
+        reroute_pct = parse_float(
+            base_cfg,
+            scenario_name,
+            "telemetry#cnc_interface_counter_json#reroute_pct",
+            default=None,
+        )
+        if reroute_pct is None:
+            reroute_pct = parse_float(base_cfg, scenario_name, "reroute_pct", default=0.0)
+        reroute_pct = reroute_pct or 0.0
+        reroute_pct = max(0.0, min(100.0, reroute_pct))
+        if reroute_pct <= 0:
+            continue
+
+        from_slices = parse_csv_list(
+            base_cfg,
+            scenario_name,
+            "telemetry#cnc_interface_counter_json#reroute_from_slice",
+        )
+        if not from_slices:
+            from_slices = parse_csv_list(base_cfg, scenario_name, "reroute_from_slice")
+        to_slices = parse_csv_list(
+            base_cfg,
+            scenario_name,
+            "telemetry#cnc_interface_counter_json#reroute_to_slice",
+        )
+        if not to_slices:
+            to_slices = parse_csv_list(base_cfg, scenario_name, "reroute_to_slice")
+        if not from_slices and not to_slices:
+            continue
+
+        progress = scenario_reroute_progress(base_cfg, scenario_name, tick_ts)
+        pct = (reroute_pct / 100.0) * progress
+
+        from_keys = []
+        seen_from = set()
+        for sid in from_slices:
+            for key_suffix in SLICE_TELEMETRY_RATE_KEYS.get(str(sid), []):
+                full_key = f"{prefix_base}{key_suffix}"
+                if full_key in seen_from:
+                    continue
+                seen_from.add(full_key)
+                from_keys.append(full_key)
+
+        to_keys = []
+        seen_to = set()
+        for sid in to_slices:
+            for key_suffix in SLICE_TELEMETRY_RATE_KEYS.get(str(sid), []):
+                full_key = f"{prefix_base}{key_suffix}"
+                if full_key in seen_to:
+                    continue
+                seen_to.add(full_key)
+                to_keys.append(full_key)
+
+        if from_keys or to_keys:
+            # 1) Reduce "from" keys by reroute percentage (ramped), and track total moved volume.
+            total_moved = 0.0
+            adjusted_values = {}
+            baseline_values = {}
+            for key in from_keys:
+                baseline_raw = base_cfg.get(section, key, fallback=None)
+                if baseline_raw is None:
+                    continue
+                try:
+                    baseline_value = float(str(baseline_raw).strip())
+                except Exception:
+                    continue
+                moved = baseline_value * pct
+                value = baseline_value - moved
+                total_moved += moved
+                baseline_values[key] = baseline_value
+                adjusted_values[key] = value
+
+            # 2) Redistribute moved volume to "to" keys by baseline-weight share.
+            # This models reroute as traffic conservation rather than independent +pct uplift.
+            to_baselines = {}
+            to_total = 0.0
+            for key in to_keys:
+                baseline_raw = base_cfg.get(section, key, fallback=None)
+                if baseline_raw is None:
+                    continue
+                try:
+                    baseline_value = float(str(baseline_raw).strip())
+                except Exception:
+                    continue
+                to_baselines[key] = baseline_value
+                to_total += baseline_value
+
+            if to_baselines and total_moved > 0:
+                equal_share = total_moved / float(len(to_baselines))
+                for key, baseline_value in to_baselines.items():
+                    if to_total > 0:
+                        weight = baseline_value / to_total
+                        added = total_moved * weight
+                    else:
+                        added = equal_share
+                    baseline_values[key] = baseline_value
+                    adjusted_values[key] = baseline_value + added
+
+            # 3) Write adjusted values and scale daily bounds by value/baseline ratio.
+            for key, value in adjusted_values.items():
+                baseline_value = baseline_values.get(key, 0.0)
+                out_cfg.set(section, key, str(value))
+                ratio = 1.0
+                if abs(baseline_value) > 1e-12:
+                    ratio = value / baseline_value
+                for suffix in (".daily_min", ".daily_max"):
+                    bound_key = f"{key}{suffix}"
+                    base_bound_raw = base_cfg.get(section, bound_key, fallback=None)
+                    if base_bound_raw is None:
+                        continue
+                    try:
+                        base_bound = float(str(base_bound_raw).strip())
+                    except Exception:
+                        continue
+                    out_cfg.set(section, bound_key, str(base_bound * ratio))
+
+        # Optional immediate directional gap rule (applies as soon as scenario is active),
+        # independent from reroute_start/ramp timing.
+        gap_pct = parse_float(
+            base_cfg,
+            scenario_name,
+            "telemetry#cnc_interface_counter_json#immediate_gap_pct",
+            default=None,
+        )
+        if gap_pct is None:
+            gap_pct = parse_float(base_cfg, scenario_name, "immediate_gap_pct", default=0.0)
+        gap_pct = max(0.0, min(100.0, gap_pct or 0.0))
+        if gap_pct > 0:
+            out_suffix = base_cfg.get(
+                scenario_name,
+                "telemetry#cnc_interface_counter_json#immediate_gap_out_key",
+                fallback=None,
+            )
+            if not out_suffix:
+                out_suffix = base_cfg.get(
+                    scenario_name, "immediate_gap_out_key", fallback=None
+                )
+            in_suffix = base_cfg.get(
+                scenario_name,
+                "telemetry#cnc_interface_counter_json#immediate_gap_in_key",
+                fallback=None,
+            )
+            if not in_suffix:
+                in_suffix = base_cfg.get(
+                    scenario_name, "immediate_gap_in_key", fallback=None
+                )
+            if out_suffix and in_suffix:
+                out_key = f"{prefix_base}{str(out_suffix).strip().lower()}"
+                in_key = f"{prefix_base}{str(in_suffix).strip().lower()}"
+                out_value = parse_float(out_cfg, section, out_key, default=None)
+                if out_value is not None:
+                    in_value = out_value * (1.0 - (gap_pct / 100.0))
+                    out_cfg.set(section, in_key, str(in_value))
+                    for suffix in (".daily_min", ".daily_max"):
+                        out_bound = parse_float(
+                            out_cfg, section, f"{out_key}{suffix}", default=None
+                        )
+                        if out_bound is None:
+                            continue
+                        out_cfg.set(
+                            section,
+                            f"{in_key}{suffix}",
+                            str(out_bound * (1.0 - (gap_pct / 100.0))),
+                        )
+
+    return out_cfg
+
+
+def apply_scenario_thousandeyes_back_to_baseline(
+    base_cfg, stream_cfg, active_scenarios, tick_ts
+):
+    """
+    For ThousandEyes metrics, allow scenario values to return to baseline after a delay,
+    then ramp linearly to baseline over a configured duration.
+    """
+    out_cfg = clone_cfg(stream_cfg)
+    section = "baseline"
+    if not base_cfg.has_section(section):
+        return out_cfg
+
+    metric_prefix = "thousandeyes#cisco:thousandeyes:metric#response_time_ms"
+    key_main = metric_prefix
+    key_min = f"{metric_prefix}.daily_min"
+    key_max = f"{metric_prefix}.daily_max"
+    key_start_delay = f"{metric_prefix}.back_to_baseline_start_minutes"
+    key_ramp = f"{metric_prefix}.back_to_baseline_ramp_minutes"
+
+    for scenario_name in active_scenarios:
+        if not base_cfg.has_section(scenario_name):
+            continue
+        if not base_cfg.has_option(scenario_name, key_start_delay) and not base_cfg.has_option(
+            scenario_name, key_ramp
+        ):
+            continue
+        start_epoch = scenario_start_epoch(base_cfg, scenario_name)
+        if start_epoch is None:
+            continue
+
+        start_delay = parse_int(base_cfg, scenario_name, key_start_delay, default=0) or 0
+        ramp_minutes = parse_int(base_cfg, scenario_name, key_ramp, default=0) or 0
+        delay_epoch = start_epoch + (max(0, int(start_delay)) * 60)
+
+        if tick_ts < delay_epoch:
+            progress = 0.0
+        elif ramp_minutes <= 0:
+            progress = 1.0
+        else:
+            elapsed_min = max(0.0, float(tick_ts - delay_epoch) / 60.0)
+            progress = max(0.0, min(1.0, elapsed_min / float(ramp_minutes)))
+
+        for key in (key_main, key_min, key_max):
+            baseline_value = parse_float(base_cfg, section, key, default=None)
+            scenario_value = parse_float(out_cfg, section, key, default=None)
+            if baseline_value is None or scenario_value is None:
+                continue
+            # progress=0 => keep scenario value; progress=1 => return to baseline.
+            blended = scenario_value + ((baseline_value - scenario_value) * progress)
+            out_cfg.set(section, key, str(blended))
+
+    return out_cfg
+
+
 def minute_due_for_interval(ts, interval_min):
     if interval_min <= 0:
         return False
@@ -924,6 +1259,24 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
             )
             if random.random() >= probability:
                 stream_cfg = base_cfg
+        if (
+            stream_cfg is effective_cfg
+            and active_scenarios
+            and stream["index"] == "telemetry"
+            and stream["sourcetype"] == "cnc_interface_counter_json"
+        ):
+            stream_cfg = apply_scenario_telemetry_reroute(
+                base_cfg, stream_cfg, active_scenarios, tick_ts
+            )
+        if (
+            stream_cfg is effective_cfg
+            and active_scenarios
+            and stream["index"] == "thousandeyes"
+            and stream["sourcetype"] == "cisco:thousandeyes:metric"
+        ):
+            stream_cfg = apply_scenario_thousandeyes_back_to_baseline(
+                base_cfg, stream_cfg, active_scenarios, tick_ts
+            )
 
         interval = parse_int(stream_cfg, "baseline", f"{prefix_base}interval", default=1)
         interval = max(interval or 1, 1)

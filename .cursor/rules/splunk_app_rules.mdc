@@ -53,6 +53,11 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 - TWAMP `*_lostperc` on the wire: integer **percent 0–100** (from lost vs expected counts under scenario loss), not millionths; align dashboards/tests to that scale.
 - Scenario 1 `cnc_service_health_json`: **`[scenario_1]`** overrides degraded **sr_policy** placeholders; **`scenario_happening_probability`** need not be set — it **defaults to 1** when missing (see `docs/project_scenario_1.md`).
+- Scenario 1 telemetry control keys are now slice-based: `telemetry#cnc_interface_counter_json#reroute_from_slice`, `...#reroute_to_slice`, `...#reroute_pct`, `...#reroute_start_minutes`, `...#reroute_ramp_minutes`.
+- `reroute_pct` semantics are conserved traffic shift (remove volume from from-slices and redistribute to to-slices), **not** independent `+pct` on healthy slices.
+- Scenario 1 must keep immediate directional gap on `R5->R7` via `telemetry#cnc_interface_counter_json#immediate_gap_out_key`, `...#immediate_gap_in_key`, `...#immediate_gap_pct` (applies from activation, independent of reroute delay/ramp).
+- Scenario 1 ThousandEyes `response_time_ms` supports timed recovery via `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
+- Baseline reroute-path router traffic ranges must stay core-consistent (avoid single-digit outliers on `R8-R6`, `R6-R4`, `R4-R2`); see `docs/project_conf_design.md` and `docs/project_scenario_1.md`.
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):
 - This file is the project daily journal, but is updated **only when the user explicitly requests** an update to `docs/daily_activity_timeline.md` (no proactive edits).

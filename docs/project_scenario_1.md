@@ -13,11 +13,17 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 **Failover:** SR-TE detects degradation and reroutes VLAN 1002/1003 to the R9→R8→R6→R4→R2 path (VLAN 1001's path).
 
 **Impact timeline:**
-1. Normal → fault begins
-2. Telemetry/TWAMP show degradation on VLAN 1002/1003 (brief window, seconds to a few minutes)
-3. SR-TE reroutes → telemetry path behavior and TWAMP recover
-4. TWAMP is the primary indicator (R2↔R9 on VLANs 1002/1003)
-5. ThousandEyes is expected to be **mostly** stable in this scenario (resilient end-to-end path remains available). **`[scenario_1]`** still applies a **small** HTTP / network-latency uplift and slight throughput dip so charts show a minor E2E effect without dominating the story.
+1. Normal -> fault begins
+2. Immediate fault signal:
+   - TWAMP 1002/1003 loss/stress applies immediately.
+   - Telemetry `R5 -> R7` directional Out/In gap applies immediately (30% receive-side depression on `R7` peer `ifIn` vs `R5` `ifOut`).
+3. Reroute control plane delay (`telemetry#cnc_interface_counter_json#reroute_start_minutes`) elapses.
+4. Telemetry reroute ramps over `telemetry#cnc_interface_counter_json#reroute_ramp_minutes`:
+   - `reroute_from_slice` traffic decreases.
+   - removed volume is redistributed to `reroute_to_slice` (conserved shift; not independent +pct on healthy slices).
+5. ThousandEyes response-time uplift starts at scenario activation, then returns to baseline using:
+   - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes`
 
 **Conf settings (in `default/ai_lab_scenarios.conf`):**
 ```ini
@@ -33,11 +39,24 @@ fault_duration = 0       # minutes how long to keep the fault, 0 means the fault
 
 ## Telemetry Modeling Decisions (Scenario 1)
 
-- Fault is directional on the impaired segment: `R5 -> R7` (Ballarat toward Bendigo on the shared R5–R7 circuit).
-- Do not use per-hop multiplicative growth (avoid avalanche behavior).
-- On the **faulted hop only** (**`R5_HundredGigE0_0_2_0` ifOut → `R7_HundredGigE0_0_0_1` ifIn**), model loss as **`R7 ifIn` depressed below baseline** while **`R5 ifOut` follows normal baseline** (do not uplift sender rate — uplifts read as higher throughput on In/Out comparison charts instead of a receive gap). The **R9→R7** link is not the impaired span; scenario telemetry must not raise `R9` ifOut just to add “stress” or unrelated panels show a spurious step-up.
-- Represent link loss explicitly using that pair mismatch. Baseline generation enforces **at most ~1%** modeled drop per link via `telemetry#cnc_interface_counter_json#directional_min_receive_fraction = 0.99`. **`[scenario_1]`** sets that fraction to **`0`** so live generation does not clamp the peer `ifIn` up toward `ifOut`; the depressed **`R7_HundredGigE0_0_0_1_ifInPktsRate`** produces the visible gap in `telemetry_if_counter_test` / the imported dashboard.
-- After SR-TE steers traffic onto the **VLAN 1001** path (**R9→R8→R6→R4→R2**), **`[scenario_1]`** raises packet rates on that chain’s modeled interfaces by **~15%** vs baseline (paired directions scaled together). Live generation does not separate pre- vs post-reroute clock phases yet, so the workshop view is an illustrative **combined** fault + bypass-load profile during the active scenario window.
+- Fault is directional on the impaired segment: `R5 -> R7`.
+- Immediate directional gap behavior is explicit and independent from reroute timing:
+  - out key: `telemetry#cnc_interface_counter_json#immediate_gap_out_key = R5_HundredGigE0_0_2_0_ifOutPktsRate`
+  - in key: `telemetry#cnc_interface_counter_json#immediate_gap_in_key = R7_HundredGigE0_0_0_1_ifInPktsRate`
+  - gap percent: `telemetry#cnc_interface_counter_json#immediate_gap_pct = 30`
+- Link-direction conservation clamp policy:
+  - baseline uses `telemetry#cnc_interface_counter_json#directional_min_receive_fraction = 0.99`
+  - scenario uses `telemetry#cnc_interface_counter_json#directional_min_receive_fraction = 0` so intentional gap effects are not clamped away.
+- Reroute is slice-based (not per-interface scenario targets):
+  - `telemetry#cnc_interface_counter_json#reroute_from_slice = 1002,1003`
+  - `telemetry#cnc_interface_counter_json#reroute_to_slice = 1001,1004`
+  - `telemetry#cnc_interface_counter_json#reroute_pct = 50`
+  - `telemetry#cnc_interface_counter_json#reroute_start_minutes` delay before reroute starts
+  - `telemetry#cnc_interface_counter_json#reroute_ramp_minutes` ramp to full reroute
+- `reroute_pct` semantics: remove `%` from from-slices and redistribute removed volume to to-slices by baseline-weight share. This is a conserved shift, not "increase healthy slices by their own +%".
+- Baseline reroute-path traffic ranges should remain core-consistent so reroute effects are visible on each hop:
+  - forward-band links (`R8->R6`, `R7->R6`, `R6->R4`, `R4->R2`): around `2222` pps (`daily_min=1999.8`, `daily_max=2444.2`)
+  - reverse-band links (`R6->R8`, `R6->R7`, `R4->R6`, `R2->R4`): around `1340` pps (`daily_min=1206`, `daily_max=1474`)
 
 ## TWAMP Correlation Decisions (Scenario 1)
 
@@ -49,6 +68,15 @@ fault_duration = 0       # minutes how long to keep the fault, 0 means the fault
   - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
   - no-loss expectation: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`
 - For workshop assumptions, packet-rate style fields are interpreted as packets per second (pps); window-level expected packets are computed as `pps * window_seconds`.
+
+## ThousandEyes behavior (Scenario 1)
+
+- Scenario applies an initial response-time/latency uplift at activation.
+- `response_time_ms` supports explicit return-to-baseline timing:
+  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes`
+  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes`
+- During `back_to_baseline_start_minutes`, scenario response-time uplift stays active.
+- After that delay, response-time linearly returns to baseline over `back_to_baseline_ramp_minutes`.
 
 ## Service health (`cnc_service_health_json`)
 

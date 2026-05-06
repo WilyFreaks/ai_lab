@@ -127,7 +127,7 @@
         <option name="leaflet_maps_app.maps-plus.measureSecondaryAreaUnit">sqmiles</option>
         <option name="leaflet_maps_app.maps-plus.measureSecondaryLengthUnit">miles</option>
         <option name="leaflet_maps_app.maps-plus.measureTool">0</option>
-        <option name="leaflet_maps_app.maps-plus.minZoom">6</option>
+        <option name="leaflet_maps_app.maps-plus.minZoom">7</option>
         <option name="leaflet_maps_app.maps-plus.msColorMode">Light</option>
         <option name="leaflet_maps_app.maps-plus.multiplePopups">0</option>
         <option name="leaflet_maps_app.maps-plus.pathColorList">#0003F0,#D43C29,darkgreen,0xe2d400,darkred,#23A378</option>

@@ -174,6 +174,20 @@ This is mandatory to avoid duplicate or missing data.
 8. Outside fault window, use baseline values
 9. Scenario activation state must be evaluated on every scheduler tick (not startup-only) so live behavior reacts immediately to enable/disable actions.
 10. For each source, evaluate `<index>#<sourcetype>#scenario_happening_probability` on each emitted event (using effective baseline/scenario-overridden config) to decide whether to apply scenario-overridden values for that source or fall back to baseline values for that event.
+11. For `telemetry#cnc_interface_counter_json`, apply scenario reroute controls (if configured) using slice groups:
+   - `telemetry#cnc_interface_counter_json#reroute_from_slice`
+   - `telemetry#cnc_interface_counter_json#reroute_to_slice`
+   - `telemetry#cnc_interface_counter_json#reroute_pct`
+   - `telemetry#cnc_interface_counter_json#reroute_start_minutes`
+   - `telemetry#cnc_interface_counter_json#reroute_ramp_minutes`
+12. `reroute_pct` semantics are conserved: remove traffic from from-slices and redistribute the removed volume to to-slices by baseline-weight share (do not apply independent +pct multipliers on healthy slices).
+13. For `scenario_1`, immediate directional gap behavior on `R5->R7` is independent from reroute timing and is configured by:
+   - `telemetry#cnc_interface_counter_json#immediate_gap_out_key`
+   - `telemetry#cnc_interface_counter_json#immediate_gap_in_key`
+   - `telemetry#cnc_interface_counter_json#immediate_gap_pct`
+14. For `thousandeyes#cisco:thousandeyes:metric`, `response_time_ms` may return to baseline after scenario start using:
+   - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes`
 
 **Restart behavior:** 
 If Splunk restarts and `backfill_start_time` is already set in `local/`, that indicates live_log.py needs to backfill the live events.

@@ -108,8 +108,46 @@ scenario_1_fault_duration = 0
 - Keep `[baseline]` as the single source of truth for normal-state values.
 - In `[scenario_*]`, define only values that must change during the fault.
 - If a key is not defined in `[scenario_*]`, generator behavior falls back to baseline.
-- For Scenario 1 specifically, ThousandEyes metrics can remain unchanged while telemetry/TWAMP and CNC-path *fields* (for example `cnc_srte_path_json`) carry the fault signal.
+- For Scenario 1 specifically:
+  - TWAMP slices `1002/1003` carry immediate fault signal.
+  - `cnc_interface_counter_json` uses explicit immediate-gap keys for `R5->R7`, plus slice-based reroute keys (from/to slices, percent, start delay, and ramp).
+  - ThousandEyes metrics are scenario-overridden at activation, and `response_time_ms` may return to baseline via `back_to_baseline_start_minutes` + `back_to_baseline_ramp_minutes`.
 - **`cnc_service_health_json`**: during **`scenario_1`**, degraded status/score placeholders apply each tick without setting `telemetry#cnc_service_health_json#scenario_happening_probability` — **`live_log.py`** defaults that key to **`1`** when omitted (see `docs/project_scenario_1.md`).
+
+### Scenario 1 dynamic control keys (current pattern)
+
+Example keys in `[scenario_1]`:
+
+```ini
+telemetry#cnc_interface_counter_json#immediate_gap_out_key = R5_HundredGigE0_0_2_0_ifOutPktsRate
+telemetry#cnc_interface_counter_json#immediate_gap_in_key = R7_HundredGigE0_0_0_1_ifInPktsRate
+telemetry#cnc_interface_counter_json#immediate_gap_pct = 30
+
+telemetry#cnc_interface_counter_json#reroute_from_slice = 1002,1003
+telemetry#cnc_interface_counter_json#reroute_to_slice = 1001,1004
+telemetry#cnc_interface_counter_json#reroute_pct = 50
+telemetry#cnc_interface_counter_json#reroute_start_minutes = 3
+telemetry#cnc_interface_counter_json#reroute_ramp_minutes = 7
+
+thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes = 3
+thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes = 7
+```
+
+### Router traffic range guidance (scenario_1 reroute path)
+
+To keep reroute-path visuals and conservation math realistic, baseline `cnc_interface_counter_json`
+rates on the core reroute chain should stay in the same magnitude band (not single-digit outliers):
+
+- High direction (core forward band): `2222` pps, with `daily_min=1999.8`, `daily_max=2444.2`
+  - Path links: `R8->R6`, `R7->R6`, `R6->R4`, `R4->R2`
+- Return direction (core reverse band): `1340` pps, with `daily_min=1206`, `daily_max=1474`
+  - Path links: `R6->R8`, `R6->R7`, `R4->R6`, `R2->R4`
+
+Design intent:
+
+- Prevent tiny baseline values on `R6-R4` / `R4-R2` from hiding reroute effects.
+- Keep path segments visually consistent for workshop storytelling.
+- Preserve directional asymmetry while maintaining coherent end-to-end traffic magnitude.
 
 ## Sample Directory Structure
 

@@ -73,6 +73,20 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 - `scenario_happening_probability` is per-source (`<index>#<sourcetype>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
 - For TWAMP CSV (`pca_twamp_csv`), treat packet-rate fields as packets per second (pps) unless the user explicitly asks for a different unit model.
 - TWAMP delay/jitter integers still **fluctuate across ticks**: one standard-normal draw **per slice per event** scales `twamp#pca_twamp_csv#default.noise_stdev` for all noisy delay/jitter fields in that slice (see `docs/project_script_design.md`).
+- Scenario 1 telemetry reroute uses prefixed slice controls in `[scenario_1]`:
+  - `telemetry#cnc_interface_counter_json#reroute_from_slice`
+  - `telemetry#cnc_interface_counter_json#reroute_to_slice`
+  - `telemetry#cnc_interface_counter_json#reroute_pct`
+  - `telemetry#cnc_interface_counter_json#reroute_start_minutes`
+  - `telemetry#cnc_interface_counter_json#reroute_ramp_minutes`
+- `reroute_pct` means conserved shift: traffic removed from from-slices is redistributed to to-slices (not healthy-link independent `+pct`).
+- Scenario 1 must show immediate `R5->R7` directional gap from activation via:
+  - `telemetry#cnc_interface_counter_json#immediate_gap_out_key`
+  - `telemetry#cnc_interface_counter_json#immediate_gap_in_key`
+  - `telemetry#cnc_interface_counter_json#immediate_gap_pct`
+- Scenario 1 ThousandEyes `response_time_ms` can return to baseline with:
+  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_start_minutes`
+  - `thousandeyes#cisco:thousandeyes:metric#response_time_ms.back_to_baseline_ramp_minutes`
 - TWAMP UL packet sequence continuity is mandatory across backfill/live/restart:
   - `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
   - no-loss check: `ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1`

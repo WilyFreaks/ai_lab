@@ -65,7 +65,7 @@
     <panel>
       <title>Workshop Dashboards</title>
       <html>
-        <a href="/app/ai_lab/scenario_1_$region$">#1 Backbone Network Status</a>
+        <a href="/app/ai_lab/scenario_1_$region$" style="font-size: 20px;" target="_blank">#1 Backbone Network Status</a>
       </html>
     </panel>
   </row>

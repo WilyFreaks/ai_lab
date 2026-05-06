@@ -1,0 +1,1 @@
+{{timestamp}} r5.5gsc.lab 42790: RP/0/RP0/CPU0: SSHD_[68961]: %SECURITY-SSHD-4-INFO_FAILURE : Failed authentication attempt by user '<unknown>' from '172.20.12.103' on 'vty1' 
