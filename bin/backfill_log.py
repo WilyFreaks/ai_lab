@@ -82,6 +82,34 @@ def build_streams():
             "spool_dir": os.path.join(SPOOL_ROOT, "telemetry", "cnc_service_health_json"),
         },
         {
+            "index": "ios",
+            "sourcetype": "cisco:ios",
+            "sample": os.path.join(
+                SAMPLES_DIR, "ios", "cisco:ios", "sample_session_key.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
+        },
+        {
+            "index": "ios",
+            "sourcetype": "cisco:ios",
+            "sample": os.path.join(
+                SAMPLES_DIR, "ios", "cisco:ios", "sample_bad_login.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
+        },
+        {
+            "index": "syslog",
+            "sourcetype": "wdm_pm",
+            "sample": os.path.join(SAMPLES_DIR, "syslog", "wdm_pm", "sample.csv"),
+            "spool_dir": os.path.join(SPOOL_ROOT, "syslog", "wdm_pm"),
+        },
+        {
+            "index": "syslog",
+            "sourcetype": "wdm_alert",
+            "sample": os.path.join(SAMPLES_DIR, "syslog", "wdm_alert", "sample.xml"),
+            "spool_dir": os.path.join(SPOOL_ROOT, "syslog", "wdm_alert"),
+        },
+        {
             "index": "twamp",
             "sourcetype": "pca_twamp_csv",
             "sample": os.path.join(SAMPLES_DIR, "twamp", "pca_twamp_csv", "sample.csv"),
@@ -729,7 +757,14 @@ def generate_stream(
     section = "baseline"
     prefix_base = stream_prefix_base(stream)
     interval = parse_int(cfg, section, f"{prefix_base}interval", default=1)
-    interval = max(interval or 1, 1)
+    if interval is None or int(interval) <= 0:
+        print(
+            f"backfill_log: skip stream with interval<=0 "
+            f"(index={stream['index']} sourcetype={stream['sourcetype']})",
+            flush=True,
+        )
+        return int(sequence_start)
+    interval = int(interval)
     event_interval_sec = parse_int(
         cfg, section, f"{prefix_base}event_interval_sec", default=None
     )

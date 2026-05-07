@@ -7,9 +7,34 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-08 (Fri)
+
+- Session 1 around **01:42-05:51 JST** in this chat
+- Main activities:
+  - Fixed `live_log.py` one-shot emission state handling so scenario one-shot streams are tracked per `scenario + stream` and no longer suppress each other
+  - Ran workshop reset flow (`scripts/reset_workshop_state.sh --yes`) and mandatory smoke gates; observed the known post-start `ai_lab_log=1` residual while target app indexes remained clean
+  - Updated test scripts to use renamed saved searches without `_test` suffix (`test_backfill.sh`, `test_baseline.sh`, `test_scenario_1.sh`)
+- Resume anchor:
+  - **the first deployment is done. next step is packaging.**
+
 ## 2026-05-07 (Thu)
 
-- Session 1 (carryover from 2026-05-06) around **00:00-01:59 JST** in this chat
+- Session 3 around **21:05 JST** in this chat
+- Main activities:
+  - Resumed project work and requested a journal update to start a new session
+  - Confirmed `wdm_pm` sample-contract statistics (all-data and outlier-eliminated reference) in `samples/syslog/wdm_pm/README.md`
+- Resume anchor:
+  - **Proceed with `wdm_pm` implementation wiring (`inputs.conf` / `props.conf` / `transforms.conf` + generator integration).**
+
+- Session 2 around **10:25-19:00 JST** in this chat
+- Main activities:
+  - Resumed after a break and requested a journal update to open a new session
+  - Confirmed IOS integration is complete
+  - Set the next implementation focus to syslog integration
+- Resume anchor:
+  - **Integrate syslog generation end-to-end (sample wiring, runtime behavior, and validation).**
+
+- Session 1 (carryover from 2026-05-06) around **00:00-5:00 JST** in this chat
 - Main activities:
   - Validated generator/script updates after the sample-file-inclusive parameter naming migration
   - Ran `scripts/test_backfill.sh` and `scripts/test_baseline.sh`, fixed TWAMP bounds lookup mismatch in `scripts/test_backfill.sh`, and confirmed both tests pass
@@ -422,7 +447,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-07: ~119 minutes (1 session), ~82,000 estimated tokens
+- 2026-05-08: ~249 minutes (1 session), ~76,000 estimated tokens
+- 2026-05-07: ~815 minutes (3 sessions), ~82,000 estimated tokens
 - 2026-05-06: ~511 minutes (5 sessions), ~65,000 estimated tokens
 - 2026-05-05: ~752 minutes (4 sessions), ~99,000 estimated tokens
 - 2026-05-04: ~1,480 minutes (3 sessions), ~165,000 estimated tokens
@@ -440,7 +466,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-07 | ~119 minutes (1 session) | ~82,000 |
+| 2026-05-08 | ~249 minutes (1 session) | ~76,000 |
+| 2026-05-07 | ~815 minutes (3 sessions) | ~82,000 |
 | 2026-05-06 | ~511 minutes (5 sessions) | ~65,000 |
 | 2026-05-05 | ~752 minutes (4 sessions) | ~99,000 |
 | 2026-05-04 | ~1,480 minutes (3 sessions) | ~165,000 |

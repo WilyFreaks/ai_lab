@@ -82,6 +82,8 @@ A **static** `crcSalt` string shared by all files in a path does not fix header 
 - **`[cisco:thousandeyes:metric]`** — `default/props.conf` uses `TIME_PREFIX` / `TIME_FORMAT` with the leading raw JSON for the top-level `timestamp` key so `_time` matches the event string from `backfill_log.py` (see `samples/thousandeyes/cisco:thousandeyes:metric/README.md`).
 - **`[cnc_interface_counter_json]`** — nested `latest_data.timestamp` strings; `TIME_PREFIX` / `TIME_FORMAT` in `default/props.conf` target the indexed JSON / raw pattern for this sourcetype (see `samples/telemetry/cnc_interface_counter_json/README.md`).
 - **`[cnc_srte_path_json]`** — multi-object `.txt` payloads are broken into per-object events via `LINE_BREAKER`; `TIME_PREFIX` / `TIME_FORMAT` extract per-event `_time`; host metadata is set at index time through `TRANSFORMS-set_host = set_host_from_cnc_srte_path_json` in `props.conf` and `DEST_KEY = MetaData:Host` transform in `default/transforms.conf`, with regex extraction from payload `vlan`.
+- **`[wdm_alert]`** — XML syslog alarm payload uses `TIME_PREFIX = <source-time>` and `TIME_FORMAT = %Y-%m-%dT%H:%M:%S%z` in `default/props.conf`; host metadata is set at index time through `TRANSFORMS-set_host = set_host_from_wdm_alert_xml` with extraction from the `NativeEMSName` alias pair (`<alias-name>NativeEMSName</alias-name><alias-value>R7</alias-value>` -> host `R7`).
+- **`[wdm_pm]`** — CSV WDM performance payload should keep `_time` extraction aligned to the timestamp column contract in `samples/syslog/wdm_pm/README.md` (and `props.conf`), and should preserve endpoint identity fields required for A/Z transponder mapping from `lookups/router_wdm_transponders.csv`.
 
 After changing `props.conf` or `inputs.conf`, **reload** or restart Splunk so forwarders read the new settings.
 
@@ -113,7 +115,7 @@ scenario_1_fault_duration = 0
 - For Scenario 1 specifically:
   - TWAMP slices `1002/1003` carry immediate fault signal.
   - `cnc_interface_counter_json` uses explicit immediate-gap keys for `R5->R7`, plus slice-based reroute keys (from/to slices, percent, start delay, and ramp).
-  - ThousandEyes metrics are scenario-overridden at activation, and `response_time_ms` may return to baseline via `back_to_baseline_start_minutes` + `back_to_baseline_ramp_minutes`.
+  - ThousandEyes metrics are scenario-overridden at activation, and `response_time_ms`, `network_latency_ms`, and `throughput_kbps` may return to baseline via per-metric `back_to_baseline_start_minutes` + `back_to_baseline_ramp_minutes`.
 - **`cnc_service_health_json`**: during **`scenario_1`**, degraded status/score placeholders apply each tick without setting `telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability` — **`live_log.py`** defaults that key to **`1`** when omitted (see `docs/project_scenario_1.md`).
 
 ### Scenario 1 dynamic control keys (current pattern)
@@ -133,6 +135,10 @@ telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes = 7
 
 thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes = 3
 thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes = 7
+thousandeyes#cisco:thousandeyes:metric#sample.json#network_latency_ms.back_to_baseline_start_minutes = 3
+thousandeyes#cisco:thousandeyes:metric#sample.json#network_latency_ms.back_to_baseline_ramp_minutes = 7
+thousandeyes#cisco:thousandeyes:metric#sample.json#throughput_kbps.back_to_baseline_start_minutes = 3
+thousandeyes#cisco:thousandeyes:metric#sample.json#throughput_kbps.back_to_baseline_ramp_minutes = 7
 ```
 
 ### Router traffic range guidance (scenario_1 reroute path)
@@ -150,6 +156,27 @@ Design intent:
 - Prevent tiny baseline values on `R6-R4` / `R4-R2` from hiding reroute effects.
 - Keep path segments visually consistent for workshop storytelling.
 - Preserve directional asymmetry while maintaining coherent end-to-end traffic magnitude.
+
+## WDM PM data contract (`syslog#wdm_pm#sample.csv`)
+
+`wdm_pm` is the performance stream complementing `wdm_alert` fault events.
+
+Identity and topology requirements:
+
+- Data must carry route/endpoint identity compatible with `lookups/router_wdm_transponders.csv`.
+- Preserve A/Z orientation in fielding (`router_a`/`interface_a`/... and `router_z`/`interface_z`/...).
+- Endpoint-level records should remain uniquely attributable per timestamp + route + side + bound transponder port.
+
+Required metric set (per endpoint):
+
+- Tx side: `LSBIASCUR`, `SUMOOPCUR`
+- Rx side: `FEC_BEF_COR_ER`, `SUMIOPCUR`
+- Device context: `BDTEMPCUR`, `EDTMPCUR`
+
+Naming and semantics:
+
+- Keep metric names exactly as above for dashboard/search consistency.
+- Keep Tx/Rx semantics explicit in sample/template fields; do not mix Tx-only and Rx-only metrics without side labeling.
 
 ## Sample Directory Structure
 

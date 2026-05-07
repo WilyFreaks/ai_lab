@@ -498,7 +498,7 @@ assert_twamp_minute_bucket_count() {
   local tmp_csv
   tmp_csv="$(mktemp)"
 
-  if ! run_search_csv "| savedsearch twamp_event_count_test" >"$tmp_csv"; then
+  if ! run_search_csv "| savedsearch twamp_event_count" >"$tmp_csv"; then
     rm -f "$tmp_csv"
     fail "$label query failed"
   fi
@@ -534,12 +534,12 @@ for i, line in enumerate(raw_lines):
         break
 
 if header_idx is None:
-    raise SystemExit("no csv header row for twamp_event_count_test")
+    raise SystemExit("no csv header row for twamp_event_count")
 
 reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
 rows = list(reader)
 if not rows:
-    raise SystemExit("no rows from twamp_event_count_test")
+    raise SystemExit("no rows from twamp_event_count")
 
 row = rows[0]
 val = None
@@ -826,90 +826,90 @@ read -r IFIN_MIN IFIN_MAX IFIN_STEP <<<"$(read_bounds "_ifInPktsRate" "raw")"
 read -r TE_MIN TE_MAX TE_STEP <<<"$(read_bounds "response_time_ms" "ms_to_sec")"
 
 assert_count_gt_zero \
-  "Saved search telemetry_if_counter_test returns results" \
-  "| savedsearch telemetry_if_counter_test | stats count as count"
+  "Saved search telemetry_if_counter returns results" \
+  "| savedsearch telemetry_if_counter | stats count as count"
 
 assert_count_eq \
-  "telemetry_if_counter_test has no negative directional gaps" \
-  "| savedsearch telemetry_if_counter_test | search r1_to_r2_gap<0 OR r2_to_r1_gap<0 | stats count as count" \
+  "telemetry_if_counter has no negative directional gaps" \
+  "| savedsearch telemetry_if_counter | search r1_to_r2_gap<0 OR r2_to_r1_gap<0 | stats count as count" \
   0
 
 assert_count_eq \
-  "telemetry_if_counter_test has no drop rate over 1%" \
-  "| savedsearch telemetry_if_counter_test | search r1_to_r2_drop_rate>1 OR r2_to_r1_drop_rate>1 | stats count as count" \
+  "telemetry_if_counter has no drop rate over 1%" \
+  "| savedsearch telemetry_if_counter | search r1_to_r2_drop_rate>1 OR r2_to_r1_drop_rate>1 | stats count as count" \
   0
 
 assert_count_gt_zero \
-  "Saved search cnc_interface_ifOutPktsRate_test returns results" \
-  "| savedsearch cnc_interface_ifOutPktsRate_test | stats count as count"
+  "Saved search cnc_interface_ifOutPktsRate returns results" \
+  "| savedsearch cnc_interface_ifOutPktsRate | stats count as count"
 
 assert_savedsearch_time_aware_range \
-  "cnc_interface_ifOutPktsRate_test values follow day/hour config bounds" \
-  "| savedsearch cnc_interface_ifOutPktsRate_test" \
+  "cnc_interface_ifOutPktsRate values follow day/hour config bounds" \
+  "| savedsearch cnc_interface_ifOutPktsRate" \
   "_ifOutPktsRate" \
   "interface_ifOut"
 
 assert_count_eq \
-  "cnc_interface_ifOutPktsRate_test fluctuates gradually (no abrupt jumps)" \
-  "| savedsearch cnc_interface_ifOutPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFOUT_STEP | stats count as count" \
+  "cnc_interface_ifOutPktsRate fluctuates gradually (no abrupt jumps)" \
+  "| savedsearch cnc_interface_ifOutPktsRate | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFOUT_STEP | stats count as count" \
   0
 
 assert_count_gt_zero \
-  "Saved search cnc_interface_ifInPktsRate_test returns results" \
-  "| savedsearch cnc_interface_ifInPktsRate_test | stats count as count"
+  "Saved search cnc_interface_ifInPktsRate returns results" \
+  "| savedsearch cnc_interface_ifInPktsRate | stats count as count"
 
 assert_savedsearch_time_aware_range \
-  "cnc_interface_ifInPktsRate_test values follow day/hour config bounds" \
-  "| savedsearch cnc_interface_ifInPktsRate_test" \
+  "cnc_interface_ifInPktsRate values follow day/hour config bounds" \
+  "| savedsearch cnc_interface_ifInPktsRate" \
   "_ifInPktsRate" \
   "interface_ifIn"
 
 assert_count_eq \
-  "cnc_interface_ifInPktsRate_test fluctuates gradually (no abrupt jumps)" \
-  "| savedsearch cnc_interface_ifInPktsRate_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFIN_STEP | stats count as count" \
+  "cnc_interface_ifInPktsRate fluctuates gradually (no abrupt jumps)" \
+  "| savedsearch cnc_interface_ifInPktsRate | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$IFIN_STEP | stats count as count" \
   0
 
 assert_count_gt_zero \
-  "Saved search thousandeyes_response_time_sec_test returns results" \
-  "| savedsearch thousandeyes_response_time_sec_test | stats count as count"
+  "Saved search thousandeyes_response_time_sec returns results" \
+  "| savedsearch thousandeyes_response_time_sec | stats count as count"
 
 assert_count_gt_zero \
-  "Saved search cnc_srte_path_test returns results" \
-  "| savedsearch cnc_srte_path_test | stats count as count"
+  "Saved search cnc_srte_path returns results" \
+  "| savedsearch cnc_srte_path | stats count as count"
 
 assert_count_gt_zero \
-  "Saved search cnc_service_health_test returns results" \
-  "| savedsearch cnc_service_health_test | stats count as count"
+  "Saved search cnc_service_health returns results" \
+  "| savedsearch cnc_service_health | stats count as count"
 
 assert_count_eq \
-  "cnc_service_health_test baseline has no SERVICE_DEGRADED rows" \
-  "| savedsearch cnc_service_health_test | search generated_data=\"*SERVICE_DEGRADED*\" | stats count as count" \
+  "cnc_service_health baseline has no SERVICE_DEGRADED rows" \
+  "| savedsearch cnc_service_health | search generated_data=\"*SERVICE_DEGRADED*\" | stats count as count" \
   0
 
 assert_twamp_minute_bucket_count \
-  "twamp_event_count_test minute buckets in 5m window (expect ~5; edges may be lower)"
+  "twamp_event_count minute buckets in 5m window (expect ~5; edges may be lower)"
 
 assert_twamp_directional_avg_metric \
-  "twamp_dmean_test averages within configured daily_min/daily_max per direction" \
-  "twamp_dmean_test" \
+  "twamp_dmean averages within configured daily_min/daily_max per direction" \
+  "twamp_dmean" \
   "dmean" \
   "avg_dmean"
 
 assert_twamp_directional_avg_metric \
-  "twamp_jmean_test averages within configured daily_min/daily_max per direction" \
-  "twamp_jmean_test" \
+  "twamp_jmean averages within configured daily_min/daily_max per direction" \
+  "twamp_jmean" \
   "jmean" \
   "avg_jmean"
 
 assert_savedsearch_time_aware_range \
-  "thousandeyes_response_time_sec_test values follow day/hour config bounds" \
-  "| savedsearch thousandeyes_response_time_sec_test" \
+  "thousandeyes_response_time_sec values follow day/hour config bounds" \
+  "| savedsearch thousandeyes_response_time_sec" \
   "response_time_ms" \
   "thousandeyes_response_sec"
 
 assert_count_range \
-  "thousandeyes_response_time_sec_test fluctuates gradually (abrupt jumps within expected outlier range)" \
-  "| savedsearch thousandeyes_response_time_sec_test | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$TE_STEP | stats count as count" \
+  "thousandeyes_response_time_sec fluctuates gradually (abrupt jumps within expected outlier range)" \
+  "| savedsearch thousandeyes_response_time_sec | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$TE_STEP | stats count as count" \
   "$TE_JUMP_OUTLIER_MIN" \
   "$TE_JUMP_OUTLIER_MAX"
 

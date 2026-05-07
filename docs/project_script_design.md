@@ -123,6 +123,7 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
    - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`
    - `var/spool/ai_lab/telemetry/cnc_service_health_json/`
    - `var/spool/ai_lab/twamp/pca_twamp_csv/`
+   - `var/spool/ai_lab/syslog/wdm_pm/` (when enabled)
 5. Template source files may use `json`, `xml`, `csv`, or `txt` under `samples/.../` (for example `sample.json` or `sample.txt`), and must follow each source template contract documented in `samples/.../README.md` when present.
 6. Loader logic must first inspect the template file extension and route to the matching parser/renderer behavior for that format.
 7. Output wire format must follow sample extension: `.json` templates emit NDJSON lines; `.csv`/`.xml`/`.txt` templates emit the corresponding text payload format. For `.csv` specifically, follow **CSV templates (`*.csv`)** (single header line at file start; body rendered per event).
@@ -185,13 +186,24 @@ This is mandatory to avoid duplicate or missing data.
    - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key`
    - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_in_key`
    - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_pct`
-14. For `thousandeyes#cisco:thousandeyes:metric#sample.json`, `response_time_ms` may return to baseline after scenario start using:
-   - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes`
-   - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes`
-15. For `ios#cisco:ios` BFD fault logs (`samples/ios/cisco:ios/sample_bfd.txt`), emit once per `scenario_1` activation at the reroute onset timestamp:
-   - `scenario_1_activated + scenario_1_fault_start*60 + telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes*60`
+14. For `thousandeyes#cisco:thousandeyes:metric#sample.json`, these metrics may return to baseline after scenario start using per-metric keys:
+   - `response_time_ms`
+   - `network_latency_ms`
+   - `throughput_kbps`
+   with:
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_start_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_ramp_minutes`
+15. For `ios#cisco:ios` BFD fault logs (`samples/ios/cisco:ios/sample_bfd.txt`), emit once per `scenario_1` activation:
+   - Preferred scenario keys:
+     - `ios#cisco:ios#sample_bfd.txt#interval = once`
+     - `ios#cisco:ios#sample_bfd.txt#start_minutes = <delay_after_activation>`
+   - Effective one-shot emit epoch:
+     - `scenario_1_activated + scenario_1_fault_start*60 + ios#cisco:ios#sample_bfd.txt#start_minutes*60`
+   - Backward compatibility fallback when `start_minutes` is missing:
+     - `scenario_1_activated + scenario_1_fault_start*60 + telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes*60`
    - The emitted `{{timestamp}}` in IOS BFD lines must align to this reroute-start epoch (not initial activation epoch).
    - Persist per-activation emit state in local runtime keys so restart does not duplicate BFD sequence for the same activation.
+16. For scenario one-shot streams (for example IOS BFD and `syslog#wdm_alert#sample.xml`), emit-state tracking must be keyed by `scenario + stream` (not scenario-only), so multiple one-shot sources can each emit once for the same activation without suppressing each other.
 
 **Restart behavior:** 
 If Splunk restarts and `backfill_start_time` is already set in `local/`, that indicates live_log.py needs to backfill the live events.
@@ -241,7 +253,7 @@ This contract applies when generating `index=twamp sourcetype=pca_twamp_csv` tog
 
 ### Baseline verification (scripts + saved searches)
 
-- `scripts/test_baseline.sh` runs `scripts/test_backfill.sh`, which invokes saved searches `twamp_event_count_test` (minute buckets in the last 5m), `twamp_dmean_test`, and `twamp_jmean_test` against `index=twamp` / `pca_twamp_csv`, comparing rolling averages to `default/ai_lab_scenarios.conf` `daily_min` / `daily_max` (with noise tolerance). See `docs/project_test_design.md` and `default/savedsearches.conf`.
+- `scripts/test_baseline.sh` runs `scripts/test_backfill.sh`, which invokes saved searches `twamp_event_count` (minute buckets in the last 5m), `twamp_dmean`, and `twamp_jmean` against `index=twamp` / `pca_twamp_csv`, comparing rolling averages to `default/ai_lab_scenarios.conf` `daily_min` / `daily_max` (with noise tolerance). See `docs/project_test_design.md` and `default/savedsearches.conf`.
 
 ### TWAMP peak-rate fallback strategy
 
@@ -302,10 +314,29 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
   → `index=twamp`, `sourcetype=pca_twamp_csv`, `host=twamp_pca`, `source=ai_lab:script:twamp` each spool `monitor://` stanza should set **`crcSalt = <SOURCE>`** (Splunk literal: includes each file’s path in the CRC). Do not use a constant label as `crcSalt` to “fix” header collisions between different files. **`backfill_log.py`** writes each spool file with a **unique basename** (timestamp-derived value and PID) to avoid reusing the same path for unrelated runs. See `docs/project_conf_design.md` and `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md`.
 - `var/spool/ai_lab/ios/cisco_ios/`  
   → `index=ios`, `sourcetype=cisco:ios`, `host=ios_router`, `source=ai_lab:script:ios`
+- `var/spool/ai_lab/syslog/wdm_alert/` (when enabled)  
+  → `index=syslog`, `sourcetype=wdm_alert`, base monitor host may be static, and per-event host metadata should be overridden from XML alias `NativeEMSName` via `props.conf` + `transforms.conf` (`set_host_from_wdm_alert_xml`)
+- `var/spool/ai_lab/syslog/wdm_pm/` (when enabled)  
+  → `index=syslog`, `sourcetype=wdm_pm`; payload should include endpoint identity fields compatible with `lookups/router_wdm_transponders.csv` so searches can join route A/Z interfaces and bound transponder ports.
 
 **Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. Population strategy is TBD, but it will not be fed by the NDJSON spool pipeline.
 
 **Derived `episode` index:** there is no file-ingest `samples/...` path for `episode` by design. The `episode` index is intended to be materialized from `alerts` (details TBD); do not add sample monitors for `episode` in `inputs.conf`.
+
+## WDM PM generation contract
+
+When `wdm_pm` generation is implemented, treat it as a structured CSV stream under `samples/syslog/wdm_pm/`.
+
+- Source mapping:
+  - Use `lookups/router_wdm_transponders.csv` as the route-to-transponder binding source.
+  - Emit endpoint records with deterministic A/Z orientation (no random side swaps between ticks).
+- Required metrics:
+  - `LSBIASCUR`, `SUMOOPCUR` (Tx-domain)
+  - `FEC_BEF_COR_ER`, `SUMIOPCUR` (Rx-domain)
+  - `BDTEMPCUR`, `EDTMPCUR` (device context)
+- Scope:
+  - Prefer one logical record per endpoint per tick (or equivalent row granularity clearly documented in sample README).
+  - Keep metric names unchanged and present in every emitted endpoint record.
 
 ---
 

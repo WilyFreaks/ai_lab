@@ -35,15 +35,15 @@ Use this block when the operator is exhausted or returning after a long gap — 
 
 ## Saved searches
 
-- `telemetry_if_counter_test`
-- `cnc_interface_ifOutPktsRate_test`
-- `cnc_interface_ifInPktsRate_test`
-- `thousandeyes_response_time_sec_test`
-- `cnc_srte_path_test`
-- `cnc_service_health_test`
-- `twamp_event_count_test`
-- `twamp_dmean_test`
-- `twamp_jmean_test`
+- `telemetry_if_counter`
+- `cnc_interface_ifOutPktsRate`
+- `cnc_interface_ifInPktsRate`
+- `thousandeyes_response_time_sec`
+- `cnc_srte_path`
+- `cnc_service_health`
+- `twamp_event_count`
+- `twamp_dmean`
+- `twamp_jmean`
 
 ## TWAMP saved searches (baseline verification)
 
@@ -51,9 +51,9 @@ Shipped in `default/savedsearches.conf` and asserted by `scripts/test_backfill.s
 
 | Saved search | Role |
 |--------------|------|
-| `twamp_event_count_test` | Last 5m: `bin span=1m _time` then count of minute buckets with ≥1 TWAMP event (`minute_buckets_with_data`). Nominal ~5; partial clock edges may yield fewer; script default range `3–6` unless overridden by `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX`. |
-| `twamp_dmean_test` | Last 5m: averages indexed `ul_dmean*`, `dl_dmean*`, `rt_dmean*` by direction; script checks each against aggregated `daily_min`/`daily_max` for `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_dmean` plus noise tolerance. |
-| `twamp_jmean_test` | Same pattern for `*_jmean` fields vs conf keys `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_jmean`. |
+| `twamp_event_count` | Last 5m: `bin span=1m _time` then count of minute buckets with ≥1 TWAMP event (`minute_buckets_with_data`). Nominal ~5; partial clock edges may yield fewer; script default range `3–6` unless overridden by `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX`. |
+| `twamp_dmean` | Last 5m: averages indexed `ul_dmean*`, `dl_dmean*`, `rt_dmean*` by direction; script checks each against aggregated `daily_min`/`daily_max` for `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_dmean` plus noise tolerance. |
+| `twamp_jmean` | Same pattern for `*_jmean` fields vs conf keys `twamp#pca_twamp_csv#sample.csv#slice*_{ul|dl|rt}_jmean`. |
 
 Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wildcards in SPL.
 
@@ -80,6 +80,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
   - `telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes`
   - `telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes`
 - `reroute_pct` means conserved shift: traffic removed from from-slices is redistributed to to-slices (not healthy-link independent `+pct`).
+- Scenario one-shot streams must track emit-state per `scenario + stream` so `ios#cisco:ios#sample_bfd.txt` and `syslog#wdm_alert#sample.xml` both emit once for a single activation (no cross-stream suppression).
 - Scenario 1 must show immediate `R5->R7` directional gap from activation via:
   - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key`
   - `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_in_key`
@@ -94,6 +95,9 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 - Index intent:
   - `ran`/`fwa` are reserved for other scenarios.
   - `alerts`/`episode` are derived from scheduled searches (not direct generator streams).
+- Syslog WDM streams:
+  - `wdm_alert` host extraction should resolve from XML Native EMS alias (`NativeEMSName` -> `host`).
+  - `wdm_pm` should be validated against `lookups/router_wdm_transponders.csv` A/Z bindings and Tx/Rx metric semantics (`LSBIASCUR` Tx, `FEC_BEF_COR_ER` Rx, `SUMOOPCUR` Tx, `SUMIOPCUR` Rx, `BDTEMPCUR`, `EDTMPCUR`).
 
 ## Quick checklist
 
@@ -101,7 +105,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 2. Confirm generation gate is open (`region` locked, `baseline_generation_enabled=true`).
 3. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
 4. Run saved searches over `-5m` and verify non-zero recent data (including `index=twamp` when TWAMP is in scope).
-5. Run baseline quality tests via `scripts/test_baseline.sh` (includes TWAMP `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` via `test_backfill.sh`; set `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` if ThousandEyes abrupt-jump allowance differs from default `0..2`).
+5. Run baseline quality tests via `scripts/test_baseline.sh` (includes TWAMP `twamp_event_count`, `twamp_dmean`, `twamp_jmean` via `test_backfill.sh`).
 6. For TWAMP + telemetry scenario checks, validate in a recent window that TWAMP UL loss indicators and telemetry directional in/out packet gaps move together for VLAN 1002/1003 during `scenario_1`.
 
 ## SRTE-specific verification addendum
@@ -118,7 +122,7 @@ Use this when validating `index=telemetry sourcetype=cnc_srte_path_json`:
 Use this when validating `index=telemetry sourcetype=cnc_service_health_json` during **`scenario_1`**:
 
 1. Omit **`telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
-2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health_test` / saved-search contract).
+2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health` / saved-search contract).
 
 ## Scenario control dashboard addendum
 

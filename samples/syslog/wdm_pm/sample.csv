@@ -1,0 +1,121 @@
+MD Name,MD Alias,ME Name,ME Alias,PTP Name,PTP Alias,CTP Name,CTP Alias,Layer Rate,Granularity,Period Start Time,Monitored Time,PM Parameter,Location,Value,Unit,Status
+Huawei/U2000,,R2,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r2_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r2_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r3_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r3_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r2_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r2_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R2,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r2_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r4_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r4_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r3_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r3_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R3,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r3_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r5_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r5_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_13_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r4_shelf_0_slot_13_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_13_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r4_shelf_0_slot_13_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_13_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_13_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_15_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r5_shelf_0_slot_15_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_15_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r5_shelf_0_slot_15_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_15_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_15_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r4_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r4_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R4,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r4_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r6_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r6_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_13_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r5_shelf_0_slot_13_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_13_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r5_shelf_0_slot_13_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_13_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R5,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r5_shelf_0_slot_13_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_15_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r7_shelf_0_slot_15_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_15_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r7_shelf_0_slot_15_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_15_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=15/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_15_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_13_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r6_shelf_0_slot_13_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_13_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r6_shelf_0_slot_13_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_13_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=13/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_13_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r7_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r7_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r6_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r6_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R6,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r6_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r8_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r8_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r7_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r7_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R7,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r7_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_8_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r9_shelf_0_slot_8_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_8_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r9_shelf_0_slot_8_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_8_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=8/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_8_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r8_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r8_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R8,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r8_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Supervision_Channel,15min,{{timestamp}},,LSBIASCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_10_domain_wdm_port_1_lsbiascur}},mA,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_PHYSICAL_OPTICAL,15min,{{timestamp}},,FEC_BEF_COR_ER,PML_NEAR_END_Rx,{{r9_shelf_0_slot_10_domain_wdm_port_1_fec_bef_cor_er}}, ,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMOOPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_10_domain_wdm_port_1_sumoopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_Optical_Transmission_Section,15min,{{timestamp}},,SUMIOPCUR,PML_NEAR_END_Rx,{{r9_shelf_0_slot_10_domain_wdm_port_1_sumiopcur}},dBm,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10,1,,,LR_Not_Applicable,15min,{{timestamp}},,BDTEMPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_10_bdtempcur}},C,PMIS_Valid
+Huawei/U2000,,R9,,/shelf=0/slot=10/domain=wdm/port=1,,,,LR_OPTICAL_SECTION,15min,{{timestamp}},,EDTMPCUR,PML_FAR_ENDTypex,{{r9_shelf_0_slot_10_domain_wdm_port_1_edtmpcur}},C,PMIS_Valid

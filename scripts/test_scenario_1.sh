@@ -60,13 +60,13 @@ fi
 echo "Running scenario1 SPL checks (app=$SPLUNK_APP)..."
 
 assert_count_eq \
-  "telemetry_if_counter_test has no negative directional gaps" \
-  "| savedsearch telemetry_if_counter_test | search r1_to_r2_gap<0 OR r2_to_r1_gap<0 | stats count as count" \
+  "telemetry_if_counter has no negative directional gaps" \
+  "| savedsearch telemetry_if_counter | search r1_to_r2_gap<0 OR r2_to_r1_gap<0 | stats count as count" \
   0
 
 assert_count_eq \
-  "telemetry_if_counter_test has no drop rate over 1%" \
-  "| savedsearch telemetry_if_counter_test | search r1_to_r2_drop_rate>1 OR r2_to_r1_drop_rate>1 | stats count as count" \
+  "telemetry_if_counter has no drop rate over 1%" \
+  "| savedsearch telemetry_if_counter | search r1_to_r2_drop_rate>1 OR r2_to_r1_drop_rate>1 | stats count as count" \
   0
 
 echo "Scenario1 SPL checks passed."

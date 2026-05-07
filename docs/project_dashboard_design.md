@@ -293,20 +293,20 @@ Goal:
 Validation data source policy:
 
 - Prefer existing saved searches in app `ai_lab` as panel sources:
-  - `telemetry_if_counter_test`
-  - `cnc_interface_ifOutPktsRate_test`
-  - `cnc_interface_ifInPktsRate_test`
-  - `thousandeyes_response_time_sec_test`
-  - `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` (TWAMP `pca_twamp_csv` health and delay/jitter bands)
+  - `telemetry_if_counter`
+  - `cnc_interface_ifOutPktsRate`
+  - `cnc_interface_ifInPktsRate`
+  - `thousandeyes_response_time_sec`
+  - `twamp_event_count`, `twamp_dmean`, `twamp_jmean` (TWAMP `pca_twamp_csv` health and delay/jitter bands)
 - For "live is active now" checks, use a bounded recent window (recommended last 5 minutes).
 
 Initial panel intent:
 
-1. Telemetry directional gap/drop-rate status (`telemetry_if_counter_test`)
-2. Interface outbound packet-rate trend (`cnc_interface_ifOutPktsRate_test`)
-3. Interface inbound packet-rate trend (`cnc_interface_ifInPktsRate_test`)
-4. ThousandEyes response-time trend (`thousandeyes_response_time_sec_test`)
-5. TWAMP ingest cadence and delay/jitter sanity (`twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`)
+1. Telemetry directional gap/drop-rate status (`telemetry_if_counter`)
+2. Interface outbound packet-rate trend (`cnc_interface_ifOutPktsRate`)
+3. Interface inbound packet-rate trend (`cnc_interface_ifInPktsRate`)
+4. ThousandEyes response-time trend (`thousandeyes_response_time_sec`)
+5. TWAMP ingest cadence and delay/jitter sanity (`twamp_event_count`, `twamp_dmean`, `twamp_jmean`)
 
 ---
 

@@ -138,7 +138,7 @@ Execution sequencing (important):
    - after reset, generation is still gated (`baseline_generation_enabled=false` until region lock path runs)
    - you must lock/select region first (for example via Workshop Introduction Submit, or `| workshopregion action="set" region="<au|jp>"`)
    - only after this step should `backfill_log.py`/`live_log.py` populate datasets
-4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated. This entrypoint runs `scripts/test_backfill.sh`, including TWAMP assertions (`twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`); optional env `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` adjusts the minute-bucket expectation for `twamp_event_count_test`, and `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` tunes allowed ThousandEyes abrupt-jump outliers (default `0..2`).
+4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated. This entrypoint runs `scripts/test_backfill.sh`, including TWAMP assertions (`twamp_event_count`, `twamp_dmean`, `twamp_jmean`); optional env `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` adjusts the minute-bucket expectation for `twamp_event_count`, and `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` tunes allowed ThousandEyes abrupt-jump outliers (default `0..2`).
 5. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
 6. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
 
@@ -153,33 +153,33 @@ Contract clarification:
 Saved-search contract for baseline/live verification:
 
 - App context: run saved searches in `ai_lab`.
-- Naming convention: use `cnc_`-prefixed saved-search names for interface/SRTE/service-health baseline checks.
+- Naming convention: use the stable app saved-search names listed below (no `_test` suffix).
 - Required saved searches:
-  - `telemetry_if_counter_test`
-  - `cnc_interface_ifOutPktsRate_test`
-  - `cnc_interface_ifInPktsRate_test`
-  - `thousandeyes_response_time_sec_test`
-  - `cnc_srte_path_test`
-  - `cnc_service_health_test`
-  - `twamp_event_count_test`
-  - `twamp_dmean_test`
-  - `twamp_jmean_test`
+ - `telemetry_if_counter`
+ - `cnc_interface_ifOutPktsRate`
+ - `cnc_interface_ifInPktsRate`
+ - `thousandeyes_response_time_sec`
+ - `cnc_srte_path`
+ - `cnc_service_health`
+ - `twamp_event_count`
+ - `twamp_dmean`
+ - `twamp_jmean`
 - Live verification window:
   - use a recent bounded window (recommended `earliest=-5m latest=now`) when confirming active `live_log.py` generation.
 
 Saved-search quality intent for backfill checks:
 
-- `telemetry_if_counter_test`:
+- `telemetry_if_counter`:
   - directional gap must never be negative
   - drop rate must never exceed `1`
-- `cnc_srte_path_test`:
+- `cnc_srte_path`:
   - must return non-zero results when `cnc_srte_path_json` generation is active
-- `cnc_service_health_test`:
+- `cnc_service_health`:
   - must return non-zero results when generation is active; during **`scenario_1`**, **`impacted_sre_policy_health_status`** / score overrides apply each tick because **`scenario_happening_probability` defaults to 1** when omitted (validate in UI or ad-hoc recent-window spot-check if extending tests)
-- `cnc_interface_ifInPktsRate_test`, `cnc_interface_ifOutPktsRate_test`, `thousandeyes_response_time_sec_test`:
+- `cnc_interface_ifInPktsRate`, `cnc_interface_ifOutPktsRate`, `thousandeyes_response_time_sec`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
   - values should fluctuate gradually; baseline abrupt-jump tolerance for ThousandEyes is range-based via `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` in `scripts/test_backfill.sh` (default `0..2`)
-- `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test` (see `scripts/test_backfill.sh`):
+- `twamp_event_count`, `twamp_dmean`, `twamp_jmean` (see `scripts/test_backfill.sh`):
   - minute buckets with TWAMP events in the last 5 minutes (nominal ~5; partial-window edges may be lower)
   - average `ul`/`dl`/`rt` `dmean` and `jmean` within aggregated `daily_min`/`daily_max` from `default/ai_lab_scenarios.conf` using sample-qualified TWAMP keys (`twamp#pca_twamp_csv#sample.csv#...`), with tolerance from per-metric or default TWAMP `noise_stdev`
 

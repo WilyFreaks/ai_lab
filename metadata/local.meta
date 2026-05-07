@@ -7,10 +7,11 @@ version = 9.4.2
 modtime = 1776700952.152288000
 
 [savedsearches/telemetry_if_counter_test]
-export = none
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777619026.194845000
+modtime = 1778174123.033303000
 
 [views/workshop_introduction]
 version = 9.4.2
@@ -18,52 +19,187 @@ modtime = 1777570243.373657000
 
 [views/scenario_1_au]
 version = 9.4.2
-modtime = 1778086474.174117000
+modtime = 1778139375.318417000
 
 [savedsearches/cnc_interface_ifInPktsRate_test]
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777790791.194969000
+modtime = 1778173860.098869000
 
 [savedsearches/cnc_interface_ifOutPktsRate_test]
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777790824.254711000
+modtime = 1778173932.110578000
 
 [savedsearches/cnc_service_health_test]
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777790850.588307000
+modtime = 1778174090.035319000
 
 [savedsearches/cnc_srte_path_test]
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777790878.252484000
+modtime = 1778174106.139972000
 
 [savedsearches/thousandeyes_response_time_sec_test]
-export = none
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777791402.541870000
+modtime = 1778174145.519180000
 
 [savedsearches/twamp_event_count_test]
-export = none
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777879140.512210000
+modtime = 1778174221.130920000
 
 [savedsearches/twamp_dmean_test]
-export = none
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777879241.239985000
+modtime = 1778174177.568551000
 
 [savedsearches/twamp_jmean_test]
-export = none
+access = read : [ * ], write : [ admin, power ]
+export = system
 owner = admin
 version = 9.4.2
-modtime = 1777879306.486249000
+modtime = 1778174253.873500000
 
 [views/scenario_control]
 version = 9.4.2
-modtime = 1778037623.702184000
+modtime = 1778185986.617438000
+
+[savedsearches/wdm_FEC_BEF_COR_ER_over_time]
+access = read : [ * ], write : [ admin, power ]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166279.233028000
+
+[savedsearches/wdm_LSBIASCUR_over_time]
+access = read : [ * ], write : [ admin ]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166316.656786000
+
+[savedsearches/wdm_SUMOOPCUR_over_time]
+access = read : [ * ], write : [ admin, power ]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166407.979741000
+
+[savedsearches/wdm_SUMIOPCUR_over_time]
+access = read : [ * ], write : [ admin, power ]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166376.929666000
+
+[savedsearches/wdm_FEC_BEF_COR_ER_over_time_by_router]
+owner = admin
+version = 9.4.2
+modtime = 1778166099.610776000
+
+[savedsearches/wdm_LSBIASCUR_over_time_by_router]
+owner = admin
+version = 9.4.2
+modtime = 1778166339.591005000
+
+[savedsearches/wdm_SUMIOPCUR_over_time_by_router]
+owner = admin
+version = 9.4.2
+modtime = 1778166163.684945000
+
+[savedsearches/wdm_SUMOOPCUR_over_time_by_router]
+owner = admin
+version = 9.4.2
+modtime = 1778166177.803063000
+
+[savedsearches/wdm_BDTEMPCUR_over_time]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166480.863777000
+
+[savedsearches/wdm_BDTEMPCUR_over_time_by_router]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166681.641371000
+
+[savedsearches/wdm_EDTMPCUR_over_time]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166789.918841000
+
+[savedsearches/wdm_EDTMPCUR_over_time_by_router]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778166864.778610000
+
+[savedsearches/cnc_interface_ifInPktsRate]
+owner = admin
+version = 9.4.2
+modtime = 1778173860.080163000
+
+[savedsearches/cnc_interface_ifOutPktsRate]
+owner = admin
+version = 9.4.2
+modtime = 1778173932.084396000
+
+[savedsearches/cnc_service_health]
+owner = admin
+version = 9.4.2
+modtime = 1778174090.009333000
+
+[savedsearches/cnc_srte_path]
+owner = admin
+version = 9.4.2
+modtime = 1778174106.116577000
+
+[savedsearches/telemetry_if_counter]
+owner = admin
+version = 9.4.2
+modtime = 1778174123.007637000
+
+[savedsearches/thousandeyes_response_time_sec]
+owner = admin
+version = 9.4.2
+modtime = 1778174145.491120000
+
+[savedsearches/twamp_dmean]
+owner = admin
+version = 9.4.2
+modtime = 1778174177.540927000
+
+[savedsearches/twamp_event_count]
+owner = admin
+version = 9.4.2
+modtime = 1778174221.103606000
+
+[savedsearches/twamp_jmean]
+owner = admin
+version = 9.4.2
+modtime = 1778174253.843869000
+
+[savedsearches/wdm_LOSTOPCUR_over_time_by_router]
+export = none
+owner = admin
+version = 9.4.2
+modtime = 1778182136.618978000

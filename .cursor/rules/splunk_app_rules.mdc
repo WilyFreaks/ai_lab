@@ -53,11 +53,14 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 - TWAMP `*_lostperc` on the wire: integer **percent 0–100** (from lost vs expected counts under scenario loss), not millionths; align dashboards/tests to that scale.
 - Scenario 1 `cnc_service_health_json`: **`[scenario_1]`** overrides degraded **sr_policy** placeholders; **`scenario_happening_probability`** need not be set — it **defaults to 1** when missing (see `docs/project_scenario_1.md`).
-- Scenario 1 telemetry control keys are now slice-based: `telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice`, `...#reroute_to_slice`, `...#reroute_pct`, `...#reroute_start_minutes`, `...#reroute_ramp_minutes`.
+- Scenario 1 telemetry control keys are now slice-based: `telemetry#cnc_interface_counter_json#reroute_from_slice`, `...#reroute_to_slice`, `...#reroute_pct`, `...#reroute_start_minutes`, `...#reroute_ramp_minutes`.
 - `reroute_pct` semantics are conserved traffic shift (remove volume from from-slices and redistribute to to-slices), **not** independent `+pct` on healthy slices.
 - Scenario 1 must keep immediate directional gap on `R5->R7` via `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_out_key`, `...#immediate_gap_in_key`, `...#immediate_gap_pct` (applies from activation, independent of reroute delay/ramp).
 - Scenario 1 ThousandEyes `response_time_ms` supports timed recovery via `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
 - Baseline reroute-path router traffic ranges must stay core-consistent (avoid single-digit outliers on `R8-R6`, `R6-R4`, `R4-R2`); see `docs/project_conf_design.md` and `docs/project_scenario_1.md`.
+- `wdm_alert` (syslog XML fault signal): keep host extraction from `<alias-name>NativeEMSName</alias-name><alias-value>...` via `props.conf` + `transforms.conf` (`set_host_from_wdm_alert_xml`), and keep sourcetype naming consistent (`wdm_alert`).
+- `wdm_pm` (WDM performance data): model per transponder endpoint with Tx/Rx metric directionality (`LSBIASCUR` Tx, `FEC_BEF_COR_ER` Rx, `SUMOOPCUR` Tx, `SUMIOPCUR` Rx, plus `BDTEMPCUR`/`EDTMPCUR`) and bind endpoints via `lookups/router_wdm_transponders.csv` using A/Z columns.
+- Scenario one-shot streams (`scenario_reroute_start_once`) must track emit-state per `scenario + stream` (not scenario-only) so IOS BFD and WDM alert both emit once for the same activation.
 
 `docs/daily_activity_timeline.md` journaling (user-controlled):
 - This file is the project daily journal, but is updated **only when the user explicitly requests** an update to `docs/daily_activity_timeline.md` (no proactive edits).
@@ -104,15 +107,15 @@ Durations and summaries:
 Saved-search validation rules (Splunk test/verification):
 - For app-level validation, use saved searches in app `ai_lab` (do not write raw SPL unless the user explicitly asks for ad-hoc SPL).
 - Preferred saved searches for baseline/live checks:
-  - `telemetry_if_counter_test`
-  - `cnc_interface_ifOutPktsRate_test`
-  - `cnc_interface_ifInPktsRate_test`
-  - `thousandeyes_response_time_sec_test`
-  - `cnc_srte_path_test`
-  - `cnc_service_health_test`
-  - `twamp_event_count_test` (minute buckets with TWAMP events in last 5m; asserted in `scripts/test_backfill.sh`)
-  - `twamp_dmean_test` (avg `ul`/`dl`/`rt` delay means vs `default/ai_lab_scenarios.conf` bounds; asserted in `scripts/test_backfill.sh`)
-  - `twamp_jmean_test` (avg `ul`/`dl`/`rt` jitter means vs conf bounds; asserted in `scripts/test_backfill.sh`)
+  - `telemetry_if_counter`
+  - `cnc_interface_ifOutPktsRate`
+  - `cnc_interface_ifInPktsRate`
+  - `thousandeyes_response_time_sec`
+  - `cnc_srte_path`
+  - `cnc_service_health`
+  - `twamp_event_count` (minute buckets with TWAMP events in last 5m; asserted in `scripts/test_backfill.sh`)
+  - `twamp_dmean` (avg `ul`/`dl`/`rt` delay means vs `default/ai_lab_scenarios.conf` bounds; asserted in `scripts/test_backfill.sh`)
+  - `twamp_jmean` (avg `ul`/`dl`/`rt` jitter means vs conf bounds; asserted in `scripts/test_backfill.sh`)
 - Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ. ThousandEyes abrupt-jump tolerance can be tuned with `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` (default `0..2`).
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.

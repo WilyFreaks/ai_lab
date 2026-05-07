@@ -17,14 +17,24 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 2. Immediate fault signal:
    - TWAMP 1002/1003 loss/stress applies immediately.
    - Telemetry `R5 -> R7` directional Out/In gap applies immediately (30% receive-side depression on `R7` peer `ifIn` vs `R5` `ifOut`).
-3. Reroute control plane delay (`telemetry#cnc_interface_counter_json#sample.json#reroute_start_minutes`) elapses.
-   - IOS BFD/control-plane fault sequence (`samples/ios/cisco:ios/sample_bfd.txt`) is emitted at this reroute-start point to indicate BFD detection and SR-policy impact timing.
+   - Syslog `wdm_alert` is the explicit WDM issue indicator (optical transport alarm), with host extracted from `NativeEMSName` alias-value (for example `R7`).
+   - `wdm_pm` is the continuous optical performance companion stream and should preserve per-endpoint Tx/Rx metric semantics so degradation context lines up with fault storytelling.
+3. IOS BFD/control-plane delay elapses.
+   - Preferred one-shot timing keys:
+     - `ios#cisco:ios#sample_bfd.txt#interval = once`
+     - `ios#cisco:ios#sample_bfd.txt#start_minutes = <delay_after_activation>`
+   - IOS BFD/control-plane fault sequence (`samples/ios/cisco:ios/sample_bfd.txt`) is emitted once at this one-shot timestamp to indicate BFD detection and SR-policy impact timing.
+   - If `wdm_alert` is configured as one-shot for the same scenario activation, emit-state must be tracked per `scenario + stream` so IOS and WDM one-shot streams both fire once (no cross-stream suppression).
 4. Telemetry reroute ramps over `telemetry#cnc_interface_counter_json#sample.json#reroute_ramp_minutes`:
    - `reroute_from_slice` traffic decreases.
    - removed volume is redistributed to `reroute_to_slice` (conserved shift; not independent +pct on healthy slices).
-5. ThousandEyes response-time uplift starts at scenario activation, then returns to baseline using:
+5. ThousandEyes uplift starts at scenario activation, then can return to baseline per metric using:
    - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes`
    - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#network_latency_ms.back_to_baseline_start_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#network_latency_ms.back_to_baseline_ramp_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#throughput_kbps.back_to_baseline_start_minutes`
+   - `thousandeyes#cisco:thousandeyes:metric#sample.json#throughput_kbps.back_to_baseline_ramp_minutes`
 
 **Conf settings (in `default/ai_lab_scenarios.conf`):**
 ```ini
@@ -73,11 +83,11 @@ fault_duration = 0       # minutes how long to keep the fault, 0 means the fault
 ## ThousandEyes behavior (Scenario 1)
 
 - Scenario applies an initial response-time/latency uplift at activation.
-- `response_time_ms` supports explicit return-to-baseline timing:
-  - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes`
-  - `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_ramp_minutes`
-- During `back_to_baseline_start_minutes`, scenario response-time uplift stays active.
-- After that delay, response-time linearly returns to baseline over `back_to_baseline_ramp_minutes`.
+- `response_time_ms`, `network_latency_ms`, and `throughput_kbps` support explicit return-to-baseline timing:
+  - `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_start_minutes`
+  - `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_ramp_minutes`
+- During each metric's `back_to_baseline_start_minutes`, scenario uplift for that metric stays active.
+- After that delay, each metric linearly returns to baseline over its `back_to_baseline_ramp_minutes`.
 
 ## Service health (`cnc_service_health_json`)
 

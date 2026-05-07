@@ -27,7 +27,7 @@ print("- Restart workers or Splunk after generator/conf edits if processes were 
 print("")
 print("CURRENT IMPLEMENTATION FOCUS:")
 print("- Scenario dashboards (e.g. scenario_1_au.xml): edit under local/data/ui/views/; on explicit request ('copy local dashboard to default') full-copy to default/data/ui/views/; Splunk prefers local at runtime when both exist")
-print("- TWAMP baseline verification: saved searches twamp_event_count_test, twamp_dmean_test, twamp_jmean_test (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")
+print("- TWAMP baseline verification: saved searches twamp_event_count, twamp_dmean, twamp_jmean (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")
 print("- TWAMP: shared per-slice noise for delay/jitter integer cells + pps packet-rate model; correlate with cnc_interface_counter_json in scenario_1 for VLANs 1002/1003")
 print("- Scenario 1 telemetry reroute keys: telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice / ...#reroute_to_slice / ...#reroute_pct / ...#reroute_start_minutes / ...#reroute_ramp_minutes")
 print("- reroute_pct means conserved traffic shift from impacted slices to healthy slices (not independent +pct on healthy links)")
@@ -35,6 +35,9 @@ print("- Scenario 1 immediate R5->R7 gap keys: telemetry#cnc_interface_counter_j
 print("- ThousandEyes response-time back-to-baseline keys: thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes / ...back_to_baseline_ramp_minutes")
 print("- ThousandEyes baseline abrupt-jump tolerance in scripts/test_backfill.sh uses TE_JUMP_OUTLIER_MIN / TE_JUMP_OUTLIER_MAX (default 0..2)")
 print("- Baseline reroute path links (R8-R6, R6-R4, R4-R2) should use core-consistent traffic ranges")
+print("- Syslog WDM fault source: wdm_alert XML; host comes from NativeEMSName alias-value via transforms")
+print("- WDM performance source: wdm_pm should bind A/Z endpoints through lookups/router_wdm_transponders.csv with Tx/Rx metric directionality")
+print("- Scenario one-shot emit-state must be tracked per scenario+stream so ios BFD and wdm_alert both emit once per activation")
 print("- scenario_control.xml: region token bootstrap is XML-based via workshopregion action=status; link resolves as /app/ai_lab/scenario_1_$region$")
 print("- scenariocontrol action=set: active=1 preserves existing non-zero <scenario>_activated; active=0 clears to 0")
 PY

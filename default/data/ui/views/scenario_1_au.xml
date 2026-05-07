@@ -1,4 +1,4 @@
-<form version="1.1" theme="dark">
+<form version="1.1">
   <label>#1 Backbone Network Status</label>
   <description>Workshop scenario: latency was detected on a specific VLAN over the WDM backbone. Investigate and identify the root cause.</description>
   <fieldset submitButton="false" autoRun="true">
@@ -54,7 +54,7 @@
     | mvexpand subservice_health{} 
     | spath input=subservice_health{} 
     | search category=sr_policy 
-    | stats last(health_score) as health_score last(health_status) as health_status by vpn_name device 
+    | stats latest(health_score) as health_score latest(health_status) as health_status by vpn_name device 
     | eval status=replace(health_status, "SERVICE_","") 
     | rex field=vpn_name "^NSS-5G_Slice_Vlan(?&lt;slice&gt;\d+)" 
     | fields slice health_score ] 
@@ -112,7 +112,7 @@
         <option name="leaflet_maps_app.maps-plus.mapCenterLat">-37.2</option>
         <option name="leaflet_maps_app.maps-plus.mapCenterLon">145.5</option>
         <option name="leaflet_maps_app.maps-plus.mapCenterZoom">8</option>
-        <option name="leaflet_maps_app.maps-plus.mapTile">https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png</option>
+        <option name="leaflet_maps_app.maps-plus.mapTile">https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png</option>
         <option name="leaflet_maps_app.maps-plus.maplibreStylePreset">liberty</option>
         <option name="leaflet_maps_app.maps-plus.maps-plus.allPopups">0</option>
         <option name="leaflet_maps_app.maps-plus.maxClusterRadius">80</option>
@@ -171,7 +171,7 @@
 | spath subservice_health{}
 | mvexpand subservice_health{}
 | spath input=subservice_health{}
-| stats last(health_score) as health_score last(health_status) as health_status by vpn_name category device
+| stats latest(health_score) as health_score latest(health_status) as health_status by vpn_name category device
 | eval Status=replace(health_status, "SERVICE_","")
 | rename health_score as Score, category as Category, vpn_name as Slice, device as Device
 | fields Slice Device Category Status Score
@@ -196,20 +196,22 @@
   </row>
   <row>
     <panel>
-      <title>ThousandEyes Google Monitor at R9</title>
+      <title>ThousandEyes Google Response Time at R9 for Last 60 mins</title>
       <chart>
         <search>
-          <query>index=thousandeyes
-| bin _time span=1m
-| stats avg(response_time_sec) by _time
-| join _time
-    [ search index=thousandeyes earliest=-24h
-    | table _time response_time_sec
-    | predict response_time_sec holdback=60 future_timespan=60 
-    | fields - response_time_sec prediction* ]
-| fields _time avg(response_time_sec) prediction* lower* upper*</query>
-          <earliest>$PERIOD.earliest$</earliest>
-          <latest>$PERIOD.latest$</latest>
+          <query>index=thousandeyes 
+| bin _time span=1m 
+| stats avg(response_time_sec) by _time 
+| join type=left _time 
+    [ search index=thousandeyes earliest=-7d 
+    | bin _time span=1m 
+    | stats avg(response_time_sec) by _time 
+    | predict algorithm=LLP5 avg(response_time_sec) algorithm=LLP5 holdback=60 future_timespan=60 period=1440 lower95=lower_bound upper95=upper_bound
+    | rename lower_bound(prediction(avg(response_time_sec))) as lower_bound upper_bound(prediction(avg(response_time_sec))) as upper_bound
+    | fields _time lower_bound upper_bound ] 
+| fields _time avg(response_time_sec) lower* upper*</query>
+          <earliest>-60m@m</earliest>
+          <latest>now</latest>
           <refresh>1m</refresh>
           <refreshType>delay</refreshType>
         </search>

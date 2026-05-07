@@ -161,10 +161,40 @@ def build_streams():
             "index": "ios",
             "sourcetype": "cisco:ios",
             "sample": os.path.join(
+                SAMPLES_DIR, "ios", "cisco:ios", "sample_session_key.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
+        },
+        {
+            "index": "ios",
+            "sourcetype": "cisco:ios",
+            "sample": os.path.join(
+                SAMPLES_DIR, "ios", "cisco:ios", "sample_bad_login.txt"
+            ),
+            "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
+        },
+        {
+            "index": "ios",
+            "sourcetype": "cisco:ios",
+            "sample": os.path.join(
                 SAMPLES_DIR, "ios", "cisco:ios", "sample_bfd.txt"
             ),
             "spool_dir": os.path.join(SPOOL_ROOT, "ios", "cisco_ios"),
             # Emit this sequence once per scenario activation when reroute starts.
+            "scenario_reroute_start_once": "scenario_1",
+        },
+        {
+            "index": "syslog",
+            "sourcetype": "wdm_pm",
+            "sample": os.path.join(SAMPLES_DIR, "syslog", "wdm_pm", "sample.csv"),
+            "spool_dir": os.path.join(SPOOL_ROOT, "syslog", "wdm_pm"),
+        },
+        {
+            "index": "syslog",
+            "sourcetype": "wdm_alert",
+            "sample": os.path.join(SAMPLES_DIR, "syslog", "wdm_alert", "sample.xml"),
+            "spool_dir": os.path.join(SPOOL_ROOT, "syslog", "wdm_alert"),
+            # Emit this fault indicator once per scenario activation.
             "scenario_reroute_start_once": "scenario_1",
         },
         {
@@ -179,6 +209,24 @@ def build_streams():
 def stream_prefix_base(stream):
     sample_name = os.path.basename(stream["sample"])
     return f"{stream['index']}#{stream['sourcetype']}#{sample_name}#"
+
+
+def scenario_once_emit_state_key(scenario_name, stream):
+    """Per-scenario + per-stream key for one-shot emission tracking."""
+    sample_name = os.path.basename(stream.get("sample", ""))
+    return (
+        f"{scenario_name}|"
+        f"{stream.get('index', '')}#{stream.get('sourcetype', '')}#{sample_name}"
+    )
+
+
+def is_legacy_ios_bfd_once_stream(stream):
+    """Compatibility check for historical scenario-only IOS BFD state entries."""
+    return (
+        stream.get("index") == "ios"
+        and stream.get("sourcetype") == "cisco:ios"
+        and os.path.basename(stream.get("sample", "")) == "sample_bfd.txt"
+    )
 
 
 def telemetry_link_lookup_path():
@@ -905,6 +953,36 @@ def scenario_reroute_start_epoch(cfg, scenario_name):
     return start + (int(start_delay_minutes) * 60)
 
 
+def scenario_ios_once_start_epoch(cfg, scenario_name, stream):
+    """
+    Resolve one-shot IOS emission start epoch for a scenario activation.
+    Preferred keys (in scenario stanza):
+      - <index>#<sourcetype>#<sample_file>#interval = once
+      - <index>#<sourcetype>#<sample_file>#start_minutes = <int>
+    Falls back to telemetry reroute_start_minutes behavior for backward compatibility.
+    """
+    start = scenario_start_epoch(cfg, scenario_name)
+    if start is None:
+        return None
+
+    prefix_base = stream_prefix_base(stream)
+    interval_key = f"{prefix_base}interval"
+    interval_raw = cfg.get(scenario_name, interval_key, fallback=None)
+    if interval_raw is not None:
+        interval_value = str(interval_raw).strip().lower()
+        # Keep one-shot semantics explicit when interval is configured for IOS BFD.
+        if interval_value not in ("once", "1", "true", "yes", "on"):
+            return None
+
+    start_delay_minutes = parse_int(
+        cfg, scenario_name, f"{prefix_base}start_minutes", default=None
+    )
+    if start_delay_minutes is None:
+        return scenario_reroute_start_epoch(cfg, scenario_name)
+    start_delay_minutes = max(0, int(start_delay_minutes or 0))
+    return start + (start_delay_minutes * 60)
+
+
 SLICE_TELEMETRY_RATE_KEYS = {
     # Impacted path slices (R2<->R3<->R5<->R7)
     "1002": [
@@ -1148,44 +1226,51 @@ def apply_scenario_thousandeyes_back_to_baseline(
     if not base_cfg.has_section(section):
         return out_cfg
 
-    metric_prefix = "thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms"
-    key_main = metric_prefix
-    key_min = f"{metric_prefix}.daily_min"
-    key_max = f"{metric_prefix}.daily_max"
-    key_start_delay = f"{metric_prefix}.back_to_baseline_start_minutes"
-    key_ramp = f"{metric_prefix}.back_to_baseline_ramp_minutes"
+    metric_prefixes = (
+        "thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms",
+        "thousandeyes#cisco:thousandeyes:metric#sample.json#network_latency_ms",
+        "thousandeyes#cisco:thousandeyes:metric#sample.json#throughput_kbps",
+    )
 
     for scenario_name in active_scenarios:
         if not base_cfg.has_section(scenario_name):
             continue
-        if not base_cfg.has_option(scenario_name, key_start_delay) and not base_cfg.has_option(
-            scenario_name, key_ramp
-        ):
-            continue
         start_epoch = scenario_start_epoch(base_cfg, scenario_name)
         if start_epoch is None:
             continue
-
-        start_delay = parse_int(base_cfg, scenario_name, key_start_delay, default=0) or 0
-        ramp_minutes = parse_int(base_cfg, scenario_name, key_ramp, default=0) or 0
-        delay_epoch = start_epoch + (max(0, int(start_delay)) * 60)
-
-        if tick_ts < delay_epoch:
-            progress = 0.0
-        elif ramp_minutes <= 0:
-            progress = 1.0
-        else:
-            elapsed_min = max(0.0, float(tick_ts - delay_epoch) / 60.0)
-            progress = max(0.0, min(1.0, elapsed_min / float(ramp_minutes)))
-
-        for key in (key_main, key_min, key_max):
-            baseline_value = parse_float(base_cfg, section, key, default=None)
-            scenario_value = parse_float(out_cfg, section, key, default=None)
-            if baseline_value is None or scenario_value is None:
+        for metric_prefix in metric_prefixes:
+            key_main = metric_prefix
+            key_min = f"{metric_prefix}.daily_min"
+            key_max = f"{metric_prefix}.daily_max"
+            key_start_delay = f"{metric_prefix}.back_to_baseline_start_minutes"
+            key_ramp = f"{metric_prefix}.back_to_baseline_ramp_minutes"
+            if not base_cfg.has_option(
+                scenario_name, key_start_delay
+            ) and not base_cfg.has_option(scenario_name, key_ramp):
                 continue
-            # progress=0 => keep scenario value; progress=1 => return to baseline.
-            blended = scenario_value + ((baseline_value - scenario_value) * progress)
-            out_cfg.set(section, key, str(blended))
+
+            start_delay = (
+                parse_int(base_cfg, scenario_name, key_start_delay, default=0) or 0
+            )
+            ramp_minutes = parse_int(base_cfg, scenario_name, key_ramp, default=0) or 0
+            delay_epoch = start_epoch + (max(0, int(start_delay)) * 60)
+
+            if tick_ts < delay_epoch:
+                progress = 0.0
+            elif ramp_minutes <= 0:
+                progress = 1.0
+            else:
+                elapsed_min = max(0.0, float(tick_ts - delay_epoch) / 60.0)
+                progress = max(0.0, min(1.0, elapsed_min / float(ramp_minutes)))
+
+            for key in (key_main, key_min, key_max):
+                baseline_value = parse_float(base_cfg, section, key, default=None)
+                scenario_value = parse_float(out_cfg, section, key, default=None)
+                if baseline_value is None or scenario_value is None:
+                    continue
+                # progress=0 => keep scenario value; progress=1 => return to baseline.
+                blended = scenario_value + ((baseline_value - scenario_value) * progress)
+                out_cfg.set(section, key, str(blended))
 
     return out_cfg
 
@@ -1324,7 +1409,7 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
         prefix_base = stream_prefix_base(stream)
         stream_cfg = effective_cfg
         custom_timestamps = None
-        bfd_emit_state_update = None
+        once_emit_state_update = None
         if active_scenarios:
             probability = scenario_happening_probability(
                 effective_cfg, "baseline", prefix_base
@@ -1366,16 +1451,25 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
             ) or 0
             if activation <= 0:
                 continue
+            emit_state_key = scenario_once_emit_state_key(scenario_once_name, stream)
             already_emitted = sequence_state["ios_bfd_last_emit_state"].get(
-                scenario_once_name
+                emit_state_key
             )
+            # Backward compatibility: previous versions keyed only by scenario name
+            # for IOS BFD one-shot emission.
+            if already_emitted is None and is_legacy_ios_bfd_once_stream(stream):
+                already_emitted = sequence_state["ios_bfd_last_emit_state"].get(
+                    scenario_once_name
+                )
             if already_emitted == activation:
                 continue
-            reroute_start_epoch = scenario_reroute_start_epoch(base_cfg, scenario_once_name)
+            reroute_start_epoch = scenario_ios_once_start_epoch(
+                base_cfg, scenario_once_name, stream
+            )
             if reroute_start_epoch is None or tick_ts < int(reroute_start_epoch):
                 continue
             custom_timestamps = [int(reroute_start_epoch)]
-            bfd_emit_state_update = (scenario_once_name, activation)
+            once_emit_state_update = (emit_state_key, activation, stream)
         elif not minute_due_for_interval(tick_ts, interval):
             continue
 
@@ -1402,9 +1496,15 @@ def process_tick(tick_ts, sequence_state, base_cfg=None):
             all_event_objs.extend(part)
         event_count = len(all_event_objs)
         path = write_stream_events(stream, all_event_objs, csv_header_line=csv_header_line)
-        if bfd_emit_state_update:
-            scenario_name, activation = bfd_emit_state_update
-            sequence_state["ios_bfd_last_emit_state"][scenario_name] = int(activation)
+        if once_emit_state_update:
+            emit_state_key, activation, once_stream = once_emit_state_update
+            sequence_state["ios_bfd_last_emit_state"][emit_state_key] = int(activation)
+            # Preserve legacy key updates for IOS BFD so existing tooling/state
+            # remains readable during migration.
+            if is_legacy_ios_bfd_once_stream(once_stream):
+                sequence_state["ios_bfd_last_emit_state"][scenario_once_name] = int(
+                    activation
+                )
         emitted += event_count
         per_stream_counts[f"{stream['index']}#{stream['sourcetype']}"] = (
             per_stream_counts.get(f"{stream['index']}#{stream['sourcetype']}", 0)

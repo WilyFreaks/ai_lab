@@ -60,6 +60,28 @@ Routing uses **SR-TE (Segment Routing - Traffic Engineering)**, not ECMP. Path c
 | Telemetry | Per-interface | Latency, jitter, packet loss |
 | cnc_srte_path_json | CNC routers | Active SR-TE path per VLAN |
 
+Syslog WDM issue indicator:
+
+- Sourcetype: `wdm_alert` (`samples/syslog/wdm_alert/sample.xml`)
+- WDM fault signal is carried in XML alarm fields (for example LOS / transport fault text).
+- Event host should resolve from Native EMS alias fields:
+  - `<alias-name>NativeEMSName</alias-name>`
+  - `<alias-value>R7</alias-value>` -> host `R7`
+
+Syslog WDM performance monitor:
+
+- Sourcetype: `wdm_pm` (`samples/syslog/wdm_pm/sample.csv`)
+- Scope: optical transponder performance telemetry bound to router-link endpoints.
+- Mapping source of truth: `lookups/router_wdm_transponders.csv` (one row per route with A/Z endpoint metadata and transponder port bindings).
+- Required PM metrics per endpoint:
+  - `LSBIASCUR` (Laser Bias Current, Tx-side)
+  - `FEC_BEF_COR_ER` (FEC before corrected error, Rx-side)
+  - `SUMOOPCUR` (Summarized Optical Output Power Current, Tx-side)
+  - `SUMIOPCUR` (Summarized Optical Input Power Current, Rx-side)
+  - `BDTEMPCUR` (board temperature)
+  - `EDTMPCUR` (laser temperature)
+- Direction semantics are part of the contract: Tx metrics must map to endpoint transmitter side, Rx metrics to receiver side, while temperature metrics apply per endpoint device context.
+
 **TE test setup:** Agent behind R9 runs HTTP test to google.com every 1 minute.
 **TE sourcetypes used:** `cisco:thousandeyes:metric`, `cisco:thousandeyes:alerts` (path-vis excluded — CNC routers don't respond to ICMP).
 **TWAMP agents:** Only on R2 and R9 (budget constraint — not on intermediate routers).
@@ -130,7 +152,7 @@ Use this when you are tired or returning cold — **one read, then pause**.
 9. **Scenario control specifics:** `scenario_control.xml` bootstraps `region` via XML `workshopregion action="status"` and links to `/app/ai_lab/scenario_1_$region$`; `scenariocontrol action=set` preserves non-zero `<scenario>_activated` on repeated Enable and sets `0` on Disable.
 10. **Scenario 1 telemetry model:** keep immediate `R5->R7` directional gap via `telemetry#cnc_interface_counter_json#sample.json#immediate_gap_*`, and apply slice reroute via `telemetry#cnc_interface_counter_json#sample.json#reroute_*` keys (`from_slice`, `to_slice`, `pct`, `start_minutes`, `ramp_minutes`).
 11. **Reroute semantics:** `reroute_pct` is conserved traffic shift (remove from impacted slices and redistribute removed volume to healthy slices), not independent `+pct` multiplier on healthy links.
-12. **Scenario 1 ThousandEyes timing:** `response_time_ms` supports timed return to baseline through `thousandeyes#cisco:thousandeyes:metric#sample.json#response_time_ms.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
+12. **Scenario 1 ThousandEyes timing:** `response_time_ms`, `network_latency_ms`, and `throughput_kbps` support timed return to baseline through per-metric `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
 13. **Baseline path magnitudes:** keep reroute chain links (`R8-R6`, `R6-R4`, `R4-R2`) in core-consistent ranges (see `docs/project_conf_design.md`), otherwise reroute effects look artificially small.
 14. **Config namespace convention:** use sample-aware keys in `default/ai_lab_scenarios.conf` as `<index>#<sourcetype>#<sample_file>#<param>` (index-first; for example `ios#cisco:ios#sample_bfd.txt#...`). Scenario behavior should be driven by these config entries, not hard-coded scenario constants.
 
@@ -141,7 +163,7 @@ Use this when you are tired or returning cold — **one read, then pause**.
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.<ext>` — keep payload structure aligned with the README/template contract; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
 - **SPL style for searches** (review and automation): Cursor skill `~/.cursor/skills-cursor/splunk-search-assistant/SKILL.md`. **App packaging / `inputs.conf` CRC and monitor semantics:** `~/.cursor/skills-cursor/splunk-app-manager/SKILL.md` (includes a short `crcSalt` section).
-- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter_test`, `cnc_interface_ifOutPktsRate_test`, `cnc_interface_ifInPktsRate_test`, `thousandeyes_response_time_sec_test`, `cnc_srte_path_test`, `cnc_service_health_test`, `twamp_event_count_test`, `twamp_dmean_test`, `twamp_jmean_test`). Use a recent window (recommended last 5 minutes) when validating active live generation. Baseline data-quality checks run via `scripts/test_baseline.sh` → `scripts/test_backfill.sh`, which include the TWAMP saved searches above.
+- **Saved-search-first verification policy:** for app-level checks, prefer saved searches in app `ai_lab` (`telemetry_if_counter`, `cnc_interface_ifOutPktsRate`, `cnc_interface_ifInPktsRate`, `thousandeyes_response_time_sec`, `cnc_srte_path`, `cnc_service_health`, `twamp_event_count`, `twamp_dmean`, `twamp_jmean`). Use a recent window (recommended last 5 minutes) when validating active live generation. Baseline data-quality checks run via `scripts/test_baseline.sh` → `scripts/test_backfill.sh`, which include the TWAMP saved searches above.
 - **Scenario dashboard XML:** author in `local/data/ui/views/` (Splunk UI saves here); on explicit sync (“copy local dashboard to default”), full-copy to `default/data/ui/views/` for Git/AMI. At runtime, **`local` overrides `default`** for the same view name—see `docs/project_dashboard_design.md` (*Scenario dashboard authoring*).
 - **Credentials for CLI/tests** (workshop): same as below; do not commit real production secrets. Tests expect `SPLUNK_AUTH=admin:password` in the environment.
 
