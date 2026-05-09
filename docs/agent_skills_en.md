@@ -7,9 +7,9 @@ Using Splunk episode correlation analysis, it performs cross-domain analysis acr
 
 ## Network Topology
 ```text
-R8 ──── R6 ──── R4 ──── R2
-          │       │       │       │
-         R9 ──── R7 ───── R5 ──── R3
+R8 -- R6 -- R4 -- R2
+|     |           |
+R9 -- R7 -- R5 -- R3
 ```
 
 - Routers: R2–R9 (Cisco NCS Series)
@@ -21,8 +21,10 @@ R8 ──── R6 ──── R4 ──── R2
 Proceed through the following steps. At the beginning of each step, always display the following status format:
 
 ```text
-▶ Step X Running: [Brief description of the current action]
+* Step X Running: [Brief description of the current action]
 ```
+Before infer the SPL to run for the investigation, check available saved searches to meet your needs. Read the desciption of the saved searches to understand the function and the parameters if it's available. If the description is not avilable, use saved search names to determine the use. 
+All the necessary saved searches are in ai_lab app. Don't run any saved searches outside of ai_lab.
 
 At the completion of each step, output a summary of the findings and indicate the next step.
 
@@ -31,7 +33,7 @@ At the completion of each step, output a summary of the findings and indicate th
 Always display at the beginning:
 
 ```text
-▶ Step 1 Running: Checking the service monitor status for the last 60 minutes using ThousandEyes...
+* Step 1 Running: Checking the service monitor status for the last 60 minutes using ThousandEyes...
 ```
 
 Execute the ThousandEyes SPL query over the last 60 minutes.
@@ -45,7 +47,7 @@ The timestamp when the anomaly is detected should be treated as the failure dete
 Always display at the beginning:
 
 ```text
-▶ Step 2 Running: Checking alert activity using Splunk Episode Correlation Analysis...
+* Step 2 Running: Checking alert activity using Splunk Episode Correlation Analysis...
 ```
 
 Retrieve the episode list using the Splunk saved search and verify alert activity.
@@ -59,7 +61,7 @@ Do not speculate on the root cause until it is validated through syslog correlat
 Always display at the beginning:
 
 ```text
-▶ Step 3 Running: Measuring packet loss and latency on impacted slices using TWAMP data...
+* Step 3 Running: Measuring packet loss and latency on impacted slices using TWAMP data...
 ```
 
 Analyze packet loss, latency, and jitter per slice using PCA TWAMP data.
@@ -69,7 +71,7 @@ Analyze packet loss, latency, and jitter per slice using PCA TWAMP data.
 Always display at the beginning:
 
 ```text
-▶ Step 4 Running: Comparing degraded and healthy slices to identify the problematic node...
+* Step 4 Running: Comparing degraded and healthy slices to identify the problematic node...
 ```
 
 Identify slices with high packet loss, latency, and jitter, then isolate network nodes that only exist in degraded slice paths.
@@ -79,7 +81,7 @@ Identify slices with high packet loss, latency, and jitter, then isolate network
 Always display at the beginning:
 
 ```text
-▶ Step 5 Running: Verifying detailed interface information on suspected routers using Telemetry data...
+* Step 5 Running: Verifying detailed interface information on suspected routers using Telemetry data...
 ```
 
 Identify router interfaces with greater than 30% packet loss.
@@ -89,7 +91,7 @@ Identify router interfaces with greater than 30% packet loss.
 Always display at the beginning:
 
 ```text
-▶ Step 6 Running: Reviewing router ios logs to identify network-related events...
+* Step 6 Running: Reviewing router ios logs to identify network-related events...
 ```
 
 Correlate BFD down, IS-IS adjacency loss, and SR-TE Policy DOWN events with TWAMP quality degradation.
@@ -101,7 +103,7 @@ Verify how SR-TE policies changed due to the failure.
 Always display at the beginning:
 
 ```text
-▶ Step 7 Running: Reviewing WDM syslog events for transponder-side issues per router...
+* Step 7 Running: Reviewing WDM syslog events for transponder-side issues per router...
 ```
 
 Use Splunk saved searches to identify WDM transponder abnormalities connected to the affected routers.

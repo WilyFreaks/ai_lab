@@ -40,4 +40,5 @@ print("- WDM performance source: wdm_pm should bind A/Z endpoints through lookup
 print("- Scenario one-shot emit-state must be tracked per scenario+stream so ios BFD and wdm_alert both emit once per activation")
 print("- scenario_control.xml: region token bootstrap is XML-based via workshopregion action=status; link resolves as /app/ai_lab/scenario_1_$region$")
 print("- scenariocontrol action=set: active=1 preserves existing non-zero <scenario>_activated; active=0 clears to 0")
+print("- Spool cleanup: bin/spool_cleanup.py runs hourly via scripted input (interval=3600 in default/inputs.conf); deletes var/spool/ai_lab/ files older than 4h; emits JSON to index=ai_lab_log sourcetype=ai_lab:spool_cleanup; activated by Splunk restart")
 PY

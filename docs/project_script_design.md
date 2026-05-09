@@ -384,6 +384,31 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
   - Enable: if `<scenario>_activated` is already non-zero, preserve it; otherwise set to current epoch time
   - Disable: set `<scenario>_activated` to `0`
 
+## spool_cleanup.py
+
+**Invoked by:** Splunk scripted input (`interval = 3600` in `default/inputs.conf`)
+
+**Runs:** Once on Splunk startup, then every 3600 seconds (1 hour).
+
+**Responsibilities:**
+1. Locate `var/spool/ai_lab/` relative to the app directory.
+2. Walk the entire spool tree and delete any **file** whose `mtime` is older than 4 hours (`AGE_THRESHOLD_HOURS = 4`).
+3. Preserve directory structure — only files are removed.
+4. Emit a single JSON line to stdout summarising the run (fields: `timestamp`, `status`, `spool_root`, `age_threshold_hours`, `deleted_count`, `error_count`, `deleted_files`, `errors`).
+
+**Splunk ingestion:** stdout is captured as `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`.
+
+**Activation:** A Splunk restart or app reload registers the scripted input automatically.
+
+**Threshold guidance:** Do not lower the 4-hour threshold below the longest expected Splunk monitor polling cycle; doing so risks deleting spool files before `splunkd` has ingested them.
+
+**Verification search:**
+```
+index=ai_lab_log sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count
+```
+
+---
+
 ## `reset_workshop_state.sh` packaging sync
 
 Before destructive reset actions, `scripts/reset_workshop_state.sh` now performs a packaging sync from `local/` to `default/` so workshop UI/search edits are preserved in Git-tracked defaults:

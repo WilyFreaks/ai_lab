@@ -7,9 +7,25 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-09 (Sat)
+
+- Session 1 around **19:00-21:00 JST**
+- Main activities:
+  - Implemented hourly spool cleanup scripted input (`bin/spool_cleanup.py` + `inputs.conf` `[script://./bin/spool_cleanup.py]` with `interval = 3600`) to delete `var/spool/ai_lab/` files older than 4 hours; first manual run cleared 5,317 stale files
+  - Reviewed Cisco Deep Time Series Model integration
+- Resume anchor:
+  - **Continue Cisco Deep Time Series Model integration.**
+
 ## 2026-05-08 (Fri)
 
-- Session 1 around **01:42-05:51 JST** in this chat
+- Session 2 around **13:09-18:30 JST** in this chat
+- Main activities:
+  - Resumed project work and requested a journal update to open a new session
+  - Set the implementation focus to scheduled searches that generate `alerts` and `episode`
+- Resume anchor:
+  - **Implement scheduled searches to generate `alerts` and `episode` indexes.**
+
+- Session 1 around **00:00-05:51 JST** in this chat
 - Main activities:
   - Fixed `live_log.py` one-shot emission state handling so scenario one-shot streams are tracked per `scenario + stream` and no longer suppress each other
   - Ran workshop reset flow (`scripts/reset_workshop_state.sh --yes`) and mandatory smoke gates; observed the known post-start `ai_lab_log=1` residual while target app indexes remained clean
@@ -19,7 +35,7 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-07 (Thu)
 
-- Session 3 around **21:05 JST** in this chat
+- Session 3 around **21:05-0:00 JST** in this chat
 - Main activities:
   - Resumed project work and requested a journal update to start a new session
   - Confirmed `wdm_pm` sample-contract statistics (all-data and outlier-eliminated reference) in `samples/syslog/wdm_pm/README.md`
@@ -447,7 +463,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-08: ~249 minutes (1 session), ~76,000 estimated tokens
+- 2026-05-09: ~120 minutes (1 session), ~8,000 estimated tokens
+- 2026-05-08: ~249 minutes (2 sessions), ~76,000 estimated tokens
 - 2026-05-07: ~815 minutes (3 sessions), ~82,000 estimated tokens
 - 2026-05-06: ~511 minutes (5 sessions), ~65,000 estimated tokens
 - 2026-05-05: ~752 minutes (4 sessions), ~99,000 estimated tokens
@@ -466,7 +483,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-08 | ~249 minutes (1 session) | ~76,000 |
+| 2026-05-09 | ~120 minutes (1 session) | ~8,000 |
+| 2026-05-08 | ~249 minutes (2 sessions) | ~76,000 |
 | 2026-05-07 | ~815 minutes (3 sessions) | ~82,000 |
 | 2026-05-06 | ~511 minutes (5 sessions) | ~65,000 |
 | 2026-05-05 | ~752 minutes (4 sessions) | ~99,000 |

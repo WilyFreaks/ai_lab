@@ -134,6 +134,7 @@ Key project behavior that must remain stable across changes:
 - Canonical verification entrypoint: `bash scripts/test_smoke.sh` (4-check smoke: Python syntax, runtime preconditions, spool empty, app indexes empty).
 - Environment reset for repeatable workshops/tests is handled by:
   - `scripts/reset_workshop_state.sh`
+- **Spool cleanup:** `bin/spool_cleanup.py` runs as a Splunk scripted input every hour (`interval = 3600` in `default/inputs.conf`). It deletes files in `var/spool/ai_lab/` older than 4 hours and emits a JSON summary to `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`. Activated automatically on Splunk restart. Do not lower the 4-hour threshold below the longest monitor polling cycle.
 
 ### Handoff: operators and the next implementer
 

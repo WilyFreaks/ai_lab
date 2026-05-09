@@ -160,3 +160,11 @@ Splunk Simple XML `search/done` token action rule:
 - `active=1` must **not** overwrite `<scenario>_activated` when it is already non-zero.
 - `active=1` sets current epoch only when existing activation is missing/invalid/zero.
 - `active=0` sets `<scenario>_activated=0`.
+
+Spool cleanup (`bin/spool_cleanup.py`):
+- Registered as a Splunk scripted input in `default/inputs.conf` with `interval = 3600` (runs once on startup, then every hour).
+- Walks the entire `var/spool/ai_lab/` tree and deletes any **file** whose `mtime` is older than 4 hours; directory structure is preserved.
+- Emits a single JSON line to stdout — ingested as `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`.
+- Activation: a Splunk restart (or app reload) picks up the scripted input automatically; no manual scheduling needed.
+- Verify cleanup activity: `index=ai_lab_log sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count`
+- Do not reduce the 4-hour threshold below the longest expected Splunk monitor polling cycle to avoid deleting files before they are ingested.

@@ -23,6 +23,8 @@ Proceed through the following steps. At the beginning of each step, always displ
 ```text
 * Step X Running: [Brief description of the current action]
 ```
+Before infer the SPL to run for the investigation, check available saved searches to meet your needs. Read the desciption of the saved searches to understand the function and the parameters if it's available. If the description is not avilable, use saved search names to determine the use. 
+All the necessary saved searches are in ai_lab app. Don't run any saved searches outside of ai_lab.
 
 At the completion of each step, output a summary of the findings and indicate the next step.
 
