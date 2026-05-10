@@ -5,3 +5,5 @@ metadata/local.meta
 bin/__pycache__/
 var/
 metadata/local.meta
+default/data/ui/views/aicommand.xml
+default/data/ui/views/apjc_tech_connect_ai_lab.xml
