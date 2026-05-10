@@ -105,9 +105,14 @@ fi
 echo "[4/4] Reset-readiness SPL assertions (empty-state)"
 while IFS= read -r idx; do
   [[ -n "$idx" ]] || continue
+  query="earliest=0 latest=now index=$idx | stats count as count"
+  # Match reset_workshop_state.sh: scripted inputs emit to ai_lab_logs on startup.
+  if [[ "$idx" == "ai_lab_logs" ]]; then
+    query='earliest=0 latest=now index=ai_lab_logs NOT sourcetype IN ("ai_lab:launcher","ai_lab:spool_cleanup") | stats count as count'
+  fi
   assert_count_eq \
     "Index '$idx' is empty" \
-    "earliest=0 latest=now index=$idx | stats count as count" \
+    "$query" \
     0
 done < <(load_app_indexes)
 

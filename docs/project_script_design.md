@@ -98,7 +98,7 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
    - write `[baseline] region=<au|jp>` to `local/ai_lab_scenarios.conf`
    - write `[baseline] baseline_generation_enabled=true` to `local/ai_lab_scenarios.conf`
    - trigger `launcher.py` (detached subprocess) so generation starts from current local runtime state
-3. Emit command result payloads to spool under `var/spool/ai_lab/ai_lab_log/workshop_region/` for ingestion to `index=ai_lab_log`.
+3. Emit command result payloads to spool under `var/spool/ai_lab/ai_lab_logs/workshop_region/` for ingestion to `index=ai_lab_logs`.
 
 **Important nuance:**
 - `action=set` can trigger `launcher.py` repeatedly, but `launcher.py` only initializes `backfill_start_time` when missing.
@@ -142,9 +142,17 @@ Workshop data should treat timestamps as a **first-class, timezone-explicit** do
    - next-event continuity: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`
 19. Runtime sequence continuity must survive restarts by persisting local state under `[baseline]` in `local/ai_lab_scenarios.conf` (for example `sequence_last_value` and TWAMP per-slice/per-session UL packet sequence state).
 
+**Backfill/live boundary continuity:**
+`backfill_log.py`'s `end_ts` must be aligned to the same UTC-minute boundary that `live_log.py` uses for its `first_tick`. The formula is:
+```python
+live_first_tick = ((int(start_anchor) + 59) // 60) * 60
+end_ts = live_first_tick  # exclusive upper bound for backfill range()
+```
+Without this ceiling-minute rounding, the two generators use different time grids and leave exactly one missing tick at the handoff boundary. This fix ensures continuous, gap-free, duplicate-free event generation across the backfill→live transition.
+
 **Restart behavior:** 
 If Splunk restarts mid-backfill, `backfill_start_time` is already set in `local/`, so the same time window is used.
-In this case, scipts first need to check the latest timestamp of the events before starting synthetic event generation.
+In this case, scripts first need to check the latest timestamp of the events before starting synthetic event generation.
 This is mandatory to avoid duplicate or missing data.
 
 ---
@@ -253,7 +261,7 @@ This contract applies when generating `index=twamp sourcetype=pca_twamp_csv` tog
 
 ### Baseline verification (scripts + saved searches)
 
-- `scripts/test_baseline.sh` runs `scripts/test_backfill.sh`, which invokes saved searches `twamp_event_count` (minute buckets in the last 5m), `twamp_dmean`, and `twamp_jmean` against `index=twamp` / `pca_twamp_csv`, comparing rolling averages to `default/ai_lab_scenarios.conf` `daily_min` / `daily_max` (with noise tolerance). See `docs/project_test_design.md` and `default/savedsearches.conf`.
+- `scripts/test_baseline.sh` runs `scripts/test_backfill.sh`, which invokes saved searches `twamp_event_count` (minute buckets in the last 5m), `twamp_dmean`, and `twamp_jmean` against `index=twamp` / `pca_twamp_csv`, comparing rolling averages to `default/ai_lab_scenarios.conf` `daily_min` / `daily_max` (with noise tolerance), and **`assert_thousandeyes_trend_per_day`** (ratio of medians at two Wednesday checkpoints vs `trend_per_day` from `backfill_head_time`). See `docs/project_test_design.md` and `default/savedsearches.conf`.
 
 ### TWAMP peak-rate fallback strategy
 
@@ -286,7 +294,8 @@ Behavior:
 
 - Same UTC timestamp may map to different `peak_rate_*` keys depending on selected region.
 - Hour lookup for `peak_rate_<HH>` must use region-local wall-clock hour (`HH` in `00..23`).
-- To avoid hard step changes at hour boundaries, generators should interpolate per minute between the current hour's `peak_rate_<HH>` and the next hour's `peak_rate_<HH+1>`.
+- To avoid hard step changes at hour boundaries, generators interpolate per minute between the current hour's `peak_rate_<HH>` and the next hour's `peak_rate_<HH+1>`.
+- **`peak_rate_<HH>` is the rate at the middle of hour HH (i.e. HH:30), not the top of the hour (HH:00).** Implementation: shift the local time by −30 minutes before computing the hour and minute-progress interpolation in `interpolated_hourly_peak_rate()`. Effect: at HH:30 the rate equals `peak_rate_<HH>` exactly; at HH:00 the rate is halfway between `peak_rate_<HH-1>` and `peak_rate_<HH>`; transitions occur smoothly across the ±30-minute window.
 - Region timezone mapping must be deterministic and shared by backfill/live logic.
 
 Design intent:
@@ -296,14 +305,85 @@ Design intent:
 
 ---
 
+## Day-to-Day Variation (`daily_variation_stdev`)
+
+Without extra configuration, the same hour on the same day of week looks identical across weeks because the diurnal curve (`peak_rate_*`) and `daily_min`/`daily_max` are fixed. `noise_stdev` only adds tick-level jitter, which averages out over an hour.
+
+To produce realistic week-over-week variation, each metric prefix supports an optional key:
+
+```
+<prefix>.daily_variation_stdev = 0.08
+```
+
+**Behaviour:**
+- A multiplicative factor is drawn from `N(1.0, daily_variation_stdev)` once per calendar date per metric.
+- The seed is `MD5(local_date | section | prefix)` — deterministic: the same date always produces the same factor for the same metric in both backfill and live generation.
+- Different metrics on the same day get independent factors.
+- Result is clamped to `[0.2, 2.0]` to prevent pathological extremes.
+- Applied in `metric_value()` after `weekend_multiplier` and before the outlier/noise step.
+- Omitting the key (or setting it to `0`) disables the feature — no change in existing behaviour.
+
+**Tuning guidance:**
+
+| Value | Visible effect |
+|---|---|
+| `0.0` | Disabled — identical curve every day |
+| `0.05` | Subtle ±5% day-to-day drift |
+| `0.08` | Moderate ±8% variation (shipped default) |
+| `0.15` | Pronounced variation; weekly pattern still recognisable |
+
+The shipped `default/ai_lab_scenarios.conf` sets `daily_variation_stdev = 0.08` for every metric that already has a `noise_stdev` entry (ThousandEyes, telemetry interface counters, TWAMP defaults).
+
+---
+
+## Long-Term Trend (`trend_per_day`)
+
+Day-to-day variation (`daily_variation_stdev`) adds random scatter but no directional drift. `trend_per_day` adds a linear upward or downward slope across the **synthetic baseline history**, measured **from `backfill_head_time`** — not from `backfill_start_time` (workshop-lock / backfill tail).
+
+**Rule:** **`days_elapsed = 0` at `backfill_head_time`.** Workshop status and dashboards expose this value as **`backfill_head_time`** (`workshopregion` computes it when the key is not in conf).
+
+```
+<prefix>.trend_per_day = 0.05   # +5% per day (negative = decline)
+```
+
+**Behaviour:**
+- Multiplier at tick `t`: `1.0 + trend_per_day × days_elapsed`
+- **`days_elapsed`** = `(local_dt.timestamp() − trend_zero) / 86400`, clamped to ≥ 0.
+- **`trend_zero`** (same logical instant as **`backfill_head_time`**) =
+  - `[baseline].backfill_head_time` (epoch seconds) when explicitly set in **`local/ai_lab_scenarios.conf`** or **`default/ai_lab_scenarios.conf`**, otherwise
+  - **`backfill_start_time − backfill_days×86400`** (computed synthetic window head — matches dashboard / `workshopregion` metadata when the key is unset).
+  - Omitting **`backfill_start_time`** ⇒ **`trend_multiplier` returns `1.0`** (no trend).
+- Persist **`backfill_head_time`** in **`[baseline]`** if **`backfill_days`** changes after a lock and generated **and** dashboards must keep a fixed drift origin; otherwise the generators derive head from **`backfill_start_time`** and current **`backfill_days`**.
+- Result clamped to `[0.05, 10.0]` to prevent runaway extremes.
+- Applied in `metric_value()` after `daily_variation_multiplier` and before outlier/noise.
+- Omitting the key (or `0.0`) disables the feature — no change to existing behaviour.
+
+**Shipped defaults (`default/ai_lab_scenarios.conf`):**
+- All telemetry `ifOutPktsRate` and `ifInPktsRate` metrics: `trend_per_day = 0.03`
+- ThousandEyes `response_time_ms`, `throughput_kbps`, `network_latency_ms`, `network_jitter_ms`: `trend_per_day = 0.03`
+- TWAMP: **no trend** — delay/jitter stays flat as long as the link has headroom; it only spikes when utilisation hits capacity (modelled by scenario_1)
+
+**Effect at 3%/day over a 14-day backfill window:**
+
+| Day | Multiplier | Δ from baseline |
+|---|---|---|
+| 0 | 1.00 | 0% |
+| 1 | 1.03 | +3% |
+| 3 | 1.09 | +9% |
+| 7 | 1.21 | +21% |
+| 14 | 1.42 | +42% |
+
+This gives a clearly visible upward slope in baseline interface counters (and ThousandEyes metrics that set `trend_per_day`) over the synthetic history. A 42% total increase between backfill head and tail tells a credible "capacity is being consumed" story while leaving room for the scenario_1 spike on top (TWAMP itself remains untrended in shipped defaults).
+
+
 ## Ingestion Routing (inputs.conf monitors)
 
 Scripted input launches `launcher.py` only. Event ingestion is file-based via monitor stanzas:
 
 - `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_metric/`  
   → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:metric`, `host=thousandeyes_at_r9`, `source=ai_lab:backfill:thousandeyes_metric`
-- `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_alerts/`  
-  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alerts`, `source=ai_lab:backfill:thousandeyes_alerts`
+- `var/spool/ai_lab/thousandeyes/cisco_thousandeyes_alert/`
+  → `index=thousandeyes`, `sourcetype=cisco:thousandeyes:alert`, `source=ai_lab:backfill:thousandeyes_alert`
 - `var/spool/ai_lab/telemetry/cnc_interface_counter_json/`  
   → `index=telemetry`, `sourcetype=cnc_interface_counter_json`, `host=router_int_count`, `source=ai_lab:backfill:telemetry`
 - `var/spool/ai_lab/telemetry/cnc_srte_path_json/`  
@@ -383,6 +463,10 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
 - Activation behavior:
   - Enable: if `<scenario>_activated` is already non-zero, preserve it; otherwise set to current epoch time
   - Disable: set `<scenario>_activated` to `0`
+- **Activation safeguard (`active=1`):** `scenario_control.py` must reject activation (`active=1`) with an error message if either of the following conditions are not met in `local/ai_lab_scenarios.conf`:
+  - `[baseline].region` is a valid value (`au` or `jp`) — region must be locked
+  - `[baseline].backfill_completed = true` — backfill must have completed
+  - This prevents scenarios from being activated before the workshop data foundation is ready. The command returns `status=error` and a descriptive `message` so the dashboard can display the rejection reason.
 
 ## spool_cleanup.py
 
@@ -396,7 +480,7 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
 3. Preserve directory structure — only files are removed.
 4. Emit a single JSON line to stdout summarising the run (fields: `timestamp`, `status`, `spool_root`, `age_threshold_hours`, `deleted_count`, `error_count`, `deleted_files`, `errors`).
 
-**Splunk ingestion:** stdout is captured as `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`.
+**Splunk ingestion:** stdout is captured as `index=ai_lab_logs sourcetype=ai_lab:spool_cleanup`.
 
 **Activation:** A Splunk restart or app reload registers the scripted input automatically.
 
@@ -404,7 +488,7 @@ All scripts (`launcher.py`, `backfill_log.py`, `live_log.py`, and command script
 
 **Verification search:**
 ```
-index=ai_lab_log sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count
+index=ai_lab_logs sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count
 ```
 
 ---

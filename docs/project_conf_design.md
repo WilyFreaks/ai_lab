@@ -20,7 +20,9 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 
 `[baseline]` defines the backfill process — the normal period before the scenario runs.
 
-Key parameter: `backfill_days` (not `duration`) — how many days of historical logs to generate when the app starts.
+Key parameter: `backfill_days` (not `duration`) — how many days of historical logs to generate when the app starts. Defaults to **7** if not explicitly set in `default/ai_lab_scenarios.conf` or `local/ai_lab_scenarios.conf`.
+
+**`backfill_head_time`** (optional epoch seconds): **drift anchor for `trend_per_day`**. **`trend_per_day` counts fractional days elapsed from `backfill_head_time`** (`days_elapsed = 0` at that instant); see `docs/project_script_design.md` (*Long-Term Trend*). When this key is absent, generators use **`backfill_start_time − backfill_days×86400`** — the same synthetic head as **`workshopregion`** / dashboard **`backfill_head_time`** fields. Persist **`backfill_head_time`** if you change **`backfill_days`** after a workshop lock and need the trend origin to stay fixed.
 
 ## Value Variation Model
 

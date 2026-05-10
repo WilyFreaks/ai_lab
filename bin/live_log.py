@@ -1,11 +1,13 @@
 import csv
+import functools
+import hashlib
 import json
 import os
 import random
 import re
 import time
 from configparser import ConfigParser
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 
@@ -14,7 +16,7 @@ DEFAULT_CONF = os.path.join(APP_ROOT, "default", "ai_lab_scenarios.conf")
 LOCAL_CONF = os.path.join(APP_ROOT, "local", "ai_lab_scenarios.conf")
 SAMPLES_DIR = os.path.join(APP_ROOT, "samples")
 SPOOL_ROOT = os.path.join(APP_ROOT, "var", "spool", "ai_lab")
-GEN_LOG_DIR = os.path.join(SPOOL_ROOT, "ai_lab_log", "log_generation")
+GEN_LOG_DIR = os.path.join(SPOOL_ROOT, "ai_lab_logs", "log_generation")
 LOOKUPS_DIR = os.path.join(APP_ROOT, "lookups")
 
 PLACEHOLDER_RE = re.compile(r"\{\{([A-Za-z0-9_]+)\}\}")
@@ -253,6 +255,13 @@ def load_telemetry_bidirectional_links():
                 continue
             links.append((r1, i1, r2, i2))
     return links
+
+
+def interface_to_placeholder_token(interface_name):
+    token = str(interface_name).strip()
+    token = token.replace("Bundle-Ether", "Bundle_Ether")
+    token = token.replace("/", "_")
+    return token
 
 
 def telemetry_key(router_id, interface_name, direction):
@@ -553,7 +562,10 @@ def weekend_multiplier(local_dt, configured):
 
 
 def interpolated_hourly_peak_rate(cfg, section, prefix, local_dt):
-    current_hour = local_dt.hour
+    # Shift -30 min so peak_rate_XX is centred on the middle of hour XX (:30),
+    # not the top of the hour (:00).
+    shifted = local_dt - timedelta(minutes=30)
+    current_hour = shifted.hour
     next_hour = (current_hour + 1) % 24
     current_rate = parse_float(
         cfg, section, f"{prefix}.peak_rate_{current_hour:02d}", default=None
@@ -563,11 +575,123 @@ def interpolated_hourly_peak_rate(cfg, section, prefix, local_dt):
         return None
     if next_rate is None:
         next_rate = current_rate
-    minute_progress = (local_dt.minute + (local_dt.second / 60.0)) / 60.0
+    minute_progress = (shifted.minute + (shifted.second / 60.0)) / 60.0
     return current_rate + ((next_rate - current_rate) * minute_progress)
 
 
-def metric_value(cfg, section, prefix, local_dt, twamp_shared_noise_epsilon=None):
+@functools.lru_cache(maxsize=4096)
+def _daily_variation_factor(date_str, section, seed_prefix, stdev):
+    """Cached inner computation — called at most once per (date, section, seed_prefix, stdev)."""
+    seed_bytes = hashlib.md5(f"{date_str}|{section}|{seed_prefix}".encode()).digest()
+    seed_int = int.from_bytes(seed_bytes, "big") % (2**32)
+    rng = random.Random(seed_int)
+    return max(0.2, min(2.0, rng.gauss(1.0, stdev)))
+
+
+_DAILY_VAR_BLEND_HALF_H = 1.0  # blend window: 1h before + 1h after midnight = 2h total
+
+
+def daily_variation_multiplier(local_dt, section, prefix, stdev, seed_prefix=None):
+    """Return a date-stable multiplicative factor drawn from N(1.0, stdev).
+
+    The seed is derived from the local calendar date + section + seed_prefix so that:
+    - The same date always produces the same multiplier (backfill/live consistency).
+    - Different metrics on the same day get independent variation.
+    - Different days get different variation.
+    Result is clamped to [0.2, 2.0] to prevent pathological extremes.
+
+    The factor is linearly blended across a 2-hour window centred on midnight
+    (23:00–01:00) so that adjacent days transition smoothly instead of stepping
+    instantaneously at 00:00:00.
+
+    seed_prefix: when provided, use this key instead of prefix for the random seed.
+    Paired ifOut/ifIn placeholders on the same physical wire share the same seed_prefix
+    so they draw the same daily factor and do not diverge due to independent variation.
+    """
+    if not stdev or stdev <= 0:
+        return 1.0
+    effective_seed = seed_prefix if seed_prefix is not None else prefix
+    date_str = local_dt.strftime("%Y-%m-%d")
+    factor_today = _daily_variation_factor(date_str, section, effective_seed, stdev)
+    hour_frac = local_dt.hour + local_dt.minute / 60.0
+
+    if hour_frac >= (24.0 - _DAILY_VAR_BLEND_HALF_H):
+        # 23:00–24:00: first half of blend — ramp from today toward tomorrow.
+        tomorrow = (local_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+        factor_next = _daily_variation_factor(tomorrow, section, effective_seed, stdev)
+        alpha = (hour_frac - (24.0 - _DAILY_VAR_BLEND_HALF_H)) / (_DAILY_VAR_BLEND_HALF_H * 2)
+        return factor_today * (1.0 - alpha) + factor_next * alpha
+
+    if hour_frac < _DAILY_VAR_BLEND_HALF_H:
+        # 00:00–01:00: second half of blend — continue ramp from yesterday toward today.
+        yesterday = (local_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+        factor_prev = _daily_variation_factor(yesterday, section, effective_seed, stdev)
+        alpha = (hour_frac + _DAILY_VAR_BLEND_HALF_H) / (_DAILY_VAR_BLEND_HALF_H * 2)
+        return factor_prev * (1.0 - alpha) + factor_today * alpha
+
+    return factor_today
+
+
+def build_link_dvar_seed_map(links, prefix_base):
+    """Build a mapping from full telemetry metric prefix → canonical shared seed prefix.
+
+    For each bidirectional link pair (r1,i1) ↔ (r2,i2), the two physical wire directions are:
+      r1/i1/ifOutPktsRate paired with r2/i2/ifInPktsRate
+      r2/i2/ifOutPktsRate paired with r1/i1/ifInPktsRate
+
+    Both keys in each pair share the same daily variation seed (the lexicographically
+    smaller of the two full prefix strings) so that ifOut and ifIn on the same physical
+    wire draw the same per-day multiplier and do not diverge due to independent variation.
+    """
+    seed_map = {}
+    for (r1, i1, r2, i2) in links:
+        i1_tok = interface_to_placeholder_token(i1)
+        i2_tok = interface_to_placeholder_token(i2)
+        for (ra, ia_tok, dir_a, rb, ib_tok, dir_b) in [
+            (r1, i1_tok, "ifOutPktsRate", r2, i2_tok, "ifInPktsRate"),
+            (r2, i2_tok, "ifOutPktsRate", r1, i1_tok, "ifInPktsRate"),
+        ]:
+            key_a = f"{prefix_base}{ra}_{ia_tok}_{dir_a}"
+            key_b = f"{prefix_base}{rb}_{ib_tok}_{dir_b}"
+            canonical = min(key_a, key_b)
+            seed_map[key_a] = canonical
+            seed_map[key_b] = canonical
+    return seed_map
+
+
+def trend_anchor_epoch(cfg):
+    """Epoch where trend_per_day multiplier is 1.0 — start of baseline backfill window."""
+    head = parse_float(cfg, "baseline", "backfill_head_time", default=None)
+    if head is not None:
+        return head
+    anchor = parse_float(cfg, "baseline", "backfill_start_time", default=None)
+    if anchor is None:
+        return None
+    days = parse_int(cfg, "baseline", "backfill_days", default=7) or 7
+    return anchor - (float(days) * 86400.0)
+
+
+def trend_multiplier(cfg, section, prefix, local_dt):
+    """Return a linear trend factor along the synthetic baseline timeline.
+
+    Uses {prefix}.trend_per_day (fractional; e.g. 0.05 = +5%/day).
+    Zero point = [baseline].backfill_head_time when set, else
+    backfill_start_time − backfill_days (same as dashboard backfill head).
+
+    Clamped to [0.05, 10.0] to prevent runaway values.
+    Returns 1.0 when trend_per_day is absent or zero.
+    """
+    per_day = parse_float(cfg, section, f"{prefix}.trend_per_day", default=0.0) or 0.0
+    if per_day == 0.0:
+        return 1.0
+    trend_zero = trend_anchor_epoch(cfg)
+    if trend_zero is None:
+        return 1.0
+    days_elapsed = max(0.0, (local_dt.timestamp() - trend_zero) / 86400.0)
+    return max(0.05, min(10.0, 1.0 + per_day * days_elapsed))
+
+
+def metric_value(cfg, section, prefix, local_dt, twamp_shared_noise_epsilon=None, link_dvar_seed=None):
     base = parse_float(cfg, section, prefix, default=None)
     if base is None:
         return None
@@ -583,6 +707,11 @@ def metric_value(cfg, section, prefix, local_dt, twamp_shared_noise_epsilon=None
 
     wmul = parse_float(cfg, section, f"{prefix}.weekend_multiplier", default=None)
     value *= weekend_multiplier(local_dt, wmul)
+
+    dvar_stdev = parse_float(cfg, section, f"{prefix}.daily_variation_stdev", default=0.0) or 0.0
+    value *= daily_variation_multiplier(local_dt, section, prefix, dvar_stdev, seed_prefix=link_dvar_seed)
+
+    value *= trend_multiplier(cfg, section, prefix, local_dt)
 
     outlier_p = parse_float(cfg, section, f"{prefix}.outlier_probability", default=0.0) or 0.0
     if outlier_p > 0 and random.random() < outlier_p:
@@ -720,6 +849,7 @@ def coerce_placeholder(
     region,
     telemetry_rate_state,
     twamp_slice_noise=None,
+    link_dvar_seed_map=None,
 ):
     if placeholder == "timestamp":
         return format_domain_timestamp(local_dt, region)
@@ -748,7 +878,8 @@ def coerce_placeholder(
         if sid:
             twamp_eps = twamp_slice_noise.get(sid)
 
-    value = metric_value(cfg, section, prefix, local_dt, twamp_eps)
+    link_dvar_seed = link_dvar_seed_map.get(prefix) if link_dvar_seed_map else None
+    value = metric_value(cfg, section, prefix, local_dt, twamp_eps, link_dvar_seed=link_dvar_seed)
     if value is not None:
         if placeholder.endswith("ifOutPktsRate") or placeholder.endswith("ifInPktsRate"):
             # Keep packet-rate transitions gradual for both baseline and scenario windows so
@@ -1315,6 +1446,16 @@ def generate_single_event(
 
     placeholders = sorted(set(PLACEHOLDER_RE.findall(template_text)))
     local_dt = datetime.fromtimestamp(ts, tz=timezone.utc).astimezone(tzinfo)
+
+    link_dvar_seed_map = {}
+    telemetry_links = []
+    placeholder_index = {}
+    if stream["index"] == "telemetry" and stream["sourcetype"] == "cnc_interface_counter_json":
+        placeholder_index = index_telemetry_placeholders(placeholders)
+        telemetry_links = load_telemetry_bidirectional_links()
+        if telemetry_links:
+            link_dvar_seed_map = build_link_dvar_seed_map(telemetry_links, prefix_base)
+
     replacements = {}
     twamp_slice_noise = None
     if stream.get("sourcetype") == "pca_twamp_csv":
@@ -1332,15 +1473,13 @@ def generate_single_event(
             region,
             telemetry_rate_state,
             twamp_slice_noise,
+            link_dvar_seed_map=link_dvar_seed_map,
         )
 
-    if stream["index"] == "telemetry" and stream["sourcetype"] == "cnc_interface_counter_json":
-        placeholder_index = index_telemetry_placeholders(placeholders)
-        links = load_telemetry_bidirectional_links()
-        if links:
-            enforce_telemetry_directional_conservation(
-                replacements, placeholder_index, links, cfg, section
-            )
+    if telemetry_links:
+        enforce_telemetry_directional_conservation(
+            replacements, placeholder_index, telemetry_links, cfg, section
+        )
     apply_twamp_ul_packet_sequence(
         replacements, stream, twamp_ul_last_state, cfg, section, local_dt
     )

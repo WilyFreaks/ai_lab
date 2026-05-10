@@ -66,6 +66,53 @@ print(f"{start_ts} {end_ts}")
 PY
 }
 
+read_backfill_live_handoff_state() {
+  python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" <<'PY'
+import configparser
+import os
+import sys
+
+default_conf, local_conf = sys.argv[1], sys.argv[2]
+cfg = configparser.ConfigParser(interpolation=None, delimiters=("=",), strict=False)
+if os.path.exists(default_conf):
+    cfg.read(default_conf)
+if os.path.exists(local_conf):
+    cfg.read(local_conf)
+
+if not cfg.has_section("baseline"):
+    print("SKIP\tmissing [baseline] section")
+    raise SystemExit(0)
+
+completed = cfg.get("baseline", "backfill_completed", fallback="false").strip().lower()
+if completed != "true":
+    print("SKIP\tbackfill_completed is not true")
+    raise SystemExit(0)
+
+try:
+    start_anchor = int(float(cfg.get("baseline", "backfill_start_time")))
+except Exception:
+    print("SKIP\tmissing baseline.backfill_start_time")
+    raise SystemExit(0)
+
+first_tick = ((int(start_anchor) + 59) // 60) * 60
+live_raw = cfg.get("baseline", "live_last_tick_epoch", fallback="").strip()
+if not live_raw:
+    print("SKIP\tlive_last_tick_epoch not set")
+    raise SystemExit(0)
+try:
+    live_last = int(float(live_raw))
+except Exception:
+    print("SKIP\tlive_last_tick_epoch not parseable")
+    raise SystemExit(0)
+
+if live_last < first_tick:
+    print("SKIP\tlive has not advanced through handoff tick")
+    raise SystemExit(0)
+
+print(f"RUN\t{first_tick}\t{live_last}")
+PY
+}
+
 read_stream_interval() {
   local stream_key="$1"
   python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" "$stream_key" <<'PY'
@@ -150,6 +197,105 @@ if min_time > start_allow:
 if max_time < tail_target:
     raise SystemExit(
         f"latest event too early: max_time={max_time:.3f} expected>= {tail_target}"
+    )
+PY
+  then
+    rm -f "$tmp_csv"
+    fail "$label failed"
+  fi
+
+  rm -f "$tmp_csv"
+  echo "PASS: $label"
+}
+
+assert_backfill_live_handoff_stream() {
+  local label="$1"
+  local index_sourcetype_prefix="$2"
+  local first_tick="$3"
+  local step_seconds="$4"
+  local tmp_csv
+  local slack="${BACKFILL_LIVE_HANDOFF_SLACK_SEC:-120}"
+  # Max handoff gap ≲ gap_step_mult×stream step (backfill range start alignment vs end); default 2 covers one missed cadence.
+  local gap_step_mult="${BACKFILL_LIVE_HANDOFF_GAP_STEP_MULT:-2}"
+  tmp_csv="$(mktemp)"
+  local query
+  query="${index_sourcetype_prefix} earliest=0 latest=now | eval ft=${first_tick} | eval is_bf=if(_time<ft,1,0) | eval is_lv=if(_time>=ft,1,0) | stats max(eval(if(is_bf=1,_time,null()))) as last_bf min(eval(if(is_lv=1,_time,null()))) as first_lv"
+
+  if ! run_search_csv "$query" >"$tmp_csv"; then
+    rm -f "$tmp_csv"
+    fail "$label query failed"
+  fi
+
+  if ! python3 - "$tmp_csv" "$first_tick" "$step_seconds" "$slack" "$gap_step_mult" <<'PY'
+import csv
+import io
+import math
+import sys
+
+csv_path = sys.argv[1]
+first_tick = int(sys.argv[2])
+step_seconds = int(sys.argv[3])
+slack = int(sys.argv[4])
+gap_step_mult = float(sys.argv[5])
+
+raw_lines = open(csv_path, "r", encoding="utf-8").read().splitlines()
+header_idx = None
+for i, line in enumerate(raw_lines):
+    probe = line.replace('"', "").strip().lower()
+    if "last_bf" in probe and "first_lv" in probe and "," in probe:
+        header_idx = i
+        break
+
+if header_idx is None:
+    raise SystemExit("no csv payload in search output")
+
+reader = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
+rows = list(reader)
+if not rows:
+    raise SystemExit("no rows returned")
+
+row = rows[0]
+raw_last = (row.get("last_bf") or "").strip()
+raw_first = (row.get("first_lv") or "").strip()
+if not raw_last or not raw_first:
+    raise SystemExit(f"missing last_bf/first_lv (last_bf={raw_last!r} first_lv={raw_first!r})")
+
+try:
+    last_bf = float(raw_last)
+    first_lv = float(raw_first)
+except Exception as e:
+    raise SystemExit(f"parse last_bf/first_lv: {e}") from e
+
+if math.isnan(last_bf) or math.isnan(first_lv):
+    raise SystemExit("last_bf/first_lv not numeric")
+
+# Generators: last backfill tick ~= first_tick - step; first live tick ~= first_tick.
+if last_bf < first_tick - step_seconds - slack:
+    raise SystemExit(
+        f"backfill tail too early: last_bf={last_bf:.3f} expected>= {first_tick - step_seconds - slack} "
+        f"(first_tick={first_tick} step={step_seconds} slack={slack})"
+    )
+
+if first_lv < first_tick - slack:
+    raise SystemExit(
+        f"first live event too early: first_lv={first_lv:.3f} expected>= {first_tick - slack}"
+    )
+
+if first_lv > first_tick + slack:
+    raise SystemExit(
+        f"first live event too late: first_lv={first_lv:.3f} expected<= {first_tick + slack}"
+    )
+
+gap = first_lv - last_bf
+if gap < 0:
+    raise SystemExit(f"live before last backfill event: gap={gap:.3f}")
+
+max_gap = gap_step_mult * step_seconds + slack
+if gap > max_gap:
+    raise SystemExit(
+        f"handoff gap too large (missing/near-boundary stall): gap={gap:.3f}s max≈{max_gap:.1f}s "
+        f"(step={step_seconds} mult={gap_step_mult} slack={slack}) "
+        f"last_bf={last_bf:.3f} first_lv={first_lv:.3f} first_tick={first_tick}"
     )
 PY
   then
@@ -294,15 +440,22 @@ assert_savedsearch_time_aware_range() {
     fail "$label query failed"
   fi
 
-  if ! python3 - "$SCENARIO_CONF" "$selector" "$mode" "$tmp_csv" <<'PY'
+  if ! python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" "$selector" "$mode" "$tmp_csv" <<'PY'
 import csv
 import datetime as dt
 import io
 import math
+import os
 import re
 import sys
 
-conf_path, selector, mode, csv_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+default_conf, local_conf, selector, mode, csv_path = (
+    sys.argv[1],
+    sys.argv[2],
+    sys.argv[3],
+    sys.argv[4],
+    sys.argv[5],
+)
 
 def weekend_multiplier(local_dt, configured):
     if configured is None:
@@ -328,42 +481,79 @@ def parse_time(raw):
         raise ValueError(f"unsupported _time format: {raw}")
     return dt.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S.%f")
 
-def load_metric_params(path, selector):
-    params = {}
-    section = None
-    with open(path, "r", encoding="utf-8") as f:
-        for raw in f:
-            line = raw.strip()
-            if not line or line.startswith("#"):
-                continue
-            if line.startswith("[") and line.endswith("]"):
-                section = line[1:-1].strip().lower()
-                continue
-            if section != "baseline":
-                continue
-            if "=" not in line:
-                continue
-            key, value = [x.strip() for x in line.split("=", 1)]
-            if selector not in key:
-                continue
-            leaf = key.split("#")[-1]
-            metric = leaf.split(".")[0]
-            params.setdefault(metric, {"rates": {}})
+def merged_baseline_key_values(default_path, local_path):
+    """Splunk-merge order: default then local overrides (same stanza semantics)."""
+    merged = {}
+    for path in (default_path, local_path):
+        if not path or not os.path.isfile(path):
+            continue
+        section = None
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("[") and line.endswith("]"):
+                    section = line[1:-1].strip().lower()
+                    continue
+                if section != "baseline" or "=" not in line:
+                    continue
+                key, value = [x.strip() for x in line.split("=", 1)]
+                merged[key] = value
+    return merged
+
+
+def trend_anchor_epoch(baseline_kv):
+    head = baseline_kv.get("backfill_head_time")
+    if head is not None:
+        head = head.strip()
+        if head != "":
             try:
-                fv = float(value)
+                return float(head)
             except ValueError:
-                continue
-            if leaf.endswith(".daily_min"):
-                params[metric]["daily_min"] = fv
-            elif leaf.endswith(".daily_max"):
-                params[metric]["daily_max"] = fv
-            elif ".peak_rate_" in leaf:
-                hour = int(leaf.rsplit("_", 1)[-1])
-                params[metric]["rates"][hour] = fv
-            elif leaf.endswith(".weekend_multiplier"):
-                params[metric]["weekend_multiplier"] = fv
-            elif leaf.endswith(".noise_stdev"):
-                params[metric]["noise_stdev"] = fv
+                pass
+    anchor_raw = baseline_kv.get("backfill_start_time")
+    if not anchor_raw:
+        return None
+    try:
+        anchor_epoch = float(anchor_raw.strip())
+    except ValueError:
+        return None
+    try:
+        days = int(float(baseline_kv.get("backfill_days", "7")))
+    except ValueError:
+        days = 7
+    days = days or 7
+    return anchor_epoch - (days * 86400.0)
+
+
+def load_metric_params(baseline_kv, selector):
+    params = {}
+    for key, value in baseline_kv.items():
+        if selector not in key:
+            continue
+        leaf = key.split("#")[-1]
+        metric = leaf.split(".")[0]
+        params.setdefault(metric, {"rates": {}})
+        try:
+            fv = float(value)
+        except ValueError:
+            continue
+        if leaf.endswith(".daily_min"):
+            params[metric]["daily_min"] = fv
+        elif leaf.endswith(".daily_max"):
+            params[metric]["daily_max"] = fv
+        elif ".peak_rate_" in leaf:
+            hour = int(leaf.rsplit("_", 1)[-1])
+            params[metric]["rates"][hour] = fv
+        elif leaf.endswith(".weekend_multiplier"):
+            params[metric]["weekend_multiplier"] = fv
+        elif leaf.endswith(".noise_stdev"):
+            params[metric]["noise_stdev"] = fv
+        elif leaf.endswith(".daily_variation_stdev"):
+            params[metric]["daily_variation_stdev"] = fv
+        elif leaf.endswith(".trend_per_day"):
+            params[metric]["trend_per_day"] = fv
     return params
 
 def interpolated_rate(local_dt, rates):
@@ -391,7 +581,9 @@ def metric_name_from_column(col, suffix):
     iface = if_part.replace("/", "_")
     return f"{router_id}_{iface}_{suffix}"
 
-params = load_metric_params(conf_path, selector)
+baseline_kv = merged_baseline_key_values(default_conf, local_conf)
+params = load_metric_params(baseline_kv, selector)
+trend_zero = trend_anchor_epoch(baseline_kv)
 if not params:
     raise SystemExit(f"no params found for selector {selector}")
 
@@ -460,8 +652,16 @@ for row in reader:
 
         expected = dmin + (dmax - dmin) * rate
         expected *= weekend_multiplier(local_dt, p.get("weekend_multiplier"))
+        t_day = float(p.get("trend_per_day") or 0.0)
+        if trend_zero is not None and t_day != 0.0:
+            days_elapsed = max(0.0, (local_dt.timestamp() - trend_zero) / 86400.0)
+            tm = max(0.05, min(10.0, 1.0 + t_day * days_elapsed))
+            expected *= tm
         noise = p.get("noise_stdev", 0.0) or 0.0
-        tol = max(noise * 4.0, 1e-9)
+        dvar_stdev = p.get("daily_variation_stdev", 0.0) or 0.0
+        # Tolerance covers per-event noise (4σ) plus daily-variation shift (3σ of
+        # the multiplicative factor applied to the expected value).
+        tol = max(noise * 4.0, expected * dvar_stdev * 3.0, 1e-9)
 
         # thousandeyes saved search is in seconds, config is milliseconds.
         if mode == "thousandeyes_response_sec":
@@ -785,6 +985,270 @@ PY
   echo "PASS: $label"
 }
 
+assert_thousandeyes_trend_per_day() {
+  local label="$1"
+  # Compares median response_time_sec in two narrow Splunk windows (Wed 14:05 local).
+  # TREND_SAMPLE_WINDOW_HALF_SEC (default 420) widens ± event capture.
+  # TREND_PER_DAY_ASSERTION_TOL (default 0.20) fractional slack vs expected multiplier ratio.
+  local cfg_line early late per_day
+  local csv_e csv_l
+
+  if ! cfg_line="$(
+    python3 - "$SCENARIO_CONF" "$LOCAL_SCENARIO_CONF" "$BACKFILL_START_TS" "$BACKFILL_END_TS" <<'PY'
+import os
+import sys
+from datetime import datetime, time as dtime, timedelta
+from zoneinfo import ZoneInfo
+
+default_conf, local_conf, head_ts_s, tail_ts_s = sys.argv[1:]
+head_ts = int(head_ts_s)
+tail_ts = int(tail_ts_s)
+
+REGION_TZ = {"au": "Australia/Sydney", "jp": "Asia/Tokyo"}
+
+
+def merged_baseline_key_values(default_path, local_path):
+    merged = {}
+    for path in (default_path, local_path):
+        if not path or not os.path.isfile(path):
+            continue
+        section = None
+        with open(path, encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+                if line.startswith("[") and line.endswith("]"):
+                    section = line[1:-1].strip().lower()
+                    continue
+                if section != "baseline" or "=" not in line:
+                    continue
+                k, v = [x.strip() for x in line.split("=", 1)]
+                merged[k] = v
+    return merged
+
+
+baseline_kv = merged_baseline_key_values(default_conf, local_conf)
+
+per_day_val = None
+for k, v in baseline_kv.items():
+    if "response_time_ms" not in k or not k.endswith(".trend_per_day"):
+        continue
+    try:
+        per_day_val = float(v)
+    except ValueError:
+        continue
+    break
+
+if per_day_val is None or abs(per_day_val) < 1e-9:
+    print("SKIP", "no nonzero response_time_ms.trend_per_day in baseline", flush=True)
+    raise SystemExit(0)
+
+head_raw = baseline_kv.get("backfill_head_time", "").strip()
+if head_raw != "":
+    try:
+        trend_zero = float(head_raw)
+    except ValueError:
+        trend_zero = None
+else:
+    trend_zero = None
+if trend_zero is None:
+    try:
+        anchor = float(baseline_kv.get("backfill_start_time", "nan"))
+    except ValueError:
+        anchor = None
+    if anchor is None:
+        print("SKIP", "missing baseline.backfill_start_time for trend anchor", flush=True)
+        raise SystemExit(0)
+    try:
+        days = int(float(baseline_kv.get("backfill_days", "7")))
+    except ValueError:
+        days = 7
+    if days < 1:
+        days = 7
+    trend_zero = anchor - (days * 86400.0)
+
+region = (baseline_kv.get("region", "") or "").strip().lower()
+tz_name = REGION_TZ.get(region)
+if not tz_name:
+    print("SKIP", f"unsupported or missing baseline.region={region!r}", flush=True)
+    raise SystemExit(0)
+
+
+def slot_epoch_after(tzname, min_epoch, dow_py, hh, mm):
+    tz = ZoneInfo(tzname)
+    dt0 = datetime.fromtimestamp(min_epoch, tz=tz).date()
+    for off in range(400):
+        d = dt0 + timedelta(days=off)
+        if d.weekday() != dow_py:
+            continue
+        cand = datetime.combine(d, dtime(hour=hh, minute=mm), tzinfo=tz)
+        te = cand.timestamp()
+        if te >= min_epoch:
+            return int(te)
+    return None
+
+
+def slot_epoch_before(tzname, max_epoch, dow_py, hh, mm):
+    tz = ZoneInfo(tzname)
+    dt0 = datetime.fromtimestamp(max_epoch, tz=tz).date()
+    for off in range(400):
+        d = dt0 - timedelta(days=off)
+        if d.weekday() != dow_py:
+            continue
+        cand = datetime.combine(d, dtime(hour=hh, minute=mm), tzinfo=tz)
+        te = cand.timestamp()
+        if te <= max_epoch:
+            return int(te)
+    return None
+
+
+# Avoid midnight daily-variation blend and weekend ramp edges: weekday @ 14:05 local.
+EDGE_SKIP = int(86400 * 2.5)
+DOW_PY = 2  # Wednesday
+HH, MM = 14, 5
+
+early = slot_epoch_after(tz_name, head_ts + EDGE_SKIP, DOW_PY, HH, MM)
+late = slot_epoch_before(tz_name, tail_ts - EDGE_SKIP, DOW_PY, HH, MM)
+if early is None or late is None:
+    print("SKIP", "could not locate Wednesday 14:05 slots inside backfill span", flush=True)
+    raise SystemExit(0)
+if late <= early + 7 * 86400:
+    print("SKIP", "backfill span too short for two separated Wednesday slots", flush=True)
+    raise SystemExit(0)
+
+de = max(0.0, (early - trend_zero) / 86400.0)
+dl = max(0.0, (late - trend_zero) / 86400.0)
+exp_ratio = (1.0 + per_day_val * dl) / max(1e-12, (1.0 + per_day_val * de))
+
+try:
+    tol = float(os.environ.get("TREND_PER_DAY_ASSERTION_TOL", "0.20").strip().split()[0].replace(",", "."))
+except ValueError:
+    tol = 0.20
+
+print(
+    f"RUN\t{early}\t{late}\t{per_day_val}\t{trend_zero}\t{exp_ratio:.8f}\t{de:.6f}\t{dl:.6f}\t{tol}",
+    flush=True,
+)
+PY
+  )"; then
+    fail "$label plan script failed"
+  fi
+
+  if [[ "$(echo "$cfg_line" | head -1)" == SKIP\ * ]]; then
+    echo "PASS: $label ($(echo "$cfg_line" | head -1))"
+    return
+  fi
+  local run_line tag
+  run_line="$(echo "$cfg_line" | grep '^RUN' || true)"
+  if [[ -z "$run_line" ]]; then
+    fail "$label expected RUN plan line from python"
+  fi
+  IFS=$'\t' read -r tag early late per_day trend_zero exp_ratio_raw de_raw dl_raw tol_raw <<<"$run_line"
+  if [[ "$tag" != "RUN" ]]; then
+    fail "$label unexpected plan line (expected RUN): $run_line"
+  fi
+
+  csv_e="$(mktemp)"
+  csv_l="$(mktemp)"
+  trap 'rm -f "$csv_e" "$csv_l"' RETURN
+
+  win_half="${TREND_SAMPLE_WINDOW_HALF_SEC:-420}"
+  if ! run_search_csv \
+    "index=thousandeyes sourcetype=cisco:thousandeyes:metric earliest=$((early - win_half)) latest=$((early + win_half)) | fields _time response_time_sec | search response_time_sec>0 response_time_sec<10" \
+    >"$csv_e"; then
+    rm -f "$csv_e" "$csv_l"
+    fail "$label early-slot Splunk query failed"
+  fi
+  if ! run_search_csv \
+    "index=thousandeyes sourcetype=cisco:thousandeyes:metric earliest=$((late - win_half)) latest=$((late + win_half)) | fields _time response_time_sec | search response_time_sec>0 response_time_sec<10" \
+    >"$csv_l"; then
+    rm -f "$csv_e" "$csv_l"
+    fail "$label late-slot Splunk query failed"
+  fi
+
+  set +e
+  eval_out="$(python3 - "$csv_e" "$csv_l" "$per_day" "$exp_ratio_raw" "$de_raw" "$dl_raw" "$tol_raw" <<'PY'
+import csv
+import io
+import statistics
+import sys
+
+
+def load_vals(path):
+    raw_lines = open(path, encoding="utf-8").read().splitlines()
+    header_idx = None
+    for i, line in enumerate(raw_lines):
+        lower = line.replace('"', "").strip().lower()
+        if "response_time_sec" in lower and "," in lower:
+            header_idx = i
+            break
+    if header_idx is None:
+        return []
+    rows = csv.DictReader(io.StringIO("\n".join(raw_lines[header_idx:])))
+    out = []
+    for row in rows:
+        raw = row.get("response_time_sec", "").strip('"')
+        if raw in ("", None):
+            continue
+        try:
+            v = float(raw)
+        except ValueError:
+            continue
+        if 0 < v < 10:
+            out.append(v)
+    return out
+
+
+ep, lp, per_day_f, exp_ratio_s, de_s, dl_s, tol_s = sys.argv[1:]
+per_day_f = float(per_day_f)
+exp_expected = float(exp_ratio_s)
+de = float(de_s)
+dl = float(dl_s)
+tol_frac = float(tol_s)
+
+vals_e = load_vals(ep)
+vals_l = load_vals(lp)
+if len(vals_e) < 3 or len(vals_l) < 3:
+    print("INSUFFICIENT\t%d\t%d" % (len(vals_e), len(vals_l)))
+    sys.exit(2)
+
+med_e = statistics.median(vals_e)
+med_l = statistics.median(vals_l)
+if med_e <= 1e-9:
+    print("BAD_MEDIAN")
+    sys.exit(2)
+
+obs = med_l / med_e
+slack = tol_frac + 0.10 * abs(dl - de)
+lo = exp_expected * (1.0 - slack)
+hi = exp_expected * (1.0 + slack)
+if obs < lo or obs > hi:
+    sys.stderr.write(
+        "ratio obs=%.6f exp=%.6f range=[%.6f,%.6f] med_early=%.6f med_late=%.6f n=%d/%d\n"
+        % (obs, exp_expected, lo, hi, med_e, med_l, len(vals_e), len(vals_l))
+    )
+    sys.exit(1)
+
+sys.stderr.write("OK obs=%.6f expected_ratio=%.6f med_early=%.6f med_late=%.6f\n" % (obs, exp_expected, med_e, med_l))
+sys.exit(0)
+PY
+  2>&1)"
+  eval_st=$?
+  set -e
+
+  if [[ "$eval_st" -eq 2 ]]; then
+    echo "PASS: $label (skipped: insufficient raw samples $(echo "$eval_out" | tr '\n' ' '))"
+    return
+  fi
+  if [[ "$eval_st" -ne 0 ]]; then
+    eval_msg="$(echo "$eval_out" | tr '\n' ' ')"
+    fail "$label median ratio vs trend_per_day failed (${eval_msg})"
+  fi
+
+  echo "PASS: $label"
+}
+
 if [[ ! -x "$SPLUNK_BIN" ]]; then
   fail "Splunk CLI not found at $SPLUNK_BIN"
 fi
@@ -803,7 +1267,20 @@ read -r BACKFILL_START_TS BACKFILL_END_TS <<<"$(read_backfill_window)"
 TE_INTERVAL_MIN="$(read_stream_interval "thousandeyes#cisco:thousandeyes:metric#sample.json#interval")"
 TM_INTERVAL_MIN="$(read_stream_interval "telemetry#cnc_interface_counter_json#sample.json#interval")"
 TE_JUMP_OUTLIER_MIN="${TE_JUMP_OUTLIER_MIN:-0}"
-TE_JUMP_OUTLIER_MAX="${TE_JUMP_OUTLIER_MAX:-2}"
+# Default ceiling scales with backfill_days: each outlier event creates 2 jumps (spike + return),
+# outlier_probability=0.0001 over 1440 min/day × backfill_days; allow 4× Poisson headroom.
+_TE_BACKFILL_DAYS="$(python3 -c "
+import re
+days = 7
+for line in open('$SCENARIO_CONF'):
+    m = re.match(r'^\s*backfill_days\s*=\s*(\d+)', line)
+    if m:
+        days = int(m.group(1))
+print(days)
+" 2>/dev/null || echo 7)"
+_TE_OUTLIER_MAX_AUTO=$(( _TE_BACKFILL_DAYS * 1440 / 10000 * 2 * 4 ))
+_TE_OUTLIER_MAX_AUTO=$(( _TE_OUTLIER_MAX_AUTO < 4 ? 4 : _TE_OUTLIER_MAX_AUTO ))
+TE_JUMP_OUTLIER_MAX="${TE_JUMP_OUTLIER_MAX:-$_TE_OUTLIER_MAX_AUTO}"
 TE_STEP_SECONDS=$(( TE_INTERVAL_MIN * 60 ))
 TM_STEP_SECONDS=$(( TM_INTERVAL_MIN * 60 ))
 
@@ -820,6 +1297,27 @@ assert_backfill_duration_coverage \
   "$BACKFILL_START_TS" \
   "$BACKFILL_END_TS" \
   "$TM_STEP_SECONDS"
+
+HANDOFF_LINE="$(read_backfill_live_handoff_state)"
+if [[ "$HANDOFF_LINE" == SKIP$'\t'* ]]; then
+  _handoff_reason="${HANDOFF_LINE#*$'\t'}"
+  echo "PASS: Backfill/live handoff continuity (skipped: ${_handoff_reason})"
+else
+  IFS=$'\t' read -r _handoff_mode HANDOFF_FIRST_TICK _ <<<"$HANDOFF_LINE"
+  if [[ "$_handoff_mode" != RUN ]] || [[ -z "${HANDOFF_FIRST_TICK:-}" ]]; then
+    fail "Backfill/live handoff: unexpected state line: $HANDOFF_LINE"
+  fi
+  assert_backfill_live_handoff_stream \
+    "Backfill/live handoff (thousandeyes)" \
+    "index=thousandeyes sourcetype=cisco:thousandeyes:metric" \
+    "$HANDOFF_FIRST_TICK" \
+    "$TE_STEP_SECONDS"
+  assert_backfill_live_handoff_stream \
+    "Backfill/live handoff (telemetry cnc_interface_counter_json)" \
+    "index=telemetry sourcetype=cnc_interface_counter_json" \
+    "$HANDOFF_FIRST_TICK" \
+    "$TM_STEP_SECONDS"
+fi
 
 read -r IFOUT_MIN IFOUT_MAX IFOUT_STEP <<<"$(read_bounds "_ifOutPktsRate" "raw")"
 read -r IFIN_MIN IFIN_MAX IFIN_STEP <<<"$(read_bounds "_ifInPktsRate" "raw")"
@@ -912,6 +1410,9 @@ assert_count_range \
   "| savedsearch thousandeyes_response_time_sec | untable _time metric value | sort 0 metric _time | streamstats current=f last(value) as prev by metric | eval delta=abs(value-prev) | where isnum(prev) AND delta>$TE_STEP | stats count as count" \
   "$TE_JUMP_OUTLIER_MIN" \
   "$TE_JUMP_OUTLIER_MAX"
+
+assert_thousandeyes_trend_per_day \
+  "ThousandEyes raw response_time_sec median ratio matches trend_per_day vs backfill head (Wed 14:05 slots)"
 
 assert_count_eq \
   "No JSON/parser errors from ai_lab ingest paths" \

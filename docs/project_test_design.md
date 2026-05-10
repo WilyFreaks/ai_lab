@@ -125,6 +125,7 @@ Execution rules:
 Recommended additional assertions:
 
 - `backfill_completed` transition in local state after backfill run
+- **`Backfill/live handoff`** — when backfill has completed *and* `live_last_tick_epoch` has advanced past the minute-aligned boundary shared with generators, `scripts/test_backfill.sh` validates Splunk ingest continuity at that boundary for ThousandEyes and `telemetry` `cnc_interface_counter_json` (last pre-boundary `_time`, first post-boundary `_time`, handoff gap bounded by a multiple of the stream step plus slack). Otherwise the check **PASSes with a skip reason** (for example backfill-only runs or pre-live workshop state). Tunables: `BACKFILL_LIVE_HANDOFF_SLACK_SEC` (default `120`), `BACKFILL_LIVE_HANDOFF_GAP_STEP_MULT` (default `2`, max gap ≲ mult×step+slack).
 - region lock/unlock behavior in `workshop_introduction`
 - scenario activation write path in `scenariocontrol`
 
@@ -138,7 +139,7 @@ Execution sequencing (important):
    - after reset, generation is still gated (`baseline_generation_enabled=false` until region lock path runs)
    - you must lock/select region first (for example via Workshop Introduction Submit, or `| workshopregion action="set" region="<au|jp>"`)
    - only after this step should `backfill_log.py`/`live_log.py` populate datasets
-4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated. This entrypoint runs `scripts/test_backfill.sh`, including TWAMP assertions (`twamp_event_count`, `twamp_dmean`, `twamp_jmean`); optional env `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` adjusts the minute-bucket expectation for `twamp_event_count`, and `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` tunes allowed ThousandEyes abrupt-jump outliers (default `0..2`).
+4. **Post-generation quality checks** (`scripts/test_baseline.sh`) are meaningful only after generation has started and saved-search datasets are populated. This entrypoint runs `scripts/test_backfill.sh`, including TWAMP assertions (`twamp_event_count`, `twamp_dmean`, `twamp_jmean`); optional env `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` adjusts the minute-bucket expectation for `twamp_event_count`, and `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` tunes allowed ThousandEyes abrupt-jump outliers (default upper bound scales with `backfill_days` when unset). **`assert_thousandeyes_trend_per_day`** samples raw `index=thousandeyes` at two **Wednesday 14:05** wall-clock instants in **`baseline.region`** and checks that the median `response_time_sec` ratio matches **`trend_per_day`** vs **`backfill_head_time`** (see `TREND_PER_DAY_ASSERTION_TOL`, `TREND_SAMPLE_WINDOW_HALF_SEC` in `scripts/test_backfill.sh`). **`assert_backfill_live_handoff_stream`** (ThousandEyes + telemetry interface counters) checks Splunk continuity across the shared backfill/live minute boundary when `baseline.backfill_completed=true` and the live cursor has passed that boundary; otherwise it **PASSes with a skip** (see *Recommended additional assertions*).
 5. **Scenario checks** (`scripts/test_scenario_1.sh`) are meaningful **only after** generation/scenario data exists.
 6. Running post-generation or scenario checks on empty indexes can return trivial zero rows (for example “No matching fields exist”), which is not a valid data-quality pass.
 
@@ -146,7 +147,7 @@ Contract clarification:
 
 - `scripts/test_smoke.sh` is a **post-reset readiness** test (empty-state contract), and must be run immediately after every workshop reset.
 - `scripts/test_baseline.sh` is a **post-generation data-quality** test (expects saved searches to return data and validates quality constraints); do not run it immediately after reset before region lock.
-- `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage plus saved-search quality checks); do not run it immediately after reset before region lock.
+- `scripts/test_backfill.sh` is a **historical backfill coverage + quality** test (head/tail window coverage, optional backfill/live ingest handoff continuity when live has started, plus saved-search quality checks); do not run it immediately after reset before region lock.
 - Saved-search packaging sync policy: when promoting runtime search definitions, copy `local/savedsearches.conf` to `default/savedsearches.conf` as full replacement unless an explicit merge is requested.
 - Scenario dashboard XML sync (on explicit request): copy `local/data/ui/views/<view>.xml` to `default/data/ui/views/<view>.xml` as a full-file replacement (`cp`); no merge. Splunk resolves the same view name with **`local` over `default`**, so functional UI state follows `local/` when both exist—sync to `default/` for repo/AMI parity and documentation.
 
@@ -177,8 +178,9 @@ Saved-search quality intent for backfill checks:
 - `cnc_service_health`:
   - must return non-zero results when generation is active; during **`scenario_1`**, **`impacted_sre_policy_health_status`** / score overrides apply each tick because **`scenario_happening_probability` defaults to 1** when omitted (validate in UI or ad-hoc recent-window spot-check if extending tests)
 - `cnc_interface_ifInPktsRate`, `cnc_interface_ifOutPktsRate`, `thousandeyes_response_time_sec`:
-  - generated values must stay in the configured range from `default/ai_lab_scenarios.conf`
-  - values should fluctuate gradually; baseline abrupt-jump tolerance for ThousandEyes is range-based via `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` in `scripts/test_backfill.sh` (default `0..2`)
+  - generated values must stay in the configured range from `default/ai_lab_scenarios.conf` (+ trend / daily-variation tolerance in `assert_savedsearch_time_aware_range`)
+  - **`trend_per_day` drift**: `assert_thousandeyes_trend_per_day` verifies ThousandEyes medians rise (or fall) between two checkpoints consistent with **`[baseline]`** head anchor and **`response_time_ms.trend_per_day`**; skips if `trend_per_day` is zero, **`baseline.region`** is not `au`/`jp`, or too few raw samples in the ±window
+  - values should fluctuate gradually; baseline abrupt-jump tolerance for ThousandEyes is range-based via `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` in `scripts/test_backfill.sh` (default upper bound scales with `backfill_days` when unset)
 - `twamp_event_count`, `twamp_dmean`, `twamp_jmean` (see `scripts/test_backfill.sh`):
   - minute buckets with TWAMP events in the last 5 minutes (nominal ~5; partial-window edges may be lower)
   - average `ul`/`dl`/`rt` `dmean` and `jmean` within aggregated `daily_min`/`daily_max` from `default/ai_lab_scenarios.conf` using sample-qualified TWAMP keys (`twamp#pca_twamp_csv#sample.csv#...`), with tolerance from per-metric or default TWAMP `noise_stdev`

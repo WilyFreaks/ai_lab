@@ -357,7 +357,12 @@ if [[ -z "$SPLUNK_AUTH" && -z "$SPLUNK_TOKEN" ]]; then
 fi
 
 for idx in "${APP_INDEXES[@]}"; do
+  # Scripted inputs write to ai_lab_logs on Splunk startup (e.g. spool_cleanup heartbeat);
+  # exclude those sourcetypes so post-restart SPL matches "no workshop payloads yet".
   query="index=$idx earliest=0 latest=now | stats count"
+  if [[ "$idx" == "ai_lab_logs" ]]; then
+    query='index=ai_lab_logs earliest=0 latest=now NOT sourcetype IN ("ai_lab:launcher","ai_lab:spool_cleanup") | stats count'
+  fi
   if [[ -n "$SPLUNK_TOKEN" ]]; then
     if ! count="$("$SPLUNK_BIN" search "$query" -token "$SPLUNK_TOKEN" | extract_count)"; then
       echo "ERROR: Verification search failed for index '$idx'"
