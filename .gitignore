@@ -1,5 +1,6 @@
 # Splunk per-instance overrides (not shared in git)
 local/
+metadata/local.meta
 .DS_Store
 bin/__pycache__/
 var/

@@ -505,6 +505,7 @@ Before destructive reset actions, `scripts/reset_workshop_state.sh` now performs
 
 - `local/savedsearches.conf` -> `default/savedsearches.conf` (full-file replacement when local file exists)
 - `local/data/ui/views/*.xml` -> `default/data/ui/views/<same-name>.xml` (per-file full replacement for each local dashboard XML)
+- `metadata/local.meta` merged into `metadata/default.meta` via `scripts/merge_local_meta_to_default_meta.py` when `local.meta` exists: Splunk UI metadata stanzas are merged into `default.meta`, **`[savedsearches/...]`** rows are dropped unless a matching stanza exists in **`default/savedsearches.conf`** (evaluated after the savedsearches copy above), and **`owner = admin`** in merged bodies is rewritten to **`owner = nobody`**. If **`metadata/local.meta`** is absent, this step is skipped.
 
 Then the script continues with the existing reset order:
 

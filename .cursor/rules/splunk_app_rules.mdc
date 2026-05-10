@@ -106,7 +106,7 @@ Splunk MCP server (`splunk-mcp-server`) usage rules:
 
 `reset_workshop_state.sh` run rules:
 - For unattended runs, execute `./scripts/reset_workshop_state.sh --yes` (avoid interactive `Proceed? (yes/no)` waits).
-- Before running `reset_workshop_state.sh`, explicitly notify the user that the script will sync `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, then wait for user confirmation so they can cancel if needed.
+- Before running `reset_workshop_state.sh`, explicitly notify the user that the script will sync `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, merge `metadata/local.meta` into `metadata/default.meta` (when local metadata exists), then wait for user confirmation so they can cancel if needed.
 - Prefer token-based verification auth, not username/password.
 - Read the token from Cursor MCP config (`~/.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.

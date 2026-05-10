@@ -2,6 +2,7 @@
 set -euo pipefail
 
 # Reset workshop runtime state:
+# 0) sync local packaging into default (savedsearches, dashboards, merged metadata from local.meta)
 # 1) stop ai_lab generators (backfill/live) and confirm no orphan app generator python remains
 # 2) stop Splunk
 # 3) delete all files under app var/spool (monitored spool JSON, etc.)
@@ -94,7 +95,7 @@ ensure_path_under_base() {
 }
 
 echo "Reset plan:"
-echo "- Sync local packaging artifacts into default (savedsearches + dashboards)"
+echo "- Sync local packaging artifacts into default (savedsearches + dashboards + metadata merge)"
 echo "- Stop ai_lab generator processes (backfill/live)"
 echo "- Confirm no orphan ai_lab generator python remains (launcher/backfill/live)"
 echo "- Stop Splunk"
@@ -241,6 +242,19 @@ sync_local_packaging_artifacts() {
   else
     echo "  skip (not found): $LOCAL_VIEWS_DIR"
   fi
+
+  # Merge Splunk UI metadata (savedsearches/views ACLs, etc.) into default for Git/AMI.
+  # Runs after savedsearches copy so [savedsearches/...] validation uses packaged default/savedsearches.conf.
+  local merge_py="$APP_ROOT/scripts/merge_local_meta_to_default_meta.py"
+  if [[ ! -f "$merge_py" ]]; then
+    echo "ERROR: Missing merge helper: $merge_py"
+    exit 1
+  fi
+  if ! ensure_path_under_base "$merge_py" "$APP_ROOT"; then
+    echo "ERROR: Refusing to run merge script outside app root: $merge_py"
+    exit 1
+  fi
+  python3 "$merge_py" --app-root "$APP_ROOT"
 }
 
 sync_local_packaging_artifacts
