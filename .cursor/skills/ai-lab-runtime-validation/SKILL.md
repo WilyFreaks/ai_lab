@@ -14,7 +14,8 @@ Use this block when the operator is exhausted or returning after a long gap — 
 - If the user asks “where am I”, read **`docs/daily_activity_timeline.md`** first and report the latest **Resume anchor**.
 - **`scenario_happening_probability`:** evaluated in **`live_log.py`** during active scenario windows; **omitted or invalid → 1**. **`[scenario_1]`** does **not** need `telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability` for deterministic degraded service-health rows.
 - **TWAMP:** `*_lostperc` = **0–100 integer percent**; rates = **pps**; correlate loss with `cnc_interface_counter_json` for VLAN **1002/1003** in `scenario_1`.
-- **After reset:** `scripts/test_smoke.sh` is mandatory before other tests; **post-generation:** `scripts/test_baseline.sh` (not immediately after reset with empty indexes).
+- **After reset:** `scripts/test_smoke.sh` is mandatory before other tests; **post-generation:** `scripts/test_baseline.sh` (not immediately after reset with empty indexes). Smoke and reset scripts treat **`index=ai_lab_logs`** as empty only when excluding startup sourcetypes **`ai_lab:launcher`** and **`ai_lab:spool_cleanup`** (see `scripts/test_smoke.sh` / `scripts/reset_workshop_state.sh`).
+- **Test entrypoints:** `scripts/test_baseline.sh` **`exec`s `scripts/test_backfill.sh`** — same suite. `test_backfill.sh` adds **backfill/live handoff** checks (ThousandEyes + `cnc_interface_counter_json`) when workshop state qualifies; otherwise skips with reason.
 - Do **not** mutate **`local/`** from automation; treat as Splunk/test-owned.
 
 ## Core policy
@@ -23,13 +24,14 @@ Use this block when the operator is exhausted or returning after a long gap — 
 - Do not use ad-hoc/raw SPL unless the user explicitly asks for it.
 - Treat `local/savedsearches.conf` as the full source-of-truth set when the user asks to sync saved searches.
 - Default sync behavior is full-copy replacement: copy `local/savedsearches.conf` to `default/savedsearches.conf`.
+- Scheduled **alert** searches (output to **`index=alerts`**, optional **`episode`** rollups) ship in the same file — promote with the same **full local → default** copy when packaging.
 - Do not merge `local` and `default` saved-search stanzas unless the user explicitly asks for a merge.
 - Respect manual dashboard-import ownership: if the user says they will manually import a dashboard source, do not propose dashboard design changes unless explicitly requested.
 
 ## Scenario dashboard XML (local → default)
 
 - Scenario views (for example `scenario_1_au.xml`) are **edited under** `local/data/ui/views/` during workshop iteration.
-- On explicit user request ("copy local dashboard to default", "sync scenario dashboard", "promote scenario XML local → default"), replace **`default/data/ui/views/<view>.xml`** with **`local/data/ui/views/<view>.xml`** via **full-file copy** (no merge). Optional: verify with `cmp` that files are byte-identical.
+- On explicit user request ("copy local dashboard to default", "sync scenario dashboard", "promote scenario XML local → default", or **bundle sync** of views + saved searches), replace **`default/data/ui/views/<view>.xml`** with **`local/data/ui/views/<view>.xml`** via **full-file copy** (no merge). Optional: verify with `cmp` that files are byte-identical. Common workshop promote: **views + `savedsearches.conf`** together for AMI/Git.
 - **Splunk runtime:** when both files exist for the same view, **`local` wins**. `default/` is for repo and packaging; keep them in sync on request so what you ship matches what you authored.
 - Do not overwrite `local/` from `default/` unless the user asks (opposite direction is rare). After copying to `default/`, reload the view in Splunk if the UI looks stale.
 
@@ -73,6 +75,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 - `scenario_happening_probability` is per-source (`<index>#<sourcetype>#<sample_file>#scenario_happening_probability`) and is evaluated in `live_log.py` during active scenario windows.
 - For TWAMP CSV (`pca_twamp_csv`), treat packet-rate fields as packets per second (pps) unless the user explicitly asks for a different unit model.
 - TWAMP delay/jitter integers still **fluctuate across ticks**: one standard-normal draw **per slice per event** scales `twamp#pca_twamp_csv#sample.csv#default.noise_stdev` for all noisy delay/jitter fields in that slice (see `docs/project_script_design.md`).
+- **Telemetry `ifIn`/`ifOut` on paired physical links** share one **daily-variation** stochastic draw per day (see `docs/project_script_design.md` *Day-to-Day Variation* — paired links). Keeps realistic symmetry when scenario sets **`directional_min_receive_fraction = 0`**. **Parity:** mirror generator changes in **`backfill_log.py` and `live_log.py`** (shared helpers such as `interface_to_placeholder_token`).
 - Scenario 1 telemetry reroute uses prefixed slice controls in `[scenario_1]`:
   - `telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice`
   - `telemetry#cnc_interface_counter_json#sample.json#reroute_to_slice`
@@ -105,7 +108,7 @@ Duplicate CSV header columns (`ul_dmean`, `ul_dmean1`, …) are selected with wi
 2. Confirm generation gate is open (`region` locked, `baseline_generation_enabled=true`).
 3. Confirm `backfill_start_time` exists and `live_last_tick_epoch` advances.
 4. Run saved searches over `-5m` and verify non-zero recent data (including `index=twamp` when TWAMP is in scope).
-5. Run baseline quality tests via `scripts/test_baseline.sh` (includes TWAMP `twamp_event_count`, `twamp_dmean`, `twamp_jmean` via `test_backfill.sh`).
+5. Run baseline quality tests via `scripts/test_baseline.sh` (runs `test_backfill.sh`: TWAMP asserts, optional **backfill/live handoff** when live state qualifies; see `BACKFILL_LIVE_HANDOFF_*` env vars in `scripts/test_backfill.sh`).
 6. For TWAMP + telemetry scenario checks, validate in a recent window that TWAMP UL loss indicators and telemetry directional in/out packet gaps move together for VLAN 1002/1003 during `scenario_1`.
 
 ## SRTE-specific verification addendum

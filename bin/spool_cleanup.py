@@ -7,7 +7,7 @@ Deletes files under var/spool/ai_lab/ whose mtime is older than
 AGE_THRESHOLD_HOURS hours.  Preserves directory structure.
 
 Emits a single JSON line to stdout so Splunk ingests it into
-index=ai_lab_log sourcetype=ai_lab:spool_cleanup.
+index=ai_lab_logs sourcetype=ai_lab:spool_cleanup.
 """
 
 import json

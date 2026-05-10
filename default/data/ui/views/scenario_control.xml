@@ -6,29 +6,33 @@
     <unset token="region_show_jp"></unset>
   </init>
   <search id="region_status_bootstrap">
-    <query>| workshopregion action="status" | eval region_lower=lower(coalesce(region, "")) | table region_lower</query>
+    <query>| workshopregion action="status" | eval region_lower=lower(region) | table region_lower</query>
     <done>
-      <condition match="true()">
+      <condition match="$result.region_lower$ != &quot;&quot;">
         <set token="region">$result.region_lower$</set>
         <set token="form.region">$result.region_lower$</set>
+      </condition>
+      <condition>
+        <unset token="region"></unset>
+        <unset token="form.region"></unset>
       </condition>
     </done>
   </search>
   <fieldset submitButton="true" autoRun="true">
-    <input type="dropdown" token="scenario">
+    <input type="dropdown" token="scenario" searchWhenChanged="true" depends="$region$">
       <label>Scenario</label>
       <choice value="scenario_1">scenario_1</choice>
     </input>
-    <input type="dropdown" token="active">
+    <input type="dropdown" token="active" depends="$scenario$">
       <label>Activation</label>
       <choice value="1">Enable (set epoch)</choice>
       <choice value="0">Disable (set 0)</choice>
     </input>
-    <input type="text" token="fault_start">
+    <input type="text" token="fault_start" depends="$scenario$">
       <label>Fault Start (minutes)</label>
       <default>0</default>
     </input>
-    <input type="text" token="fault_duration">
+    <input type="text" token="fault_duration" depends="$scenario$">
       <label>Fault Duration (minutes)</label>
       <default>0</default>
     </input>
@@ -45,11 +49,36 @@
   </row>
   <row depends="$scenario$">
     <panel>
+      <html>
+        <img src="/static/app/ai_lab/$scenario$_topology_$region$.jpg" style="max-width:100%;height:auto;"/>
+      </html>
+    </panel>
+    <panel>
+      <html>
+        <img src="/static/app/ai_lab/$scenario$_overview_$region$.jpg" style="max-width:100%;height:auto;"/>
+      </html>
+    </panel>
+  </row>
+  <row depends="$scenario$">
+    <panel>
+      <title>Current Status</title>
       <table>
         <search>
-          <done>
-            <unset token="active"></unset>
-          </done>
+          <query>| scenariostatus scenario="$scenario$"
+| rename status as Status, activation_local_time as "Activation Time"
+| table scenario Status "Activation Time"</query>
+          <refresh>30</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">1</option>
+        <option name="refresh.display">progressbar</option>
+      </table>
+    </panel>
+  </row>
+  <row depends="$active$">
+    <panel>
+      <table>
+        <search>
           <query>| scenariocontrol action=set scenario="$scenario$" active="$active$" fault_start="$fault_start$" fault_duration="$fault_duration$"
 | eval activated_local_time = strftime(activated, "%F %T %Z")
 | fields status message scenario active activated_local_time fault_start fault_duration</query>
@@ -74,10 +103,18 @@
       <title>Agent Skill Files</title>
       <html>
         <ul>
-        <li><a href="/static/app/ai_lab/agent_rules_en.md" target="_blank">Agent Rules (English)</a></li>
-        <li><a href="/static/app/ai_lab/agent_skills_en.md" target="_blank">Agent Skills (English)</a></li>
-        <li><a href="/static/app/ai_lab/agent_rules_jp.md" target="_blank">Agent Rules (Japanese)</a></li>
-        <li><a href="/static/app/ai_lab/agent_skills_jp.md" target="_blank">Agent Skills (Japanese)</a></li>
+        <li>
+            <a href="/static/app/ai_lab/agent_rules_en.md" target="_blank">Agent Rules (English)</a>
+          </li>
+        <li>
+            <a href="/static/app/ai_lab/agent_skills_en.md" target="_blank">Agent Skills (English)</a>
+          </li>
+        <li>
+            <a href="/static/app/ai_lab/agent_rules_jp.md" target="_blank">Agent Rules (Japanese)</a>
+          </li>
+        <li>
+            <a href="/static/app/ai_lab/agent_skills_jp.md" target="_blank">Agent Skills (Japanese)</a>
+          </li>
         </ul>
       </html>
     </panel>

@@ -20,6 +20,9 @@ else:
 
 print("RESUME AFTER A BREAK (see docs/project_ai_lab.md -> Resume after a break):")
 print("- Reset -> mandatory bash scripts/test_smoke.sh; generation gate opens after workshop region lock + baseline_generation_enabled")
+print("- Smoke + reset empty-index check: index ai_lab_logs excludes sourcetypes ai_lab:launcher and ai_lab:spool_cleanup (startup scripted inputs)")
+print("- test_baseline.sh execs test_backfill.sh; optional backfill/live handoff continuity assertions when backfill_completed and live cursor qualify")
+print("- Telemetry paired-link daily_variation_stdev: shared seed for ifIn/ifOut on same physical link (backfill_log + live_log); keep generator helpers in parity")
 print("- local/ai_lab_scenarios.conf is runtime/test-owned; agent changes target default/ and docs only")
 print("- live_log.py: scenario_happening_probability missing/invalid -> 1; no need to set telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability in [scenario_1] for full degradation each tick")
 print("- TWAMP: *_lostperc 0-100 integer percent; UL sequence continuity; scenario_1 loss correlated with telemetry for VLAN 1002/1003")
@@ -27,6 +30,7 @@ print("- Restart workers or Splunk after generator/conf edits if processes were 
 print("")
 print("CURRENT IMPLEMENTATION FOCUS:")
 print("- Scenario dashboards (e.g. scenario_1_au.xml): edit under local/data/ui/views/; on explicit request ('copy local dashboard to default') full-copy to default/data/ui/views/; Splunk prefers local at runtime when both exist")
+print("- Packaging promote (on request): full cp local/savedsearches.conf -> default/ (includes scheduled alert searches -> index=alerts); full cp local/data/ui/views/*.xml -> default/data/ui/views/")
 print("- TWAMP baseline verification: saved searches twamp_event_count, twamp_dmean, twamp_jmean (default/savedsearches.conf; asserted in scripts/test_backfill.sh / test_baseline.sh)")
 print("- TWAMP: shared per-slice noise for delay/jitter integer cells + pps packet-rate model; correlate with cnc_interface_counter_json in scenario_1 for VLANs 1002/1003")
 print("- Scenario 1 telemetry reroute keys: telemetry#cnc_interface_counter_json#sample.json#reroute_from_slice / ...#reroute_to_slice / ...#reroute_pct / ...#reroute_start_minutes / ...#reroute_ramp_minutes")
@@ -40,5 +44,5 @@ print("- WDM performance source: wdm_pm should bind A/Z endpoints through lookup
 print("- Scenario one-shot emit-state must be tracked per scenario+stream so ios BFD and wdm_alert both emit once per activation")
 print("- scenario_control.xml: region token bootstrap is XML-based via workshopregion action=status; link resolves as /app/ai_lab/scenario_1_$region$")
 print("- scenariocontrol action=set: active=1 preserves existing non-zero <scenario>_activated; active=0 clears to 0")
-print("- Spool cleanup: bin/spool_cleanup.py runs hourly via scripted input (interval=3600 in default/inputs.conf); deletes var/spool/ai_lab/ files older than 4h; emits JSON to index=ai_lab_log sourcetype=ai_lab:spool_cleanup; activated by Splunk restart")
+print("- Spool cleanup: bin/spool_cleanup.py runs hourly via scripted input (interval=3600 in default/inputs.conf); deletes var/spool/ai_lab/ files older than 4h; emits JSON to index=ai_lab_logs sourcetype=ai_lab:spool_cleanup; activated by Splunk restart")
 PY

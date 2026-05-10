@@ -79,7 +79,7 @@ The smoke script should orchestrate:
 1. static/syntax checks for Python files
 2. runtime precondition checks (required config/paths)
 3. spool directory emptiness check (`var/spool/ai_lab`)
-4. Splunk SPL assertions for **reset-ready state** (all app indexes empty)
+4. Splunk SPL assertions for **reset-ready state** (all app indexes empty). For **`ai_lab_logs`** only, excluded sourcetypes **`ai_lab:launcher`** and **`ai_lab:spool_cleanup`** match the same contract as `scripts/reset_workshop_state.sh` — those rows are expected immediately after Splunk start.
 
 ---
 

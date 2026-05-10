@@ -39,6 +39,7 @@ Scenario dashboard Simple XML (`scenario_1_au.xml`, etc.):
 - The workshop owner edits scenario views under **`local/data/ui/views/`** in Splunk (UI save path or manual file edit).
 - **`default/data/ui/views/`** holds the **shipped / Git-tracked** copy of the same dashboard.
 - **Explicit sync only:** when the user asks (for example "copy local dashboard to default", "sync scenario dashboard", "promote `scenario_1_au` local → default"), copy **`local/data/ui/views/<name>.xml`** → **`default/data/ui/views/<name>.xml`** as a **full-file replacement** (e.g. OS `cp`; no merge or hand-edited diffs into default). Do **not** auto-sync on every edit.
+- **Never edit `default/data/ui/views/` directly** — do not use sed, awk, StrReplace, or any other tool to modify dashboard XML files in `default/data/ui/views/` directly. The only permitted write path is a full-file copy from `local/` on explicit user request. If a rename or text change is needed inside a dashboard, instruct the user to make it in Splunk UI (which saves to `local/`) and then sync local → default on request.
 - **Splunk precedence:** if both `local` and `default` define the same view name, runtime uses the **`local`** copy. Syncing to `default/` keeps Git/AMI packaging aligned; the UI still reflects `local/` until that file changes or is removed.
 - **After sync:** reload the dashboard or refresh the view in Splunk if the editor/browser showed a stale buffer.
 - Mirrors the saved-search policy pattern (`local/` authoring, **`default/`** packaging on request) but for dashboard views.
@@ -50,6 +51,7 @@ For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/l
 - For TWAMP (`pca_twamp_csv`) correlated with `cnc_interface_counter_json`, treat packet-rate fields as packets-per-second (pps) and keep cross-source packet-loss behavior aligned per tick during scenario windows.
 - TWAMP CSV wire format: **integer-only** metric cells after generation (see `samples/twamp/pca_twamp_csv/README.md` and `format_pca_twamp_csv_metric` / `normalize_pca_twamp_csv_replacements` in `bin/backfill_log.py` / `bin/live_log.py`).
 - TWAMP delay/jitter on the wire: **`noise_stdev × ε`** per slice per event (one shared standard-normal **ε** per slice so integer delay/jitter columns move together); tune `twamp#pca_twamp_csv#sample.csv#default.noise_stdev` in `default/ai_lab_scenarios.conf`. Detail: `docs/project_script_design.md` (*TWAMP + Telemetry Correlation Contract*).
+- **Telemetry paired-link daily variation:** `backfill_log.py` and `live_log.py` use a **shared deterministic `daily_variation_stdev` seed** for **`ifOutPktsRate` / `ifInPktsRate` on opposite ends of the same physical link** (`build_link_dvar_seed_map` + bidirectional link metadata). That keeps paired directions from drifting apart when **`directional_min_receive_fraction = 0`** (scenario windows). **Generator parity:** when adding or moving helpers (e.g. `interface_to_placeholder_token`, link seed map), **update both** `backfill_log.py` and `live_log.py` together so live does not regress.
 - Keep TWAMP UL packet continuity deterministic: `next ul_firstpktSeq = previous ul_lastpktSeq + 1`, and maintain no-loss math consistency (`ul_rxpkts = (ul_lastpktSeq - ul_firstpktSeq) + 1` when loss is zero).
 - TWAMP `*_lostperc` on the wire: integer **percent 0–100** (from lost vs expected counts under scenario loss), not millionths; align dashboards/tests to that scale.
 - Scenario 1 `cnc_service_health_json`: **`[scenario_1]`** overrides degraded **sr_policy** placeholders; **`scenario_happening_probability`** need not be set — it **defaults to 1** when missing (see `docs/project_scenario_1.md`).
@@ -93,6 +95,15 @@ Durations and summaries:
 - Keep day sections and `### Daily summary` ordered **newest to oldest** (in the day section, newest session block first).
 - In `### Daily summary`, do not add the word "observed"; format as: `YYYY-MM-DD: <duration> (N sessions), <tokens> estimated tokens` (duration should reflect the per-session sum rule above; use a session count parenthetical, not an expanded sum of time ranges).
 
+Splunk MCP server (`splunk-mcp-server`) usage rules:
+- Always prefer using the Splunk MCP server (`user-splunk-mcp-server`) for Splunk queries and index operations when it is available (green dot in Cursor Settings → MCP).
+- For all Splunk REST API or CLI calls that require authentication, **always use the Bearer token** from `~/.cursor/mcp.json` (`mcpServers.splunk-mcp-server.env.AUTH_TOKEN`). Never use username/password credentials.
+- When the MCP server shows **"Error - Show Output"** (red dot), it is likely in a stale error state. Recovery steps in order:
+  1. Toggle the server **off then on** in Cursor Settings → MCP (no full Cursor restart needed).
+  2. If toggling does not help, a **full Cursor restart** clears cached MCP connection state — this is especially needed when the session has switched between a remote Cursor session and a local one, which can corrupt the MCP connection registry.
+  3. After recovery, retry the MCP tool call before falling back to the REST API.
+- REST API fallback: if the MCP server remains unavailable, use `curl` with `Authorization: Bearer <token>` against `https://localhost:8089/services/...` (token from `mcp.json`).
+
 `reset_workshop_state.sh` run rules:
 - For unattended runs, execute `./scripts/reset_workshop_state.sh --yes` (avoid interactive `Proceed? (yes/no)` waits).
 - Before running `reset_workshop_state.sh`, explicitly notify the user that the script will sync `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, then wait for user confirmation so they can cancel if needed.
@@ -102,6 +113,7 @@ Durations and summaries:
 - Use `SPLUNK_AUTH` (`user:pass`) only as fallback when token auth is unavailable.
 - Reset execution order is mandatory: stop `backfill_log.py`/`live_log.py` -> confirm no orphan `launcher.py`/`backfill_log.py`/`live_log.py` remains -> stop Splunk -> clean spool -> remove indexes safely -> start Splunk.
 - Immediately run `bash scripts/test_smoke.sh` after every reset and require pass before any generation/baseline/scenario tests.
+- **Post-reset “empty index” checks for `ai_lab_logs`:** `scripts/reset_workshop_state.sh` and `scripts/test_smoke.sh` treat the index as empty only after **`NOT sourcetype IN ("ai_lab:launcher","ai_lab:spool_cleanup")`** — scripted inputs emit those rows on Splunk startup and must not fail the clean-slate gate.
 - If a reset run appears slow/hung, first verify whether it is waiting for prompt input, then check `/opt/splunk/var/log/splunk/splunkd.log` for actual stop/start activity.
 
 Saved-search validation rules (Splunk test/verification):
@@ -119,6 +131,8 @@ Saved-search validation rules (Splunk test/verification):
 - Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ. ThousandEyes abrupt-jump tolerance can be tuned with `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` (default `0..2`).
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
+- **Scheduled alert searches** (workshop alerting) live in the same `savedsearches.conf` stanzas; output targets **`index=alerts`** (and optional downstream **`episode`** materialization). Promote definitions with the same **full `local → default` copy** as other saved searches when the user asks to package for Git/AMI.
+- **Baseline quality tests:** `scripts/test_baseline.sh` only **`exec`s `scripts/test_backfill.sh`** — one implementation, two entrypoint names. `test_backfill.sh` includes **backfill/live handoff** continuity checks (ThousandEyes + `cnc_interface_counter_json`) when `baseline.backfill_completed=true` and live has passed the minute-aligned boundary; otherwise that section **PASSes with a skip reason** (see `docs/project_test_design.md`).
 
 Index intent policy:
 - `ran` and `fwa` indexes are reserved for other scenario streams.
@@ -150,10 +164,12 @@ Splunk Simple XML `search/done` token action rule:
 `scenario_control.xml` implementation guardrails (confirmed working pattern):
 - Keep `scenario_control` as XML-first (no custom JS dependency for region bootstrap by default).
 - Bootstrap region token on load via:
-  - `<search id="region_status_bootstrap"> | workshopregion action="status" ... </search>`
-  - `<done><condition match="true()"><set token="region">...</set></condition></done>`
+ - `<search id="region_status_bootstrap"> | workshopregion action="status" | eval region_lower=lower(region) | table region_lower </search>`
+ - `<done>` must use two `<condition>` blocks: set `region`/`form.region` only when `$result.region_lower$ != ""`, and explicitly **unset** both tokens in the fallback `<condition>` so an unlocked host never retains a stale region token.
 - Keep `<fieldset submitButton="true" autoRun="true">` so bootstrap searches run on load, but gate write behavior with submitted tokens.
-- For scenario writes, use submitted tokens (`$scenario$`, `$active$`, `$fault_start$`, `$fault_duration$`) and gate the result row with `depends="$scenario$"`.
+- Input progressive disclosure: `active`, `fault_start`, `fault_duration` inputs must have `depends="$scenario$"` so they only appear after the attendee selects a scenario.
+- Write operation row must use `depends="$active$"` (not `depends="$scenario$"`) so the result table is only shown after the attendee selects and submits an activation value.
+- Do **not** unset `$active$` in the write-search `<done>` handler — the result row depends on `$active$` and unsetting it immediately hides the result before the user can read it.
 - Keep dashboard link dynamic with runtime region token (`/app/ai_lab/scenario_1_$region$`).
 
 `scenariocontrol` command activation semantics:
@@ -164,7 +180,7 @@ Splunk Simple XML `search/done` token action rule:
 Spool cleanup (`bin/spool_cleanup.py`):
 - Registered as a Splunk scripted input in `default/inputs.conf` with `interval = 3600` (runs once on startup, then every hour).
 - Walks the entire `var/spool/ai_lab/` tree and deletes any **file** whose `mtime` is older than 4 hours; directory structure is preserved.
-- Emits a single JSON line to stdout — ingested as `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`.
+- Emits a single JSON line to stdout — ingested as `index=ai_lab_logs sourcetype=ai_lab:spool_cleanup`.
 - Activation: a Splunk restart (or app reload) picks up the scripted input automatically; no manual scheduling needed.
-- Verify cleanup activity: `index=ai_lab_log sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count`
+- Verify cleanup activity: `index=ai_lab_logs sourcetype=ai_lab:spool_cleanup | table _time deleted_count error_count`
 - Do not reduce the 4-hour threshold below the longest expected Splunk monitor polling cycle to avoid deleting files before they are ingested.

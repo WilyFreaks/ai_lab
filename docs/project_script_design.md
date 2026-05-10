@@ -318,8 +318,14 @@ To produce realistic week-over-week variation, each metric prefix supports an op
 **Behaviour:**
 - A multiplicative factor is drawn from `N(1.0, daily_variation_stdev)` once per calendar date per metric.
 - The seed is `MD5(local_date | section | prefix)` — deterministic: the same date always produces the same factor for the same metric in both backfill and live generation.
-- Different metrics on the same day get independent factors.
+- Different metrics on the same day get independent factors by default **except** for telemetry interface packet rates on **paired ends of the same physical link** (see below).
 - Result is clamped to `[0.2, 2.0]` to prevent pathological extremes.
+
+**Paired-link exception (`cnc_interface_counter_json` rates):**
+
+- For placeholders ending in **`ifOutPktsRate`** / **`ifInPktsRate`** that belong to opposite router interfaces on one physical link (`lookups/router_if_connections*.csv`), generators derive a **canonical shared seed prefix** so **both directions get the same daily factor** (`build_link_dvar_seed_map` in `bin/backfill_log.py` / `bin/live_log.py`).
+- **Why:** Scenario **`directional_min_receive_fraction = 0`** disables inbound “pull up toward outbound” clamping; uncorrelated random daily factors would paint **fake asymmetric gaps** on healthy links that are visualization noise, not story intent.
+- **Implementation rule:** `bin/backfill_log.py` and **`bin/live_log.py` must stay in lockstep** for this path (shared helpers such as `interface_to_placeholder_token`, map construction, and `daily_variation_multiplier(..., seed_prefix=...)`). Changing one file without the other has broken live generation in the past.
 - Applied in `metric_value()` after `weekend_multiplier` and before the outlier/noise step.
 - Omitting the key (or setting it to `0`) disables the feature — no change in existing behaviour.
 

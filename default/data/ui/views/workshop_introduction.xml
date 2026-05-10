@@ -1,6 +1,6 @@
 <form version="1.1" script="workshop_introduction_submit_toggle.js" theme="light">
   <label>Workshop Introduction</label>
-  <description>Select a region and click Save Region &amp; Start. The region and generation gate are persisted to local/ai_lab_scenarios.conf under [baseline].</description>
+  <description>Set your time zone and select a region. The baseline data will be backfilled when you click the Submit button.</description>
   <!-- Initial state: JS runs | workshopregion action="status" once and sets tokens (no baseline &lt;search&gt;). -->
   <init>
     <unset token="region_locked"></unset>
@@ -17,7 +17,7 @@
     <panel>
       <html>
         <div style="padding: 4px 0;">
-          <img src="/static/app/ai_lab/data_sources.jpg" alt="Workshop data sources" style="max-width:100%; height:auto; border:1px solid #d9d9d9;" />
+          <img src="/static/app/ai_lab/data_sources.jpg" alt="Workshop data sources" style="max-width:100%; height:auto; border:1px solid #d9d9d9;"/>
         </div>
       </html>
     </panel>
@@ -27,7 +27,6 @@
       <title>Save Region &amp; Start Result</title>
       <table>
         <search>
-          <query>| workshopregion action="set" region="$status_region$"</query>
           <done>
             <condition match="true()">
               <set token="region_token">$result.region$</set>
@@ -45,9 +44,14 @@
               <unset token="region_unlocked"></unset>
             </condition>
           </done>
+          <query>| workshopregion action="set" region="$status_region$"
+| fields status action region launcher_message initial_backfill backfill_start_time_local backfill_head_time_local backfill_run_started_time_local backfill_completed backfill_completed_time_local backfill_duration</query>
+          <earliest>$earliest$</earliest>
+          <latest>$latest$</latest>
         </search>
-        <option name="drilldown">none</option>
         <option name="count">1</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
       </table>
     </panel>
   </row>

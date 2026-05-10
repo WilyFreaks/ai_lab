@@ -1,5 +1,5 @@
 <form version="1.1">
-  <label>#1 Backbone Network Status, Central Victoria</label>
+  <label>#1 Backbone Network Status, Western Japan</label>
   <description>Workshop scenario: latency was detected on a specific VLAN over the WDM backbone. Investigate and identify the root cause.</description>
   <fieldset submitButton="false" autoRun="true">
     <input type="time" token="PERIOD">
@@ -25,7 +25,7 @@
   </row>
   <row>
     <panel id="Panel1">
-      <title>Backbone Network Topology in Central Victoria</title>
+      <title>西日本バックホーンネットワーク</title>
       <viz type="leaflet_maps_app.maps-plus">
         <search>
           <query>index=telemetry sourcetype=cnc_srte_path_json 
@@ -44,7 +44,7 @@
 | mvexpand hops_with_index 
 | rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$" 
 | table host router_name hop_index route_changed unique_routes 
-| lookup router_areas_au.csv router_name 
+| lookup router_areas_jp.csv router_name 
 | eval customIcon = "router.png", markerSize = 70, pathWeight = 3 
 | rename host as path 
 | rex field=path "cnc_vlan(?&lt;slice&gt;\d+)" 
@@ -109,9 +109,9 @@
         <option name="leaflet_maps_app.maps-plus.i18nLanguage">en</option>
         <option name="leaflet_maps_app.maps-plus.layerControl">1</option>
         <option name="leaflet_maps_app.maps-plus.layerControlCollapsed">1</option>
-        <option name="leaflet_maps_app.maps-plus.mapCenterLat">-37.17</option>
-        <option name="leaflet_maps_app.maps-plus.mapCenterLon">145.38</option>
-        <option name="leaflet_maps_app.maps-plus.mapCenterZoom">8</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterLat">33.57</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterLon">132.4</option>
+        <option name="leaflet_maps_app.maps-plus.mapCenterZoom">7</option>
         <option name="leaflet_maps_app.maps-plus.mapTile">https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png</option>
         <option name="leaflet_maps_app.maps-plus.maplibreStylePreset">liberty</option>
         <option name="leaflet_maps_app.maps-plus.maps-plus.allPopups">0</option>
@@ -164,7 +164,7 @@
       </viz>
     </panel>
     <panel>
-      <title>Network Slice Health Score</title>
+      <title>ネットワークスライスヘルススコア</title>
       <table>
         <search>
           <query>index=telemetry sourcetype=cnc_service_health_json
@@ -196,7 +196,7 @@
   </row>
   <row>
     <panel>
-      <title>ThousandEyes Google Response Time at R9 for Last 60 mins</title>
+      <title>ThousandEyes Google 応答時間 @R9 (直近 60 分)</title>
       <chart>
         <search>
           <query>index=thousandeyes 
@@ -224,7 +224,7 @@
   </row>
   <row>
     <panel>
-      <title>TWAMP Metrics for Network Slice: P95 Delay, Jitter, and Avg Packet Loss %</title>
+      <title>スライス別 TWAMP メトリック: P95 Delay, Jitter, and Avg Packet Loss %</title>
       <table>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv 
@@ -262,7 +262,7 @@
   </row>
   <row>
     <panel>
-      <title>Delay p95</title>
+      <title>遅延 p95</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -310,7 +310,7 @@
       </chart>
     </panel>
     <panel>
-      <title>Jitter p95</title>
+      <title>ジッター p95</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -358,7 +358,7 @@
       </chart>
     </panel>
     <panel>
-      <title>R9-&gt;R2 Packet Loss%</title>
+      <title>R9-&gt;R2 パケットロス %</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -407,7 +407,7 @@
       </chart>
     </panel>
     <panel>
-      <title>R2-&gt;R9 Packet Loss%</title>
+      <title>R2-&gt;R9 パケットロス %</title>
       <chart>
         <search>
           <query>index=twamp sourcetype=pca_twamp_csv
@@ -458,7 +458,7 @@
   </row>
   <row>
     <panel>
-      <title>Interface In/Out Packet Count Comparison</title>
+      <title>対抗インタフェース別送受信パケットレート</title>
       <input type="dropdown" token="ROUTER" searchWhenChanged="true">
         <label>Router</label>
         <choice value="*">ALL</choice>
@@ -563,7 +563,7 @@
   </row>
   <row>
     <panel>
-      <title>Episodes</title>
+      <title>エピソード</title>
       <table>
         <search>
           <query>index=alert sourcetype=generic_single_line
@@ -613,7 +613,7 @@
       </table>
     </panel>
     <panel>
-      <title>AIerts</title>
+      <title>アラート</title>
       <input type="dropdown" token="slice">
         <label>Slice</label>
         <choice value="*">ALL</choice>

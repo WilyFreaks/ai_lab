@@ -40,6 +40,29 @@ def save_config(cfg):
         cfg.write(f)
 
 
+VALID_REGIONS = {"au", "jp"}
+
+
+def check_workshop_ready(cfg):
+    """
+    Return (ok, reason) — ok=True only when region is locked and backfill is complete.
+    Called before allowing active=1; deactivation (active=0) bypasses this check.
+    """
+    region = cfg.get("baseline", "region", fallback="").strip().lower()
+    if region not in VALID_REGIONS:
+        return False, "region is not set — lock the workshop region first"
+
+    enabled = cfg.get("baseline", "baseline_generation_enabled", fallback="false").strip().lower()
+    if enabled != "true":
+        return False, "baseline generation is not enabled — enable it from the workshop introduction page"
+
+    completed = cfg.get("baseline", "backfill_completed", fallback="false").strip().lower()
+    if completed != "true":
+        return False, "backfill is not complete — wait for the historical data generation to finish"
+
+    return True, "ok"
+
+
 def parse_args(argv):
     args = {}
     for token in argv[1:]:
@@ -111,6 +134,15 @@ def main():
         if active not in ("0", "1"):
             isp.outputResults([{"status": "error", "message": "active must be 0 or 1"}])
             return
+
+        if active == "1":
+            ready_cfg = read_effective_config()
+            ready, reason = check_workshop_ready(ready_cfg)
+            if not ready:
+                isp.outputResults(
+                    [{"status": "error", "message": f"cannot activate scenario: {reason}"}]
+                )
+                return
 
         cfg = read_for_write()
         if not cfg.has_section("scenarios"):

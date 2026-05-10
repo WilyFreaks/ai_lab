@@ -7,6 +7,36 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-11 (Mon)
+
+- Session 1 around **03:45-05:45 JST**
+- Main activities:
+  - Confirmed Splunk SPL around the R6→R4 minute bucket: asymmetric **ifIn**/ **ifOut** average in `timechart` (likely join/aggregation noise, not scenario intent); reroute plateau aligns with **`reroute_start_minutes + reroute_ramp_minutes`**
+  - Closed loop on workshop reset/smoke **`ai_lab_logs`** exclusions (**`ai_lab:launcher`**, **`ai_lab:spool_cleanup`**) matching empty-index semantics
+  - Promoted **`local/savedsearches.conf`** (incl. alert schedules) and **`local/data/ui/views/*.xml`** into **`default/`** via full-copy packaging
+  - Refreshed **`.cursor/rules`**, **`ai-lab-runtime-validation`** skill, **hooks**, and **`docs/project_*.md`** for backfill/live handoff tests, paired-link **`daily_variation_stdev`** parity across **`backfill_log.py`/`live_log.py`**, MCP/REST Splunk fallback, dashboard + saved-search promote workflow
+- Resume anchor:
+  - **Implement episode summary search in dashboard.**
+
+## 2026-05-10 (Sun)
+
+- Session 2 around **21:00 JST**
+- Main activities:
+  - Resumed to test new implementations
+- Resume anchor:
+  - **Test the new implementations (diurnal midpoint, daily variation, trend, boundary fix) after backfill completes.**
+
+- Session 1 around **10:07-20:00 JST**
+- Main activities:
+  - Resumed project work and opened the session
+  - Implemented drop-packet alert scheduled search
+  - Improved `scenario_control` dashboard: region-gate on scenario dropdown, topology/overview image panels, current status panel via `| scenariostatus`, progressive disclosure (activation inputs hidden until scenario selected, control result hidden until Submit)
+  - JP scenario dashboard implementation
+  - Event generation improvements: `peak_rate_*` now centred on HH:30 (−30 min shift in `interpolated_hourly_peak_rate`), `daily_variation_stdev` (date-seeded per-day multiplier, LRU-cached), `trend_per_day` (linear growth from backfill anchor, applied to telemetry interface counters and ThousandEyes metrics; TWAMP intentionally kept flat)
+  - Backfill/live boundary bug fix: aligned `end_ts` in `backfill_log.py` to `((anchor+59)//60)*60` so backfill and live share the same UTC-minute grid with no gap or duplication
+- Resume anchor:
+  - **Test the new implementations (diurnal midpoint, daily variation, trend, boundary fix) after backfill completes.**
+
 ## 2026-05-09 (Sat)
 
 - Session 1 around **19:00-21:00 JST**
@@ -463,6 +493,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
+- 2026-05-11: ~120 minutes (1 session), ~42,000 estimated tokens
+- 2026-05-10: ~593 minutes (2 sessions), ~60,000 estimated tokens
 - 2026-05-09: ~120 minutes (1 session), ~8,000 estimated tokens
 - 2026-05-08: ~249 minutes (2 sessions), ~76,000 estimated tokens
 - 2026-05-07: ~815 minutes (3 sessions), ~82,000 estimated tokens
@@ -483,6 +515,8 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
+| 2026-05-11 | ~120 minutes (1 session) | ~42,000 |
+| 2026-05-10 | ~593 minutes (2 sessions) | ~60,000 |
 | 2026-05-09 | ~120 minutes (1 session) | ~8,000 |
 | 2026-05-08 | ~249 minutes (2 sessions) | ~76,000 |
 | 2026-05-07 | ~815 minutes (3 sessions) | ~82,000 |

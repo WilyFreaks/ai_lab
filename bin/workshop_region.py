@@ -15,7 +15,7 @@ DEFAULT_CONF = os.path.join(APP_ROOT, "default", "ai_lab_scenarios.conf")
 LOCAL_CONF = os.path.join(APP_ROOT, "local", "ai_lab_scenarios.conf")
 BIN_DIR = os.path.join(APP_ROOT, "bin")
 SPOOL_LOG_DIR = os.path.join(
-    APP_ROOT, "var", "spool", "ai_lab", "ai_lab_log", "workshop_region"
+    APP_ROOT, "var", "spool", "ai_lab", "ai_lab_logs", "workshop_region"
 )
 VALID_REGIONS = {"au", "jp"}
 REGION_TZ = {

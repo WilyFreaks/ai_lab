@@ -68,6 +68,7 @@ fault_duration = 0       # minutes how long to keep the fault, 0 means the fault
 - Baseline reroute-path traffic ranges should remain core-consistent so reroute effects are visible on each hop:
   - forward-band links (`R8->R6`, `R7->R6`, `R6->R4`, `R4->R2`): around `2222` pps (`daily_min=1999.8`, `daily_max=2444.2`)
   - reverse-band links (`R6->R8`, `R6->R7`, `R4->R6`, `R2->R4`): around `1340` pps (`daily_min=1206`, `daily_max=1474`)
+- **Validation / dashboard caveats:** SPL that joins opposite ends of a link then **`timechart` + `avg()`** may show a **one-minute anomaly on one side only** (e.g. collapsed receive average while transmit stays high). Confirm with **event counts** and raw values for that bucket before treating it as modeled fault behaviour; prefer **`join type=inner`** when both legs must exist. **Timing:** telemetry reroute reaches full modeled shift about **`reroute_start_minutes + reroute_ramp_minutes`** after effective activation (e.g. **3 + 7 = 10** minutes with shipped defaults), not a separate “minute‑12 rule.”
 
 ## TWAMP Correlation Decisions (Scenario 1)
 

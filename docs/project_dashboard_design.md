@@ -42,7 +42,7 @@ The **`default/data/ui/views/`** copy is the **packaged / Git-tracked** source o
 
 **Sync policy:**
 
-- When the user explicitly asks to promote changes (for example “copy local dashboard to default”, “sync `scenario_1_au` from local to default”), copy **`local/data/ui/views/<view>.xml`** → **`default/data/ui/views/<view>.xml`** as a **full-file replacement**—use a single OS-level copy (`cp`), not a manual merge (same pattern as `local/savedsearches.conf` → `default/savedsearches.conf` on request).
+- When the user explicitly asks to promote changes (for example “copy local dashboard to default”, “sync `scenario_1_au` from local to default”, or **package workshop UI + searches**), copy **`local/data/ui/views/<view>.xml`** → **`default/data/ui/views/<view>.xml`** as a **full-file replacement**—use a single OS-level copy (`cp`), not a manual merge (same pattern as `local/savedsearches.conf` → `default/savedsearches.conf` on request). **Scheduled alert searches** (saved-search output to **`index=alerts`**) are promoted via the **`savedsearches.conf`** copy, not separate files.
 - Agents do **not** auto-copy on every edit; wait for an explicit sync request so `local/` remains the safe edit surface.
 - **Which file Splunk uses:** for the same view name, **`local/data/ui/views/` overrides `default/data/ui/views/`**. Packaging updates land in `default/`; day-to-day UI edits usually hit `local/`. Keep both in sync when promoting so Git reflects the dashboard you intend to ship.
 - After a sync, **reload the dashboard** (or refresh the Splunk view) if the browser still shows older XML.
@@ -236,17 +236,23 @@ Design constraints:
 
 - XML-first implementation (no required custom JS bootstrap for region).
 - Region bootstrap search on load:
-  - `| workshopregion action="status" | eval region_lower=lower(coalesce(region, "")) | table region_lower`
-  - `search/done` sets `region` (and optionally `form.region`) via `<condition match="true()">`.
+  - `| workshopregion action="status" | eval region_lower=lower(region) | table region_lower`
+  - `search/done` must use two `<condition>` blocks:
+    - `<condition match="$result.region_lower$ != &quot;&quot;">` → set `token="region"` and `token="form.region"`
+    - `<condition>` (fallback) → **unset** both `region` and `form.region` so an unlocked host never retains a stale region token from a previous run.
 - Fieldset uses `submitButton="true" autoRun="true"`:
   - Allows bootstrap searches to run at open time.
   - Write search is still submit-gated by using submitted tokens and row dependency.
+- **Input progressive disclosure:**
+  - `active` (Activation), `fault_start`, and `fault_duration` inputs must set `depends="$scenario$"` so they are hidden until the attendee selects a scenario.
+  - The scenario image/overview panel (`depends="$scenario$"`) shows topology and overview images for the selected scenario + locked region.
 - Write operation:
   - `| scenariocontrol action=set scenario="$scenario$" active="$active$" fault_start="$fault_start$" fault_duration="$fault_duration$"`
-  - Row gated by `depends="$scenario$"` to keep pre-submit table hidden.
+  - Row must be gated by `depends="$active$"` (not `depends="$scenario$"`) so the result table appears only after the attendee selects and submits an activation value.
+  - Do **not** unset `$active$` in the write-search `<done>` handler — the result row depends on `$active$`, so unsetting it immediately after submission hides the result before the user can read it.
 - Monitoring link is region-driven from token:
   - `/app/ai_lab/scenario_1_$region$`
-- To avoid accidental repeated enable actions in the UI flow, unset `active` in write-search `<done>` after a successful submit.
+- **No `<default>` values on dropdowns:** do not set a `<default>` on the `scenario`, `active` (Activation), or `region` dropdown inputs. Defaults cause unintended automatic submissions or hide user intent. Let the attendee make an explicit selection before anything fires.
 
 This pattern is reused in workshop-introduction save flow.
 

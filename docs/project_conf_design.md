@@ -52,6 +52,8 @@ then add `random.gauss(0, noise_stdev)`
 
 **Note:** `noise_stdev` (not `noise_stddev`) — use the Splunk-familiar abbreviation.
 
+**Telemetry link pairing:** when `daily_variation_stdev` is set on interface `ifInPktsRate` / `ifOutPktsRate` keys, generators may **tie the random daily draw** for both ends of a physical link so paired directions do not decorrelate under scenario clamp-off — see `docs/project_script_design.md` (*Day-to-Day Variation* → *Paired-link exception*).
+
 ## Realistic Values for ThousandEyes (HTTP test R9→google.com)
 
 - `response_time_ms`: daily_min=120, daily_max=200 (includes app layer overhead)

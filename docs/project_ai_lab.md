@@ -18,7 +18,7 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 
 5G mobile carrier WDM backbone ring — **Central Victoria, Australia** scenario.
 
-**Router → Location mapping** (stored in `lookups/au_router_areas.csv`):
+**Router → Location mapping** (stored in `lookups/router_areas_au.csv`):
 
 | Router | Model | Location |
 |--------|-------|----------|
@@ -31,7 +31,7 @@ originSessionId: 023ba004-a2ab-41d3-9152-4eb0746bfa20
 | R8-NCS540 | NCS 540 | Wodonga |
 | R9-NCS540 | NCS 540 | Shepparton |
 
-Japanese version: `lookups/jp_router_areas.csv` (maps same routers to cities in western Japan).
+Japanese version: `lookups/router_areas_jp.csv` (maps same routers to cities in western Japan).
 
 ---
 
@@ -83,7 +83,7 @@ Syslog WDM performance monitor:
 - Direction semantics are part of the contract: Tx metrics must map to endpoint transmitter side, Rx metrics to receiver side, while temperature metrics apply per endpoint device context.
 
 **TE test setup:** Agent behind R9 runs HTTP test to google.com every 1 minute.
-**TE sourcetypes used:** `cisco:thousandeyes:metric`, `cisco:thousandeyes:alerts` (path-vis excluded — CNC routers don't respond to ICMP).
+**TE sourcetypes used:** `cisco:thousandeyes:metric`, `cisco:thousandeyes:alert` (path-vis excluded — CNC routers don't respond to ICMP).
 **TWAMP agents:** Only on R2 and R9 (budget constraint — not on intermediate routers).
 
 TWAMP/PCA interpretation note:
@@ -131,10 +131,10 @@ Key project behavior that must remain stable across changes:
 - Runtime mutable state is written to `local/ai_lab_scenarios.conf` (not `default/` files).
 - Workshop generation is host-gated via region selection and baseline enablement before launch.
 - Historical and live generation must preserve timeline continuity across Splunk restarts.
-- Canonical verification entrypoint: `bash scripts/test_smoke.sh` (4-check smoke: Python syntax, runtime preconditions, spool empty, app indexes empty).
+- Canonical verification entrypoint: `bash scripts/test_smoke.sh` (4-check smoke: Python syntax, runtime preconditions, spool empty, app indexes empty — for **`ai_lab_logs`**, empty means **excluding** sourcetypes **`ai_lab:launcher`** and **`ai_lab:spool_cleanup`** used by startup scripted inputs).
 - Environment reset for repeatable workshops/tests is handled by:
   - `scripts/reset_workshop_state.sh`
-- **Spool cleanup:** `bin/spool_cleanup.py` runs as a Splunk scripted input every hour (`interval = 3600` in `default/inputs.conf`). It deletes files in `var/spool/ai_lab/` older than 4 hours and emits a JSON summary to `index=ai_lab_log sourcetype=ai_lab:spool_cleanup`. Activated automatically on Splunk restart. Do not lower the 4-hour threshold below the longest monitor polling cycle.
+- **Spool cleanup:** `bin/spool_cleanup.py` runs as a Splunk scripted input every hour (`interval = 3600` in `default/inputs.conf`). It deletes files in `var/spool/ai_lab/` older than 4 hours and emits a JSON summary to `index=ai_lab_logs sourcetype=ai_lab:spool_cleanup`. Activated automatically on Splunk restart. Do not lower the 4-hour threshold below the longest monitor polling cycle.
 
 ### Handoff: operators and the next implementer
 
@@ -156,10 +156,12 @@ Use this when you are tired or returning cold — **one read, then pause**.
 12. **Scenario 1 ThousandEyes timing:** `response_time_ms`, `network_latency_ms`, and `throughput_kbps` support timed return to baseline through per-metric `thousandeyes#cisco:thousandeyes:metric#sample.json#<metric>.back_to_baseline_start_minutes` + `...back_to_baseline_ramp_minutes`.
 13. **Baseline path magnitudes:** keep reroute chain links (`R8-R6`, `R6-R4`, `R4-R2`) in core-consistent ranges (see `docs/project_conf_design.md`), otherwise reroute effects look artificially small.
 14. **Config namespace convention:** use sample-aware keys in `default/ai_lab_scenarios.conf` as `<index>#<sourcetype>#<sample_file>#<param>` (index-first; for example `ios#cisco:ios#sample_bfd.txt#...`). Scenario behavior should be driven by these config entries, not hard-coded scenario constants.
+15. **Baseline quality tests:** `scripts/test_baseline.sh` **`exec`s `scripts/test_backfill.sh`** (one implementation). `test_backfill.sh` includes optional **backfill/live handoff** continuity checks when `baseline.backfill_completed=true` and the live cursor has crossed the shared minute boundary; tunables `BACKFILL_LIVE_HANDOFF_SLACK_SEC`, `BACKFILL_LIVE_HANDOFF_GAP_STEP_MULT`. See `docs/project_test_design.md`.
+16. **Telemetry paired-link daily variation:** `ifInPktsRate` / `ifOutPktsRate` on opposite ends of the same physical link share one daily draw so scenario windows with **`directional_min_receive_fraction = 0`** do not show fake asymmetric noise — see `docs/project_script_design.md`. Keep **`backfill_log.py` and `live_log.py` in parity** when changing this path.
+17. **Packaging:** on explicit request, promote **`local/savedsearches.conf`** (including **alert** scheduled searches → **`index=alerts`**) and **`local/data/ui/views/*.xml`** to **`default/`** with full-file copies for Git/AMI.
 
 - **Splunk install path:** scripts default to `SPLUNK_HOME=/opt/splunk`. On **macOS** (developer installs), set `SPLUNK_HOME` explicitly, e.g. `export SPLUNK_HOME=/Applications/Splunk`, when running the reset script or any doc examples that call `$SPLUNK_HOME/bin/splunk`.
-- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops Splunk, deletes per-index data under `$SPLUNK_DB`, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), removes `local/ai_lab_scenarios.conf`, restarts, then (if set) verifies all `default/indexes.conf` app indexes are empty. **Requires** `SPLUNK_AUTH` (same credentials as the workshop admin user) for the post-start SPL verification. See `docs/project_test_design.md` for the full contract.
-- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops app generators first (`backfill_log.py`/`live_log.py`), confirms no orphan `launcher.py`/`backfill_log.py`/`live_log.py`, stops Splunk, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), deletes per-index data under `$SPLUNK_DB`, removes `local/ai_lab_scenarios.conf`, restarts, then verifies all `default/indexes.conf` app indexes are empty. Prefer token auth (`SPLUNK_TOKEN`/`AUTH_TOKEN`) sourced from Cursor MCP config; use `SPLUNK_AUTH` only as fallback. See `docs/project_test_design.md` for the full contract.
+- **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops app generators first (`backfill_log.py`/`live_log.py`), confirms no orphan `launcher.py`/`backfill_log.py`/`live_log.py`, stops Splunk, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), deletes per-index data under `$SPLUNK_DB`, removes `local/ai_lab_scenarios.conf`, syncs packaged `local` saved searches and views into `default/` per script header, restarts Splunk, then verifies all `default/indexes.conf` app indexes are empty (with **`ai_lab_logs`** excluding **`ai_lab:launcher`** / **`ai_lab:spool_cleanup`** as in smoke). Prefer token auth (`SPLUNK_TOKEN`/`AUTH_TOKEN`) from Cursor MCP config; use `SPLUNK_AUTH` only as fallback. See `docs/project_test_design.md` for the full contract.
 - **Mandatory test gate after reset:** always run `bash scripts/test_smoke.sh` immediately after reset and require pass before region-lock/generation tests.
 - **Ingestion details** (file monitors, `crcSalt`, spool filename uniqueness, `_time` from JSON): `docs/project_conf_design.md` and the **Ingestion** subsection in `docs/project_script_design.md`. App monitors use **`crcSalt = <SOURCE>`** (literal Splunk token), not a fixed arbitrary string, so the CRC includes each file’s path.
 - **Sample contracts:** `samples/<index>/<sourcetype>/README.md` and `sample.<ext>` — keep payload structure aligned with the README/template contract; routing (`index`, `sourcetype`, `host`, `source`) stays in `default/inputs.conf`.
