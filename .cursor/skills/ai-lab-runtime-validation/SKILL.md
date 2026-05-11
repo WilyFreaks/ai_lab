@@ -25,6 +25,8 @@ Use this block when the operator is exhausted or returning after a long gap — 
 - Treat `local/savedsearches.conf` as the full source-of-truth set when the user asks to sync saved searches.
 - Default sync behavior is full-copy replacement: copy `local/savedsearches.conf` to `default/savedsearches.conf`.
 - Scheduled **alert** searches (output to **`index=alerts`**, optional **`episode`** rollups) ship in the same file — promote with the same **full local → default** copy when packaging.
+- Current scheduled alert stanzas expected in `default/savedsearches.conf`: `Interface Counter Mismatch`, `Packet Loss Threshold Exceeded`, `CNC Service Health Status Degraded` (all emit `sourcetype=ai_lab_alert` to `index=alerts`).
+- Dashboard episode/timeline SPL should read from `index=alerts sourcetype=ai_lab_alert` (not legacy `index=alert` / `generic_single_line` sources).
 - Do not merge `local` and `default` saved-search stanzas unless the user explicitly asks for a merge.
 - Respect manual dashboard-import ownership: if the user says they will manually import a dashboard source, do not propose dashboard design changes unless explicitly requested.
 
@@ -126,6 +128,7 @@ Use this when validating `index=telemetry sourcetype=cnc_service_health_json` du
 
 1. Omit **`telemetry#cnc_service_health_json#sample.txt#scenario_happening_probability`** in **`[scenario_1]`** unless you want stochastic baseline fallback: when missing or invalid, **`live_log.py`** defaults it to **`1`**, so degraded **`impacted_sre_policy_health_status`** / **`impacted_sr_policy_health_score`** apply on every eligible emission (see `docs/project_scenario_1.md` and `samples/telemetry/cnc_service_health_json/README.md`).
 2. In a recent window with scenario active, confirm VLAN 1002/1003 **sr_policy** rows show **`SERVICE_DEGRADED`** / **50** (via dashboard or `cnc_service_health` / saved-search contract).
+3. Scheduled alert search `CNC Service Health Status Degraded` should stay **Critical** and query `_index_earliest=-6m@m _index_latest=-1m@m`; validate emitted rows in `index=alerts sourcetype=ai_lab_alert`.
 
 ## Scenario control dashboard addendum
 
@@ -146,6 +149,7 @@ Use this when a dashboard XML is copied from another Splunk environment.
    - `index,sourcetype,source,host,time duration`
 3. Mark non-`ai_lab` dependencies (for example legacy indexes or external app script paths) as external dependencies.
 4. Use the inventory as the source for a follow-up comparison CSV when mapping to `ai_lab` saved searches and indexes.
+5. For scenario regional dashboards, verify lookup file correctness: AU dashboard uses `router_areas_au.csv`; JP dashboard uses `router_areas_jp.csv`.
 
 ## Post-migration generation checkpoint
 

@@ -177,6 +177,7 @@ Saved-search quality intent for backfill checks:
   - must return non-zero results when `cnc_srte_path_json` generation is active
 - `cnc_service_health`:
   - must return non-zero results when generation is active; during **`scenario_1`**, **`impacted_sre_policy_health_status`** / score overrides apply each tick because **`scenario_happening_probability` defaults to 1** when omitted (validate in UI or ad-hoc recent-window spot-check if extending tests)
+  - scheduled alert stanza `CNC Service Health Status Degraded` should emit `severity="Critical"` rows to `index=alerts sourcetype=ai_lab_alert` using `_index_earliest=-6m@m _index_latest=-1m@m`
 - `cnc_interface_ifInPktsRate`, `cnc_interface_ifOutPktsRate`, `thousandeyes_response_time_sec`:
   - generated values must stay in the configured range from `default/ai_lab_scenarios.conf` (+ trend / daily-variation tolerance in `assert_savedsearch_time_aware_range`)
   - **`trend_per_day` drift**: `assert_thousandeyes_trend_per_day` verifies ThousandEyes medians rise (or fall) between two checkpoints consistent with **`[baseline]`** head anchor and **`response_time_ms.trend_per_day`**; skips if `trend_per_day` is zero, **`baseline.region`** is not `au`/`jp`, or too few raw samples in the ±window
@@ -217,6 +218,10 @@ Saved-search quality intent for backfill checks:
   - `index=twamp`
   - `index=telemetry sourcetype=cnc_srte_path_json`
   - `index=telemetry sourcetype=cnc_interface_counter_json`
+- For scenario episode/timeline panels, verify the data-source contract is `index=alerts sourcetype=ai_lab_alert` (not `index=alert`/`generic_single_line`).
+- For regional route lookup panels, verify lookup mapping remains region-correct:
+  - AU dashboard uses `router_areas_au.csv`
+  - JP dashboard uses `router_areas_jp.csv`
 
 ---
 

@@ -566,30 +566,34 @@
       <title>Episodes</title>
       <table>
         <search>
-          <query>index=alert sourcetype=generic_single_line
-| eval related_slice=split(related_slice,",")
-| mvexpand related_slice
-| eval slice=coalesce(slice, related_slice)
-| eval alert_time=strftime(_time,"%Y/%m/%d %H:%M:%S")
-| eval alert_time_name=alert_time." ".alert_name
-| bin span=20m _time
-| search alert_name!="*Warning*Counter*"
-```| eval alert_name=replace(alert_name, "Warning", "Critical")```
-| stats count by _time slice alert_name source
-| rex field=alert_name "from (?&lt;router1&gt;R[0-9]*)"
-| rex field=alert_name "to (?&lt;router2&gt;R[0-9]*)"
-| eval alert_name=alert_name." (".count.")"
-| eval sort_no=case(router1="R7" AND router2="R5",3,router1="R5" AND router2="R7",2,true(),1)
-| sort - sort_no
-| stats list(router1) as router1 list(router2) as router2 list(alert_name) as alert_name list(count) as alert_count dc(source) as dc_source sum(count) as cnt by _time slice
-| eval router1=mvindex(router1, 0), router2=mvindex(router2, 0)
-| eval sort_no=case(router1="R7" AND router2="R5",2,true(),1)
-| eval severity=case(dc_source&gt;=3,"Critical",dc_source&gt;=1,"Warning",true(),"Normal") 
-| sort - sort_no _time dc_source cnt
-| fields - dc_source cnt
-| eval episode="[Warning] Service Disruption: Slice".slice." Traffic Dropping on the link from ".router1." to ".router2
-| rename alert_name as alerts
-| table _time slice episode alerts severity</query>
+          <query>index=alerts sourcetype=ai_lab_alert alert_name="[Critical]*" source="alert:Interface Counter Mismatch" 
+| eval related_slice=split(related_slice,",") 
+| mvexpand related_slice 
+| eval slice = coalesce(slice, related_slice) 
+| stats first(_time) as _time count by slice alert_name source 
+| rex field=alert_name "from (?&lt;router1&gt;R[0-9]*)" 
+| rex field=alert_name "to (?&lt;router2&gt;R[0-9]*)" 
+| join type=left slice 
+    [ search index=alerts sourcetype=ai_lab_alert alert_name="[Critical]*" source!="alert:Interface Counter Mismatch" 
+    | stats first(_time) as _time count by slice alert_name source 
+    | eval {source}_alert_name = alert_name." (".count.")" 
+    | stats dc(source) as dc_sub_alert sum(count) as sub_alert_count values(*) as * by slice 
+    | fields - source alert_name count 
+    | foreach alert:* 
+        [ eval "&lt;&lt;FIELD&gt;&gt;" = mvjoin('&lt;&lt;FIELD&gt;&gt;', "###") ] 
+    | rename "alert:Packet Loss*" as "alert_1:Packet Loss*", "alert:CNC*" as "alert_2:CNC*" 
+    | eval sub_alert = "" 
+    | foreach alert_* 
+        [ eval sub_alert = if(isnotnull('&lt;&lt;FIELD&gt;&gt;'), sub_alert."###".'&lt;&lt;FIELD&gt;&gt;', sub_alert) ] 
+    | fields slice sub_alert sub_alert_count dc_sub_alert ] 
+| rex field=sub_alert max_match=0 "###(?&lt;sub_alert&gt;[^#]+)" 
+| eval alert_name = alert_name." (".count.")" 
+| eval alert_name = mvappend(alert_name, sub_alert) 
+| eval dc_alert = dc_sub_alert + 1
+| eval episode = "Traffic on Slice".slice." dropping on the link from ".router1." to ".router2."."
+| sort - count sub_alert_count dc_alert + _time
+| fields _time episode alert_name count sub_alert_count dc_alert
+| eval impact = case(count&gt;=30, "High", dc_alert&gt;=10, "Medium", true(),"Low")</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
           <sampleRatio>1</sampleRatio>
@@ -604,8 +608,8 @@
         <option name="rowNumbers">false</option>
         <option name="totalsRow">false</option>
         <option name="wrap">true</option>
-        <format type="color" field="severity">
-          <colorPalette type="map">{"Critical":#9E2520,"Warning":#CBA700}</colorPalette>
+        <format type="color" field="impact">
+          <colorPalette type="map">{"High":#9E2520,"Medium":#CBA700}</colorPalette>
         </format>
         <drilldown>
           <set token="form.slice">$row.slice$</set>
@@ -653,13 +657,13 @@
       <title>Alert Timeline Slice$slice$</title>
       <viz type="timeline_app.timeline">
         <search>
-          <query>index=alert
-| eval related_slice=split(related_slice,",")
+          <query>index=alerts
+| eval related_slice = split(related_slice, ",")
 | mvexpand related_slice
-| eval slice=coalesce(slice, related_slice)
-| search slice=$slice$
-| eval source=replace(source, "alert:", "")
-| eval source=replace(source, "Alert:", "")
+| eval slice = coalesce(slice, related_slice)
+| search slice=*
+| eval source = replace(source, "alert:", "")
+| eval source = replace(source, "Alert:", "")
 | table _time source severity</query>
           <earliest>$PERIOD.earliest$</earliest>
           <latest>$PERIOD.latest$</latest>
@@ -702,7 +706,7 @@
 | mvexpand hops_with_index 
 | rex field=hops_with_index "^(?&lt;hop_index&gt;[^:]+):::(?&lt;router_name&gt;.+)$" 
 | fields host router_name hop_index route_changed unique_routes 
-| lookup au_router_areas.csv router_name 
+| lookup router_areas_au.csv router_name 
 | rename host as path 
 | eval from = router_name 
 | appendpipe 

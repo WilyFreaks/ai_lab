@@ -405,9 +405,9 @@ Scripted input launches `launcher.py` only. Event ingestion is file-based via mo
 - `var/spool/ai_lab/syslog/wdm_pm/` (when enabled)  
   → `index=syslog`, `sourcetype=wdm_pm`; payload should include endpoint identity fields compatible with `lookups/router_wdm_transponders.csv` so searches can join route A/Z interfaces and bound transponder ports.
 
-**Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. Population strategy is TBD, but it will not be fed by the NDJSON spool pipeline.
+**Derived `alerts` index:** there is no file-ingest `samples/...` path for `alerts` by design. Population is scheduled-search output (for example `Interface Counter Mismatch`, `Packet Loss Threshold Exceeded`, and `CNC Service Health Status Degraded` stanzas in `default/savedsearches.conf`) and should emit `sourcetype=ai_lab_alert`.
 
-**Derived `episode` index:** there is no file-ingest `samples/...` path for `episode` by design. The `episode` index is intended to be materialized from `alerts` (details TBD); do not add sample monitors for `episode` in `inputs.conf`.
+**Derived `episode` index:** there is no file-ingest `samples/...` path for `episode` by design. The `episode` index is intended to be materialized from `alerts`; until dedicated materialization is enabled, scenario dashboards may compute episode summaries directly from `index=alerts`. Do not add sample monitors for `episode` in `inputs.conf`.
 
 ## WDM PM generation contract
 

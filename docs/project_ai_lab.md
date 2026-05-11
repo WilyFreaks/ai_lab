@@ -104,10 +104,12 @@ Indexes are defined in `default/indexes.conf`. Current intent:
 - **Derived `alerts` index**
   - `alerts` is reserved for *scheduled-search output* (workshop “alerting” signals).
   - It is expected to be empty until those scheduled searches run, and it does not require `samples/...` templates.
+  - Current workshop alert sourcetype contract: `sourcetype=ai_lab_alert` (emitted by scheduled stanzas such as `Interface Counter Mismatch`, `Packet Loss Threshold Exceeded`, and `CNC Service Health Status Degraded`).
 - **Derived `episode` index**
   - `episode` is reserved for a higher-level rollup of `alerts` (for example “episodes” as aggregated windows).
   - The materialization schedule and SPL will be defined later (not shipped in `default/` yet).
   - Like `alerts`, it is not expected to have a `samples/...` file-ingest path.
+  - Current scenario dashboards build episode summaries directly from `index=alerts` until dedicated `index=episode` materialization is introduced.
 
 **Naming note:** “CNC” still appears in field names, sourcetypes, and paths (for example `cnc_interface_counter_json` and `cnc_srte_path_json`) because that is the domain data model, but the old duplicate Splunk index named `cnc` is intentionally removed in favor of `telemetry` for interface telemetry and `alerts` for scheduled alert outputs.
 
@@ -159,6 +161,8 @@ Use this when you are tired or returning cold — **one read, then pause**.
 15. **Baseline quality tests:** `scripts/test_baseline.sh` **`exec`s `scripts/test_backfill.sh`** (one implementation). `test_backfill.sh` includes optional **backfill/live handoff** continuity checks when `baseline.backfill_completed=true` and the live cursor has crossed the shared minute boundary; tunables `BACKFILL_LIVE_HANDOFF_SLACK_SEC`, `BACKFILL_LIVE_HANDOFF_GAP_STEP_MULT`. See `docs/project_test_design.md`.
 16. **Telemetry paired-link daily variation:** `ifInPktsRate` / `ifOutPktsRate` on opposite ends of the same physical link share one daily draw so scenario windows with **`directional_min_receive_fraction = 0`** do not show fake asymmetric noise — see `docs/project_script_design.md`. Keep **`backfill_log.py` and `live_log.py` in parity** when changing this path.
 17. **Packaging:** on explicit request, promote **`local/savedsearches.conf`** (including **alert** scheduled searches → **`index=alerts`**) and **`local/data/ui/views/*.xml`** to **`default/`** with full-file copies for Git/AMI. Full workshop reset (`scripts/reset_workshop_state.sh`) also merges **`metadata/local.meta`** into **`metadata/default.meta`** (see `docs/project_script_design.md` → *reset_workshop_state.sh packaging sync*).
+18. **Scenario dashboard alert sourcing:** episode/timeline panels should query **`index=alerts sourcetype=ai_lab_alert`** (not legacy `index=alert` / `generic_single_line`).
+19. **Region lookup wiring:** keep `scenario_1_au` on `lookup router_areas_au.csv` and `scenario_1_jp` on `lookup router_areas_jp.csv`.
 
 - **Splunk install path:** scripts default to `SPLUNK_HOME=/opt/splunk`. On **macOS** (developer installs), set `SPLUNK_HOME` explicitly, e.g. `export SPLUNK_HOME=/Applications/Splunk`, when running the reset script or any doc examples that call `$SPLUNK_HOME/bin/splunk`.
 - **Workshop full reset (destructive):** `bash scripts/reset_workshop_state.sh --yes` — stops app generators first (`backfill_log.py`/`live_log.py`), confirms no orphan `launcher.py`/`backfill_log.py`/`live_log.py`, stops Splunk, removes all files under `etc/apps/ai_lab/var/spool/ai_lab` (keeping the directory), deletes per-index data under `$SPLUNK_DB`, removes `local/ai_lab_scenarios.conf`, syncs packaged `local` saved searches, dashboard XML, and merged **`metadata/default.meta`** from **`metadata/local.meta`** into `default/` per script header, restarts Splunk, then verifies all `default/indexes.conf` app indexes are empty (with **`ai_lab_logs`** excluding **`ai_lab:launcher`** / **`ai_lab:spool_cleanup`** as in smoke). Prefer token auth (`SPLUNK_TOKEN`/`AUTH_TOKEN`) from Cursor MCP config; use `SPLUNK_AUTH` only as fallback. See `docs/project_test_design.md` for the full contract.

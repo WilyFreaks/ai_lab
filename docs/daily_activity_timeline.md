@@ -9,12 +9,14 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-11 (Mon)
 
-- Session 2 around **07:18 JST** in this chat
+- Session 2 around **07:18-11:13 JST** in this chat
 - Main activities:
-  - Requested a journal update to open a new session
-  - Confirmed next work item remains the dashboard episode summary implementation
+  - Requested a journal update to open a new session, then investigated a suspected lost `local/savedsearches.conf` change
+  - Traced likely overwrite paths and confirmed sync behavior (`local` -> `default`) for saved searches and dashboard XML packaging
+  - Promoted `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, then committed/pushed the packaging update
+  - Updated rules, runtime-validation skill, hooks, and project docs to capture new episode/alerts source contracts and regional lookup wiring
 - Resume anchor:
-  - **Implement episode summary search in dashboard.**
+  - **implement time serise forecasting methods**
 
 - Session 1 around **03:45-05:45 JST**
 - Main activities:

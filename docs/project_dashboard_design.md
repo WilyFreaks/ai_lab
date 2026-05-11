@@ -328,6 +328,20 @@ When a dashboard is copied from another Splunk environment (for example `default
    - `index,sourcetype,source,host,time duration`
 6. Treat non-`ai_lab` indexes and external script paths as legacy dependencies to be compared/migrated later.
 
+### Scenario 1 episode/timeline source contract
+
+For `scenario_1_au.xml` and `scenario_1_jp.xml`:
+
+- Episode and alert-timeline panels should read from `index=alerts sourcetype=ai_lab_alert` (scheduled search outputs), not legacy `index=alert` / `sourcetype=generic_single_line`.
+- Episode rollup logic can use `source="alert:Interface Counter Mismatch"` as the primary trigger and append supporting alert families (for example packet-loss and CNC service-health alerts) by `slice`.
+- Keep the impact presentation tokenized as `impact` (`High`/`Medium`/`Low`) when using the current episode table color mapping.
+
+### Scenario 1 region lookup contract
+
+- `scenario_1_au.xml` must use `lookup router_areas_au.csv`.
+- `scenario_1_jp.xml` must use `lookup router_areas_jp.csv`.
+- Do not use the AU lookup file in JP views (or vice versa), even when the panel SPL is otherwise identical.
+
 Current inventory artifact:
 
 - `docs/scenario_1_au_dashboard_data_sources.csv`

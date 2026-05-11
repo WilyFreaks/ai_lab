@@ -132,6 +132,9 @@ Saved-search validation rules (Splunk test/verification):
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
 - **Scheduled alert searches** (workshop alerting) live in the same `savedsearches.conf` stanzas; output targets **`index=alerts`** (and optional downstream **`episode`** materialization). Promote definitions with the same **full `local → default` copy** as other saved searches when the user asks to package for Git/AMI.
+- Scenario alert contract (current): scheduled searches **`Interface Counter Mismatch`**, **`Packet Loss Threshold Exceeded`**, and **`CNC Service Health Status Degraded`** write **`index=alerts sourcetype=ai_lab_alert`**.
+- Scenario dashboard episode/timeline searches must use **`index=alerts sourcetype=ai_lab_alert`** (not legacy `index=alert` / `sourcetype=generic_single_line`).
+- `CNC Service Health Status Degraded` saved search should remain **Critical-only** and use `_index_earliest=-6m@m _index_latest=-1m@m` to avoid minute-boundary ingestion misses.
 - **Baseline quality tests:** `scripts/test_baseline.sh` only **`exec`s `scripts/test_backfill.sh`** — one implementation, two entrypoint names. `test_backfill.sh` includes **backfill/live handoff** continuity checks (ThousandEyes + `cnc_interface_counter_json`) when `baseline.backfill_completed=true` and live has passed the minute-aligned boundary; otherwise that section **PASSes with a skip reason** (see `docs/project_test_design.md`).
 
 Index intent policy:
@@ -149,6 +152,7 @@ Imported dashboard intake rules:
 - If SPL references non-`ai_lab` indexes or external app paths, record them explicitly in the CSV as legacy/external dependencies instead of silently rewriting them.
 - After remapping imported dashboard SPL to project data sources, document and execute a data-generation checkpoint before UI validation.
 - Current checkpoint target streams for `scenario_1_au` migration: `twamp`, `telemetry#cnc_srte_path_json`, `telemetry#cnc_interface_counter_json`.
+- Scenario router-area lookup contract: `scenario_1_au.xml` uses `lookup router_areas_au.csv`, and `scenario_1_jp.xml` uses `lookup router_areas_jp.csv` (do not cross-wire region lookup files).
 
 Splunk Simple XML `fieldset` visibility:
 - `<fieldset>` only supports `autoRun` and `submitButton` (not `depends`). To show or hide the whole form input block (including Submit), wrap it in `<row depends="$token$">` (or use `depends` / `rejects` on `<input>` per input docs).
