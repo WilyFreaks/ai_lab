@@ -47,7 +47,7 @@ modtime = 1778210661.542347000
 
 [views/scenario_1_au]
 version = 9.4.2
-modtime = 1778393818.279459000
+modtime = 1778525294.648743000
 
 [views/scenario_control]
 version = 9.4.2
@@ -128,12 +128,12 @@ modtime = 1778166864.778610000
 [savedsearches/cnc_interface_ifInPktsRate]
 owner = nobody
 version = 9.4.2
-modtime = 1778173860.080163000
+modtime = 1778528114.753491000
 
 [savedsearches/cnc_interface_ifOutPktsRate]
 owner = nobody
 version = 9.4.2
-modtime = 1778173932.084396000
+modtime = 1778528185.783495000
 
 [savedsearches/cnc_service_health]
 owner = nobody
@@ -184,7 +184,7 @@ modtime = 1778376188.314590000
 
 [views/scenario_1_jp]
 version = 9.4.2
-modtime = 1778393790.524507000
+modtime = 1778525321.053811000
 
 [savedsearches/Packet%20Loss%20Threshold%20Exceeded]
 owner = nobody
@@ -201,7 +201,7 @@ modtime = 1778418409.859160000
 export = none
 owner = nobody
 version = 9.4.2
-modtime = 1778443837.004803000
+modtime = 1778457861.167355000
 
 [savedsearches/Interface%20Counter%20Mismatch]
 access = read : [ * ], write : [ admin, power ]
@@ -209,3 +209,27 @@ export = none
 owner = nobody
 version = 9.4.2
 modtime = 1778444241.454696000
+
+[savedsearches/forecast_predict]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778525268.943263000
+
+[savedsearches/forecast_cdtsm]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778523249.904179000
+
+[savedsearches/forecast_predict_multi_series]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778527520.218782000
+
+[savedsearches/forecast_cdtsm_multi_series]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778527931.523420000

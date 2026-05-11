@@ -182,6 +182,33 @@ Naming and semantics:
 - Keep metric names exactly as above for dashboard/search consistency.
 - Keep Tx/Rx semantics explicit in sample/template fields; do not mix Tx-only and Rx-only metrics without side labeling.
 
+## Saved Search `description =` Authoring Standard
+
+Every saved search that an agent or LLM may call should carry a `description =` key in `savedsearches.conf`. The structure is:
+
+**1. Capability section (required, at the top)**
+What the search returns: output field names, data source, index, sourcetype. This is the primary signal the agent uses to decide "does this search answer my question?" without reading the SPL. Write it to reflect the search's data capability, not its first or most common use case.
+
+**2. "Use case examples:" (recommended, at the bottom)**
+Concrete investigation triggers as short phrases. Examples: "confirm a reroute has occurred", "check per-slice packet loss", "verify telemetry is actively ingested". These are hints to save the agent tokens when matching intent — not an exhaustive list. The agent may use the search in other valid contexts not listed.
+
+**Anti-patterns to avoid:**
+- Leading with internal jargon: "Baseline check", "coverage test", "used by test_backfill.sh" — these describe internal test usage, not data capability.
+- Listing use cases only, with no output field / schema information — the agent cannot interpret results without knowing what fields come back.
+- Overly narrow use case lists that imply the search cannot be used outside those scenarios.
+
+**Example (cnc_srte_path):**
+```
+description = Returns the most recent SR-TE path JSON per CNC host (fields: generated_data, \
+backfill_head, backfill_tail). generated_data contains a list of raw JSON blobs — each blob \
+holds active SR-TE policy results per slice including router hop sequences. \
+Index: telemetry, sourcetype: cnc_srte_path_json. \
+Use case examples: (1) determine which routers carry traffic for a given slice; \
+(2) confirm a reroute has occurred and identify the new path; \
+(3) check path asymmetry between slices; \
+(4) verify SR-TE telemetry is actively ingested and data is fresh.
+```
+
 ## Sample Directory Structure
 
 ```

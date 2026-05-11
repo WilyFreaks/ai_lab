@@ -503,7 +503,7 @@ index=ai_lab_logs sourcetype=ai_lab:spool_cleanup | table _time deleted_count er
 
 Before destructive reset actions, `scripts/reset_workshop_state.sh` now performs a packaging sync from `local/` to `default/` so workshop UI/search edits are preserved in Git-tracked defaults:
 
-- `local/savedsearches.conf` -> `default/savedsearches.conf` (full-file replacement when local file exists)
+- `local/savedsearches.conf` -> `default/savedsearches.conf` (**full-file `cp`** when local file exists; this can **drop default-only stanzas**—for Git/AMI packaging by hand, **merge** `local` into `default` like metadata, then reconcile if you rely on this script step)
 - `local/data/ui/views/*.xml` -> `default/data/ui/views/<same-name>.xml` (per-file full replacement for each local dashboard XML)
 - `metadata/local.meta` merged into `metadata/default.meta` via `scripts/merge_local_meta_to_default_meta.py` when `local.meta` exists: Splunk UI metadata stanzas are merged into `default.meta`, **`[savedsearches/...]`** rows are dropped unless a matching stanza exists in **`default/savedsearches.conf`** (evaluated after the savedsearches copy above), and **`owner = admin`** in merged bodies is rewritten to **`owner = nobody`**. If **`metadata/local.meta`** is absent, this step is skipped.
 

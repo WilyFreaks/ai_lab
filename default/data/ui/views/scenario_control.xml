@@ -100,20 +100,21 @@
   </row>
   <row depends="$region$">
     <panel>
-      <title>Agent Skill Files</title>
+      <title>Agent Rules &amp; Skills (plain text)</title>
       <html>
+        <p style="margin:0 0 0.75em 0;color:#555;font-size:12px">Links open UTF-8 plain text (.txt mirrors of the Markdown) so attendees can select-all and paste into Cursor. Use &quot;Save As&quot; from the browser if you prefer a file.</p>
         <ul>
         <li>
-            <a href="/static/app/ai_lab/agent_rules_en.md" target="_blank">Agent Rules (English)</a>
+            <a href="/static/app/ai_lab/agent_rules_en.txt" target="_blank">Agent Rules (English)</a>
           </li>
         <li>
-            <a href="/static/app/ai_lab/agent_skills_en.md" target="_blank">Agent Skills (English)</a>
+            <a href="/static/app/ai_lab/agent_skills_en.txt" target="_blank">Agent Skills (English)</a>
           </li>
         <li>
-            <a href="/static/app/ai_lab/agent_rules_jp.md" target="_blank">Agent Rules (Japanese)</a>
+            <a href="/static/app/ai_lab/agent_rules_jp.txt" target="_blank">Agent Rules (Japanese)</a>
           </li>
         <li>
-            <a href="/static/app/ai_lab/agent_skills_jp.md" target="_blank">Agent Skills (Japanese)</a>
+            <a href="/static/app/ai_lab/agent_skills_jp.txt" target="_blank">Agent Skills (Japanese)</a>
           </li>
         </ul>
       </html>

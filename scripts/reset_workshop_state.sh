@@ -2,7 +2,11 @@
 set -euo pipefail
 
 # Reset workshop runtime state:
-# 0) sync local packaging into default (savedsearches, dashboards, merged metadata from local.meta)
+# 0) sync local packaging into default:
+#    - savedsearches.conf: stanza/key-level merge (local wins per key, default-only keys kept),
+#      validated with btool before/after (local disabled during after-test); reverts on failure
+#    - dashboards: per-file full replace (local -> default)
+#    - metadata: merge local.meta into default.meta
 # 1) stop ai_lab generators (backfill/live) and confirm no orphan app generator python remains
 # 2) stop Splunk
 # 3) delete all files under app var/spool (monitored spool JSON, etc.)
@@ -205,9 +209,71 @@ sync_local_packaging_artifacts() {
       echo "ERROR: Refusing to write saved searches path outside app root: $DEFAULT_SAVEDSEARCHES_CONF"
       exit 1
     fi
+    local merge_ss_py="$APP_ROOT/scripts/merge_local_savedsearches_to_default.py"
+    if [[ ! -f "$merge_ss_py" ]]; then
+      echo "ERROR: Missing merge helper: $merge_ss_py"
+      exit 1
+    fi
     mkdir -p "$(dirname "$DEFAULT_SAVEDSEARCHES_CONF")"
-    cp "$LOCAL_SAVEDSEARCHES_CONF" "$DEFAULT_SAVEDSEARCHES_CONF"
-    echo "  synced: $LOCAL_SAVEDSEARCHES_CONF -> $DEFAULT_SAVEDSEARCHES_CONF"
+
+    # --- capture btool "truth" (local + default, runtime effective) ---
+    local btool_truth
+    btool_truth="$(mktemp /tmp/btool_truth_XXXXXX.txt)"
+    "$SPLUNK_BIN" btool savedsearches list --app=ai_lab > "$btool_truth" 2>&1 || true
+    echo "  btool truth stanzas: $(grep -c '^\[' "$btool_truth" || true)"
+
+    # --- backup current default in case we need to revert ---
+    local default_backup
+    default_backup="$(mktemp /tmp/default_savedsearches_backup_XXXXXX.conf)"
+    cp "$DEFAULT_SAVEDSEARCHES_CONF" "$default_backup"
+
+    # --- run stanza/key-level merge (local wins per key, default-only keys kept) ---
+    python3 "$merge_ss_py" --app-root "$APP_ROOT"
+    echo "  merged: $LOCAL_SAVEDSEARCHES_CONF -> $DEFAULT_SAVEDSEARCHES_CONF"
+
+    # --- after-test: disable local, run btool on default-only, restore local ---
+    local btool_post
+    btool_post="$(mktemp /tmp/btool_post_XXXXXX.txt)"
+    local local_disabled="${LOCAL_SAVEDSEARCHES_CONF}.disable"
+    mv "$LOCAL_SAVEDSEARCHES_CONF" "$local_disabled"
+    "$SPLUNK_BIN" btool savedsearches list --app=ai_lab > "$btool_post" 2>&1 || true
+    mv "$local_disabled" "$LOCAL_SAVEDSEARCHES_CONF"
+    echo "  btool post-merge (default-only) stanzas: $(grep -c '^\[' "$btool_post" || true)"
+
+    # --- compare truth vs post-merge-default-only per named [stanza] ---
+    local btool_diff_result
+    btool_diff_result="$(python3 - "$btool_truth" "$btool_post" << 'PYEOF'
+import re, sys
+STANZA = re.compile(r'^\[[^\]]+\]$')
+def split_named(text):
+    blocks = {}; cur = None
+    for line in text.splitlines():
+        if STANZA.match(line):
+            cur = line; blocks.setdefault(cur, []).append(line)
+        elif cur is not None:
+            blocks[cur].append(line)
+    return {k: '\n'.join(v) for k, v in blocks.items()}
+truth = split_named(open(sys.argv[1]).read())
+post  = split_named(open(sys.argv[2]).read())
+only_t = sorted(set(truth) - set(post))
+only_p = sorted(set(post)  - set(truth))
+diffs  = [k for k in sorted(set(truth) & set(post)) if truth[k] != post[k]]
+if only_t or only_p or diffs:
+    print(f"FAIL only_in_truth={only_t} only_in_post={only_p} body_diffs={diffs}")
+    sys.exit(1)
+print(f"PASS {len(truth)} stanzas match")
+PYEOF
+)"
+    echo "  btool validation: $btool_diff_result"
+
+    if echo "$btool_diff_result" | grep -q '^FAIL'; then
+      echo "ERROR: savedsearches merge validation failed — reverting default/savedsearches.conf"
+      cp "$default_backup" "$DEFAULT_SAVEDSEARCHES_CONF"
+      rm -f "$btool_truth" "$btool_post" "$default_backup"
+      exit 1
+    fi
+
+    rm -f "$btool_truth" "$btool_post" "$default_backup"
   else
     echo "  skip (not found): $LOCAL_SAVEDSEARCHES_CONF"
   fi

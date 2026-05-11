@@ -206,7 +206,7 @@
     [ search index=thousandeyes earliest=-7d 
     | bin _time span=1m 
     | stats avg(response_time_sec) by _time 
-    | predict algorithm=LLP5 avg(response_time_sec) algorithm=LLP5 holdback=60 future_timespan=60 period=1440 lower95=lower_bound upper95=upper_bound
+    | predict avg(response_time_sec) algorithm=LLP5 holdback=60 future_timespan=60 period=1440 lower95=lower_bound upper95=upper_bound
     | rename lower_bound(prediction(avg(response_time_sec))) as lower_bound upper_bound(prediction(avg(response_time_sec))) as upper_bound
     | fields _time lower_bound upper_bound ] 
 | fields _time avg(response_time_sec) lower* upper*</query>
@@ -563,8 +563,22 @@
   </row>
   <row>
     <panel>
-      <title>エピソード</title>
+      <title>エピソードとアラート</title>
+      <input type="dropdown" token="slice">
+        <label>Slice</label>
+        <choice value="*">ALL</choice>
+        <choice value="1001">1001</choice>
+        <choice value="1002">1002</choice>
+        <choice value="1003">1003</choice>
+        <choice value="1004">1004</choice>
+        <default>*</default>
+      </input>
+    </panel>
+  </row>
+  <row>
+    <panel>
       <table>
+        <title>エピソード</title>
         <search>
           <query>index=alerts sourcetype=ai_lab_alert alert_name="[Critical]*" source="alert:Interface Counter Mismatch" 
 | eval related_slice=split(related_slice,",") 
@@ -573,6 +587,7 @@
 | stats first(_time) as _time count by slice alert_name source 
 | rex field=alert_name "from (?&lt;router1&gt;R[0-9]*)" 
 | rex field=alert_name "to (?&lt;router2&gt;R[0-9]*)" 
+| search slice=$slice$
 | join type=left slice 
     [ search index=alerts sourcetype=ai_lab_alert alert_name="[Critical]*" source!="alert:Interface Counter Mismatch" 
     | stats first(_time) as _time count by slice alert_name source 
@@ -617,19 +632,8 @@
       </table>
     </panel>
     <panel>
-      <title>アラート</title>
-      <input type="dropdown" token="slice">
-        <label>Slice</label>
-        <choice value="*">ALL</choice>
-        <choice value="1001">1001</choice>
-        <choice value="1002">1002</choice>
-        <choice value="1003">1003</choice>
-        <choice value="1004">1004</choice>
-        <choice value="1005">1005</choice>
-        <choice value="1006">1006</choice>
-        <default>*</default>
-      </input>
       <table>
+        <title>アラート</title>
         <search>
           <query>index=alerts severity=* 
 | eval related_slice=split(related_slice,",")
@@ -644,8 +648,8 @@
           <refresh>1m</refresh>
           <refreshType>delay</refreshType>
         </search>
+        <option name="count">20</option>
         <option name="drilldown">none</option>
-        <option name="refresh.display">progressbar</option>
         <format type="color" field="severity">
           <colorPalette type="map">{"Warning":#CBA700,"Critical":#D41F1F}</colorPalette>
         </format>
@@ -654,14 +658,14 @@
   </row>
   <row>
     <panel>
-      <title>Alert Timeline Slice$slice$</title>
+      <title>アラート時系列発生状況 Slice$slice$</title>
       <viz type="timeline_app.timeline">
         <search>
           <query>index=alerts
 | eval related_slice = split(related_slice, ",")
 | mvexpand related_slice
 | eval slice = coalesce(slice, related_slice)
-| search slice=*
+| search slice=$slice$
 | eval source = replace(source, "alert:", "")
 | eval source = replace(source, "Alert:", "")
 | table _time source severity</query>
