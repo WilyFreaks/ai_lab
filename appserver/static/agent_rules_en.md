@@ -1,23 +1,95 @@
-<pre><code># 5G WDM Backbone Network Failure Detection and Recovery Demo Skill
+# AI Lab - Agent rules (Splunk workshop)
 
-This skill demonstrates failure detection and recovery workflows for a 5G WDM backbone network.
+**Workshop purpose:** The lab is meant to demonstrate **Splunk as a machine data platform for an intelligent agent** - bringing **heterogeneous operational data** (synthetic UX metrics, TWAMP, streaming telemetry, IOS/syslog, WDM PM/alerts, scheduled alert artifacts) onto **one analyzable timeline**, using **transparent SPL and knowledge objects** (indexes, sourcetypes, saved searches, lookups, clear time windows) instead of opaque "black box" answers. Agent responses should **show how Splunk ingests, models, and queries** that data so facilitators can tell an **"agent + Splunk"** story, not a disconnected guess.
 
-Using Splunk MCP, it performs correlation analysis across ThousandEyes, TWAMP, Telemetry, IOS, and syslog data sources to identify the root cause of silent failures and simulate recovery actions through CNC SR-TE Policy bypass path configuration.
+These rules govern how an agent uses Splunk for the **ai_lab** 5G WDM backbone workshop. They complement repository `.cursor` rules and project docs (`docs/project_ai_lab.md`, `docs/project_test_design.md`).
 
-This skill is triggered by the following keywords:
+---
 
-- WDM network failure
-- Backbone network failure investigation
-- TWAMP quality investigation
-- Network failure recovery
-- Bypass path
-- Episode correlation analysis
-- Packet loss investigation
-- Service quality investigation
+## 1. Splunk access
 
-This skill MUST always be triggered when the user says:
+1. **Prefer Splunk MCP** when the `splunk-mcp-server` integration is available. Before calling a tool, read its schema in the MCP tools folder.
+2. **Authentication:** use a **Bearer token** (e.g. from Cursor MCP config `AUTH_TOKEN`) for REST or CLI `-token`; do not guess passwords.
+3. If MCP is unavailable, fall back to **`splunk` CLI** or REST against the deployment's management port, still using token auth when possible.
 
-- "WDM network failure"
-- "Investigate network failure"
-- "TWAMP"
-- "Network failure recovery"</code></pre>
+---
+
+## 2. Queries and saved searches
+
+1. **Saved-search-first:** for workshop verification and investigation, prefer **`| savedsearch <name>`** in app **`ai_lab`**. Inspect stanza titles in `default/savedsearches.conf` (and **`local/savedsearches.conf`** if the deployment overrides). All 32 current saved searches have a `description =` field — read it to confirm capability before calling.
+2. **Do not run saved searches from other apps** unless the user explicitly asks for a cross-app comparison.
+3. **Raw SPL** is acceptable when no saved search fits, or for narrow ad hoc checks; keep **`index=`** / **`sourcetype=`** explicit and aligned with shipped data contracts.
+4. **Episode / alert correlation:** prefer materialized workshop objects when present (e.g. **`index=episode`**). If a deployment defines **`list_episodes`** (or equivalent) in **`ai_lab`**, use it. Otherwise use **`index=alerts sourcetype=ai_lab_alert`** for scenario alert rows (see project docs for the current contract).
+5. **Forecasting searches:** the app ships four ML forecasting saved searches — `forecast_cdtsm` and `forecast_predict` for single-series ThousandEyes response time; `forecast_cdtsm_multi_series` and `forecast_predict_multi_series` for per-interface traffic across all routers. Use these for anomaly detection and workshop ML demos.
+6. **Parameterized searches:** `cnc_interface_ifInPktsRate_for_a_router` requires a `router` argument (e.g. `router="R2"`). Pass it via MCP `args` or CLI token substitution. Read the search's `description =` for the full parameter spec.
+7. **How to pick the right saved search using `description =`:** each saved search in `ai_lab` carries a `description =` key structured as:
+   - **Capability first** — what the search returns (output fields, data source, index/sourcetype). This is the primary signal for search selection; read it to decide whether this search answers your question.
+   - **"Use case examples:"** at the bottom — concrete investigation triggers (e.g. "confirm a reroute", "check packet loss per slice"). These are hints, not an exhaustive list; the search can be used in other valid contexts not listed.
+   - **Do not treat "use case examples" as the only valid uses.** If the capability section matches your need, call the search even if no listed example matches exactly.
+   - If a search has **no `description =`**, fall back to reading the `search =` SPL directly to infer capability before deciding to call it or write raw SPL instead.
+
+---
+
+## 3. Data contracts (must not contradict)
+
+1. **TWAMP (`pca_twamp_csv`):** **`ul_lostperc` / `dl_lostperc`** are **integer percent 0-100**, not ppm or millionths. Packet-rate fields are **pps** where applicable. UL sequence rules apply per project script design.
+2. **Telemetry (`cnc_interface_counter_json`):** use workshop lookups and field names as in saved searches (e.g. **`telemetry_if_counter`**, interface rate saved searches).
+3. **WDM PM (`wdm_pm`):** treat **`LSBIASCUR` / `SUMOOPCUR`** as **Tx-leaning**, **`FEC_BEF_COR_ER` / `SUMIOPCUR`** as **Rx-leaning**; bind endpoints with **`lookups/router_wdm_transponders.csv`** (see `docs/project_ai_lab.md`).
+4. **ThousandEyes:** follow the app's sourcetype and field naming; watch unit conversions (e.g. ms vs s) when comparing to scenario bounds.
+
+---
+
+## 4. Workshop tone and evidence
+
+1. Default to **evidence and hypotheses** (what correlates in time, what slice/link is implicated). Avoid **stating a single definitive "root cause"** unless the user asks for a debrief or the evidence chain is explicit in the data.
+2. **Scenario / quiz mode:** do not spoil facilitator-only answers in attendee-facing wording unless the user requests it.
+3. **"Recovery" / SR-TE:** describe **observed path or policy signals** in Splunk (IOS, telemetry, SR-TE JSON). Do not imply the agent pushed configuration to real network elements unless that is literally in scope.
+
+---
+
+## 5. Workshop environment
+
+1. **Data is pre-loaded:** the workshop Splunk instance has all indexes, sourcetypes, saved searches, and lookups already populated. Do not attempt to load or modify data — use saved searches to query what is there.
+2. **Scenario state:** the facilitator controls fault scenarios via the `scenario_control` dashboard. Do not manually modify scenario configuration; ask the facilitator if you need the scenario activated or reset.
+3. **Scope:** confine queries and investigation to the **`ai_lab`** app indexes (`telemetry`, `twamp`, `thousandeyes`, `syslog`, `ios`, `alerts`). Do not query indexes from other apps unless the facilitator explicitly asks.
+
+---
+
+## 6. When to use the investigation skill (`skills_en.md` / `skills_jp.md`)
+
+Use the **5G WDM backbone failure investigation** workflow when the user's intent matches **multi-source correlation** (ThousandEyes + alerts/TWAMP + telemetry + IOS + WDM), for example:
+
+- WDM / backbone **failure investigation**, **packet loss**, **service degradation**, **bypass / SR-TE path**, **episode or alert correlation**, **TWAMP quality investigation** (phrase-level, not the token "TWAMP" alone in unrelated tasks).
+
+**Do not** force that workflow for: generator code edits, **`scripts/test_*.sh`** debugging, saved-search packaging only, or generic Splunk admin - use normal engineering rules instead.
+
+---
+
+## 7. Triggers (guidance, not literal string matching)
+
+- **Strong triggers:** "investigate backbone failure", "WDM + router correlation", "episode / alert timeline", "packet loss across slices", "SR-TE bypass / recovery story".
+- **Weak trigger:** the substring **"TWAMP"** alone - confirm the user wants **end-to-end investigation** before running the full seven-step skill; otherwise answer the narrow TWAMP question only.
+
+---
+
+## 8. Optional UX
+
+If the user asks for a **compact** run (no banners), shorten status lines while keeping **step boundaries** and **summaries** so results stay auditable.
+
+---
+
+## 9. Cursor Canvas - data-driven workshop boards
+
+When the facilitator wants an **A/B or scoreboard** (for example **LLM cost vs saved-search reuse**, **latency**, **accuracy**), prefer a **Cursor Canvas** (a single `*.canvas.tsx` beside chat) over long narrative-only chat.
+
+1. **Location:** write canvases only under  
+   `~/.cursor/projects/<workspace>/canvases/<name>.canvas.tsx`  
+   (see the Cursor canvas skill: `~/.cursor/skills-cursor/canvas/SKILL.md`). Import **only** from `cursor/canvas`; **no `fetch`**, **no** extra modules - embed or persist data per that skill.
+
+2. **Splunk-backed numbers:** anything measured from Splunk (job duration, row counts, checksums) should appear as **constants or tables** with **how and when** it was recorded (`recordedAt`, probe type: REST oneshot, MCP tool round-trip, etc.). Refresh those constants **before each workshop** if the story depends on fresh timings.
+
+3. **LLM tokens and assistant turn latency:** the agent **cannot** reliably read Cursor's per-turn token meter from tools. Use **`useCanvasState`** + inputs (or equivalent) so the facilitator **pastes** totals and **turn latency** (send → final reply) from the Cursor UI or a stopwatch **after each scripted prompt**. Do **not** label SPL character counts or guesses as "LLM tokens."
+
+4. **Accuracy:** record **PASS / FAIL** and **one line of evidence** (for example numeric match of a reference bucket, wrong index, missing field) in persistent canvas state - not hand-wavy "looks fine."
+
+5. **Separation of concerns:** keep **investigation narrative** in `agent_skills_*.md`; keep **metrics and deltas** on the canvas so the audience sees **numbers and provenance** in one place.

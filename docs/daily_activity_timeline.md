@@ -7,6 +7,18 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-12 (Tue)
+
+- Session 1 around **01:00-07:49 JST**
+- Main activities:
+  - Implemented time-series forecasting for the workshop: CDTSM and LLP5-based saved searches for both single-series ThousandEyes response time (`forecast_cdtsm`, `forecast_predict`) and multi-series per-interface traffic (`forecast_cdtsm_multi_series`, `forecast_predict_multi_series`)
+  - Filled `description =` fields for all 32 saved searches in `local/savedsearches.conf` following the "capability first, use case examples at bottom" standard established last session
+  - Ran each saved search via Splunk MCP to verify return format before writing descriptions
+  - Added parameter documentation (`router: e.g. R2`) for parameterized search `cnc_interface_ifInPktsRate_for_a_router`
+  - Merged `local/savedsearches.conf` → `default/savedsearches.conf` and validated with btool (32 stanzas, PASS)
+- Resume anchor:
+  - **Deploy production with prophet search deploy.**
+
 ## 2026-05-11 (Mon)
 
 - Session 2 around **07:18-11:13 JST** in this chat
@@ -502,6 +514,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
+- 2026-05-12: ~0 minutes (1 session), ~3,000 estimated tokens
 - 2026-05-11: ~120 minutes (1 session), ~42,000 estimated tokens
 - 2026-05-10: ~593 minutes (2 sessions), ~60,000 estimated tokens
 - 2026-05-09: ~120 minutes (1 session), ~8,000 estimated tokens
@@ -524,6 +537,7 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
+| 2026-05-12 | ~0 minutes (1 session) | ~3,000 |
 | 2026-05-11 | ~120 minutes (1 session) | ~42,000 |
 | 2026-05-10 | ~593 minutes (2 sessions) | ~60,000 |
 | 2026-05-09 | ~120 minutes (1 session) | ~8,000 |

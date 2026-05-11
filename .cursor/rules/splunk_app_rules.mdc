@@ -11,6 +11,17 @@ Always read:
 - docs/project_dashboard_design.md
 - docs/project_scenario_*.md
 
+Workshop attendee deliverables (`agent_rules_*` / `agent_skills_*`):
+- `appserver/static/agent_rules_en.md` and `agent_skills_en.md` (plus `_jp.md` and `.txt` mirrors, and `docs/` copies) are **workshop-facing documents** that attendees download from the Splunk dashboard and import into their own Cursor instance as rules and skills.
+- Purpose: teach the attendee's local Cursor agent how to use Splunk (MCP, saved-search-first, data contracts, investigation workflow) during the hands-on lab activity.
+- **Content rule (strict):** these files must contain ONLY workshop investigation guidance — Splunk access, saved-search usage, data contracts, investigation steps, tone. **No development content** (packaging, merge scripts, btool, reset procedures, `default/` promotion, Git/AMI). Development rules belong only in `.cursor/rules/splunk_app_rules.mdc` and `.cursor/hooks/`.
+- **Mirror discipline:** whenever you edit any one of these files, sync ALL eight mirrors in the same operation:
+  - `appserver/static/agent_rules_en.md` → `appserver/static/agent_rules_en.txt`, `docs/agent_rules_en.md`, `docs/agent_rules_en.txt`
+  - `appserver/static/agent_rules_jp.md` → `appserver/static/agent_rules_jp.txt`, `docs/agent_rules_jp.md`, `docs/agent_rules_jp.txt`
+  - `appserver/static/agent_skills_en.md` → `appserver/static/agent_skills_en.txt`, `docs/agent_skills_en.md`, `docs/agent_skills_en.txt`
+  - `appserver/static/agent_skills_jp.md` → `appserver/static/agent_skills_jp.txt`, `docs/agent_skills_jp.md`, `docs/agent_skills_jp.txt`
+  - Quick sync command: `cp appserver/static/agent_rules_en.md appserver/static/agent_rules_en.txt && cp appserver/static/agent_rules_en.md docs/agent_rules_en.md && cp appserver/static/agent_rules_en.md docs/agent_rules_en.txt` (repeat for jp, skills).
+
 Session resume ("where i am" / "where am i" / "resume my work"):
 - Always read `docs/daily_activity_timeline.md` as the first action when the user asks where they are or wants to resume the project.
 - Report the current session's resume anchor and the most recent activity summary.
@@ -42,7 +53,7 @@ Scenario dashboard Simple XML (`scenario_1_au.xml`, etc.):
 - **Never edit `default/data/ui/views/` directly** — do not use sed, awk, StrReplace, or any other tool to modify dashboard XML files in `default/data/ui/views/` directly. The only permitted write path is a full-file copy from `local/` on explicit user request. If a rename or text change is needed inside a dashboard, instruct the user to make it in Splunk UI (which saves to `local/`) and then sync local → default on request.
 - **Splunk precedence:** if both `local` and `default` define the same view name, runtime uses the **`local`** copy. Syncing to `default/` keeps Git/AMI packaging aligned; the UI still reflects `local/` until that file changes or is removed.
 - **After sync:** reload the dashboard or refresh the view in Splunk if the editor/browser showed a stale buffer.
-- Mirrors the saved-search policy pattern (`local/` authoring, **`default/`** packaging on request) but for dashboard views.
+- Same **`local/`** authoring / **`default/`** packaging-on-request rhythm as saved searches, but packaging differs: **dashboard XML = full-file replace per view**; **`savedsearches.conf` = merge into `default/`** (see *Saved-search sync policy* below), not a blind wholesale copy of `local` only.
 
 For production data generators (`bin/launcher.py`, `bin/backfill_log.py`, `bin/live_log.py`):
 - Keep weekend/weekday transition behavior smooth.
@@ -106,7 +117,7 @@ Splunk MCP server (`splunk-mcp-server`) usage rules:
 
 `reset_workshop_state.sh` run rules:
 - For unattended runs, execute `./scripts/reset_workshop_state.sh --yes` (avoid interactive `Proceed? (yes/no)` waits).
-- Before running `reset_workshop_state.sh`, explicitly notify the user that the script will sync `local/savedsearches.conf` and `local/data/ui/views/*.xml` into `default/`, merge `metadata/local.meta` into `metadata/default.meta` (when local metadata exists), then wait for user confirmation so they can cancel if needed.
+- Before running `reset_workshop_state.sh`, explicitly notify the user that the script will **copy** `local/savedsearches.conf` over `default/savedsearches.conf` (full replace), **copy** each `local/data/ui/views/*.xml` into `default/` (per-file replace is correct for dashboards), and **merge** `metadata/local.meta` into `metadata/default.meta` (when local metadata exists). Warn that the saved-searches **copy** can **drop `default/`-only stanzas** unless `local` is already a superset; agents packaging by hand should **merge** `local` into `default/savedsearches.conf` like metadata, not rely on blind replace. Then wait for user confirmation so they can cancel if needed.
 - Prefer token-based verification auth, not username/password.
 - Read the token from Cursor MCP config (`~/.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.
@@ -116,22 +127,33 @@ Splunk MCP server (`splunk-mcp-server`) usage rules:
 - **Post-reset “empty index” checks for `ai_lab_logs`:** `scripts/reset_workshop_state.sh` and `scripts/test_smoke.sh` treat the index as empty only after **`NOT sourcetype IN ("ai_lab:launcher","ai_lab:spool_cleanup")`** — scripted inputs emit those rows on Splunk startup and must not fail the clean-slate gate.
 - If a reset run appears slow/hung, first verify whether it is waiting for prompt input, then check `/opt/splunk/var/log/splunk/splunkd.log` for actual stop/start activity.
 
+Saved-search `description =` authoring standard:
+- Every saved search that an agent or LLM may call should have a `description =` key in `local/savedsearches.conf` (promoted to `default/` via merge on packaging). **All 32 current shipped searches have descriptions** — agents can rely on `description =` being present.
+- Structure: **capability first**, **use case examples at the bottom**.
+  - **Capability section (required):** what the search returns — output field names, data source, index, sourcetype. This is the primary signal the agent uses to select the right search. Write it so an agent can decide "does this search answer my question?" without reading the SPL.
+  - **"Use case examples:" (at the bottom, optional but recommended):** concrete investigation triggers in the form of short phrases (e.g. "confirm a reroute has occurred", "check per-slice packet loss"). These are hints, not an exhaustive list — do not write them as the only valid uses.
+- Do **not** lead with internal jargon ("baseline check", "coverage test", "used by test_backfill.sh"). A search may serve multiple purposes; the description should reflect its **data capability**, not the first use case you thought of.
+- If a search has no `description =`, the agent should fall back to reading the `search =` SPL directly to infer capability.
+
 Saved-search validation rules (Splunk test/verification):
 - For app-level validation, use saved searches in app `ai_lab` (do not write raw SPL unless the user explicitly asks for ad-hoc SPL).
 - Preferred saved searches for baseline/live checks:
   - `telemetry_if_counter`
   - `cnc_interface_ifOutPktsRate`
   - `cnc_interface_ifInPktsRate`
+  - `cnc_interface_ifInPktsRate_for_a_router` *(parameterized — requires `router="R2"` style arg)*
   - `thousandeyes_response_time_sec`
   - `cnc_srte_path`
   - `cnc_service_health`
   - `twamp_event_count` (minute buckets with TWAMP events in last 5m; asserted in `scripts/test_backfill.sh`)
   - `twamp_dmean` (avg `ul`/`dl`/`rt` delay means vs `default/ai_lab_scenarios.conf` bounds; asserted in `scripts/test_backfill.sh`)
   - `twamp_jmean` (avg `ul`/`dl`/`rt` jitter means vs conf bounds; asserted in `scripts/test_backfill.sh`)
+  - `twamp_lostperc`, `twamp_rxpkts` (packet loss % and received packet counts per session)
+  - Forecasting / ML: `forecast_cdtsm`, `forecast_predict` (ThousandEyes single-series); `forecast_cdtsm_multi_series`, `forecast_predict_multi_series` (per-interface traffic, all routers)
 - Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ. ThousandEyes abrupt-jump tolerance can be tuned with `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` (default `0..2`).
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
-- Saved-search sync policy: when asked to sync saved searches, treat `local/savedsearches.conf` as full source-of-truth and copy it to `default/savedsearches.conf` as full replacement. Do not merge unless the user explicitly requests merge behavior.
-- **Scheduled alert searches** (workshop alerting) live in the same `savedsearches.conf` stanzas; output targets **`index=alerts`** (and optional downstream **`episode`** materialization). Promote definitions with the same **full `local → default` copy** as other saved searches when the user asks to package for Git/AMI.
+- Saved-search sync policy: when asked to sync or package saved searches for Git/AMI, **merge** `local/savedsearches.conf` into **`default/savedsearches.conf`** (preserve stanzas and keys that exist only in `default/`, apply `local` per-stanza deltas). **Do not** treat a verbatim **`cp local/savedsearches.conf` → `default/savedsearches.conf`** as safe packaging: it is the same failure mode as replacing `default.meta` with only `local.meta`. Use the same discipline as **`metadata/local.meta` merged into `metadata/default.meta`**. If the user explicitly wants `local` to become the **entire** shipped file (they accept dropping default-only stanzas), say so and proceed only with that acknowledgment.
+- **Scheduled alert searches** (workshop alerting) live in the same `savedsearches.conf` stanzas; output targets **`index=alerts`** (and optional downstream **`episode`** materialization). When promoting alert definitions to `default/`, use the **merge** policy above, not a blind full replace, unless the user explicitly accepts wholesale replacement.
 - Scenario alert contract (current): scheduled searches **`Interface Counter Mismatch`**, **`Packet Loss Threshold Exceeded`**, and **`CNC Service Health Status Degraded`** write **`index=alerts sourcetype=ai_lab_alert`**.
 - Scenario dashboard episode/timeline searches must use **`index=alerts sourcetype=ai_lab_alert`** (not legacy `index=alert` / `sourcetype=generic_single_line`).
 - `CNC Service Health Status Degraded` saved search should remain **Critical-only** and use `_index_earliest=-6m@m _index_latest=-1m@m` to avoid minute-boundary ingestion misses.

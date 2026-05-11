@@ -1,305 +1,233 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-</head>
-<body>
-<pre><code># 5G WDM バックボーンネットワーク 障害検知・根本原因究明
+# 5G WDM バックボーン - 障害検知・相関分析・復旧ガイダンス
 
-## 概要
-このスキルは、5G WDM バックボーン環境におけるネットワーク品質異常の検知から根本原因特定・復旧指示までの一連のフローをガイドする。
-Splunkのエピソード相関分析を活用し、ThousandEyes・TWAMP・Telemetry・ios・syslog の各データソースを横断的に分析することで、障害箇所と影響範囲を特定、障害を発生させていると想定される装置を特定する。
+## 目的
 
-## ネットワーク構成
-```
+**ThousandEyes** → **アラート／エピソード** → **TWAMP** → **SR-TE／経路** → **Telemetry** → **IOS** → **WDM（PM＋syslog）** の順で、Splunk 上の**根拠**を積み上げる調査手順をガイドする。既定では**証拠と仮説**までとし、決定的な「根本原因」の単一言及は、ユーザーが解説を求めたとき、またはデータ上の鎖が明らかな場合に限定する。
+
+**前提:** **`rules_jp.md`**（MCP、保存済みサーチ優先、データ契約、`local/` 方針）に従う。
+
+---
+
+## トポロジ（論理）
+
+```text
 R8 -- R6 -- R4 -- R2
 |     |           |
 R9 -- R7 -- R5 -- R3
 ```
-- ルーター: R2〜R9（Cisco NCS シリーズ）
-- プロトコル: SR-MPLS、IS-IS、BFD、BGP
-- 管理IP: 172.20.0.{2-9} = R{2-9}
-- サービス: VRF スライスごとに SR-TE Policy で経路制御（Slice 1001 〜 1004）
 
-## 実行フロー
-以下のステップで進める。**各ステップの冒頭では必ず以下の形式でステータスを表示すること**:
+- **ルータ:** R2-R9（ワークショップ設定上の Cisco NCS 系）。
+- **プロトコル（物語）:** SR-MPLS、IS-IS、BFD、BGP；スライス／VLAN ごとの **SR-TE**（ドキュメント上は **1001-1004** が一般的）。
+- **管理 IP（ラボ想定）:** 例: `172.20.0.{2..9}` ↔ `R{2..9}`（シナリオがその対応を使う場合）。
+- **地域ルックアップ:** AU は **`router_areas_au.csv`**、JP は **`router_areas_jp.csv`** - **混線禁止**。
 
-```
-▶ Step X 実行中: [何をしているか簡潔に]
-```
-調査のために実行するSPLを推測する前に、ニーズを満たす保存済みサーチが利用可能かどうかを確認すること。保存済みサーチに説明がある場合は、それを読んで機能とパラメータを理解する。説明がない場合は、保存済み検索名から用途を判断する。
-必要な保存済み検索はすべて ai_lab アプリ内にある。ai_lab アプリ以外で保存済み検索を実行しないこと。
+---
 
-ステップ完了時は結果サマリーを出力し、次のステップへの導線を示す。 
+## データソース（参照先）
 
-### Step 1: ThousandEyes のモニター
-**冒頭に必ず表示する:**
-```
-▶ Step 1 実行中: ThousandEyes による直近 60 分のサービスモニターの状態を確認しています...
-```
+| 領域 | 代表 index / sourcetype | メモ |
+|------|-------------------------|------|
+| ThousandEyes | `index=thousandeyes` | E2E 合成監視；境界値との比較で **ms と s** に注意。 |
+| TWAMP | `index=twamp` `sourcetype=pca_twamp_csv` | **`ul_lostperc` / `dl_lostperc` は 0-100 の整数％**；共有リンク（例 VLAN **1002/1003**）で telemetry と相関。 |
+| Telemetry | `index=telemetry` `sourcetype=cnc_interface_counter_json` | IF カウンタ；可能なら **`telemetry_if_counter`** 等の保存済みサーチを利用。 |
+| SR-TE 経路 | `index=telemetry` `sourcetype=cnc_srte_path_json` | ホスト・スライスごとの hop / policy 結果。 |
+| IOS | `index=ios` | BFD、IS-IS、SR-TE Policy UPDOWN、リンク系 - TWAMP／telemetry と時刻突合。 |
+| WDM syslog | `wdm_alert`、`wdm_pm` 等 | **`wdm_alert`**: 障害 XML；ホストは EMS エイリアス契約。**`wdm_pm`**: トランスポンダ PM；**`router_wdm_transponders.csv`** で束ねる。 |
+| シナリオアラート | `index=alerts` `sourcetype=ai_lab_alert` | スケジュール検索の実体行。 |
+| エピソード | `index=episode`（投入されている場合） | 上位ロールアップが有効なワークショップ向け。 |
 
-```spl
-# ThousandEyes サービスモニター
-index=thousandeyes 
-| bin _time span=1m 
-| stats avg(response_time_sec) by _time 
-| join type=left _time 
-    [ search index=thousandeyes earliest=-7d 
-    | bin _time span=1m 
-    | stats avg(response_time_sec) by _time 
-    | predict algorithm=LLP5 avg(response_time_sec) algorithm=LLP5 holdback=60 future_timespan=60 period=1440 lower95=lower_bound upper95=upper_bound
-    | rename lower_bound(prediction(avg(response_time_sec))) as lower_bound upper_bound(prediction(avg(response_time_sec))) as upper_bound
-    | fields _time lower_bound upper_bound ] 
-| fields _time avg(response_time_sec) lower* upper*
-```
-上記のサーチを過去 60 分の範囲で実行。
+---
 
-#### サーチ結果の読み方
-上記のサーチで、avg(response_time_sec) が upper_bound を超えた場合はサービス異常。
-サービス異常を検知した時間を障害認知の時間とする。
+## 全体の実行ルール
 
-#### 完了後の必須アウトプット
-サービス異常検知後、**次の Step に進む前に**、必ず以下の形式で出力すること:
-```
-## 📋 Step 1 完了 — サービス異常を検知しました。
+1. **各ステップ開始時**に 1 行表示:
 
-**サービス検知時刻**: YYYY-mm-dd H:M:S Timezone 
-**期待される応答時間**: upper_bound 秒
-**実際の応答時間**: avg(response_time_sec)
-```
+   ```text
+   * Step X 実行中: <短い説明>
+   ```
 
-サービス異常を検知しなかった場合は以下のメッセージを出力:
-```
-## 📋 Step 1 完了 — サービス異常は検知できませんでしたが調査を進めます。
-```
+2. **各ステップ終了時**に **要約**（事実＋タイムスタンプ）と **次ステップ**（またはデータ不足で停止）を書く。
 
-### Step 2: エピソード相関分析（アラート発生状況の確認）
-**冒頭に必ず表示する:**
-```
-▶ Step 2 実行中: Splunk エピソード相関分析でアラートの発生状況を確認しています...
-```
+3. **生 SPL の前**に **`ai_lab`** の **`| savedsearch`**（`default/savedsearches.conf` / `local` 上書き）を列挙し、**再利用可能なら保存済みサーチを優先**する。
 
-Splunk の保存済みサーチでエピソード一覧を取得し、アラートの発生状況を確認する。
-ユーザーが時間範囲を指定している場合はそれに従う（デフォルトは過去60分）。
+4. **時間窓:** ユーザー指定がなければ **直近 60 分**；復旧確認では Step 1 を**再実行**して事後の ThousandEyes を見る。
 
-```spl
-# エピソード一覧（相関分析結果）
-| savedsearch list_episodes
-```
+5. **コンパクトモード:** バナー省略依頼時は見出しだけでステップ境界を維持する。
 
-#### list_episodes の読み方
-エピソードは複数のアラートを相関分析して集約したもの。
-- episode — エピソード名（障害スライスと障害リンクが示される）
-- slice — 影響スライス 
-- alerts — 集約されたアラート一覧
- - [Critical] Interface Counter Mismatch — インターフェースカウンタ不整合（障害リンク特定）
- - Packet Loss Threshold Exceeded — パケットロス閾値超過
- - [DEGRADED] sr_policy — SR-TE Policyの劣化検知
-- severity — Warning / Critical
-エピソードが Critical に昇格するのは、Interface Counter Mismatch が検出された時。これはデータプレーンレベルでの確定的な障害証拠。
-Step 1 でサービス異常を検知できなかった場合でも、ここで Critical なエピソードを検知した場合、その時刻を障害発生時刻とする。
+---
 
-#### 完了後の必須アウトプット
-エピソード取得後、**次のStep（TWAMP/ios/syslog深掘り）に進む前に**、必ず以下の形式で出力すること:
-```
-## 📋 Step 2 完了 — エピソード相関分析サマリー
+## Step 1 - ThousandEyes（サービス監視）
 
-**Critical エピソード発生時刻: YYYY-mm-dd H:M:S Timezone 
-**Critical エピソード概要: エピソードの概要
-**検出エピソード数**: X件
-**影響スライス**: SliceXXXX, SliceYYYY（エピソードがない場合は「なし」）
-**注目アラート**: [検出されたアラート種別をリスト]
-**最大Severity**: Critical / Warning（エピソードがない場合は「正常」）
+**ステータス:** `* Step 1 実行中: ThousandEyes サービス監視（直近約60分）...`
 
-### 次に必要な深掘り調査
+**作業**
 
-アラートの内容から、以下の点を確認する必要があります：
-- 確認事項: [エピソード名・アラート内容から読み取れる確認すべき事象を中立的に記述する]
-**注意**: この時点では障害の種別（WDM 起因/ルーター起因など）を邪推しない。
-障害原因に関する言及は、syslog との相関分析で裏付けが取れてから行うこと。
+- 推奨: **`| savedsearch thousandeyes_response_time_sec`** を CLI/API で **`-60m`～`now`**（または MCP 同等）に設定して実行。
+- カスタム可視化が必要なら: `index=thousandeyes`（環境の sourcetype に合わせる）、`bin _time span=1m`、`stats avg(response_time_sec)` 等。
 
-これを確認するために、以下の3つの観点で深掘り調査を行います。：
+**読み方**
 
-1. **TWAMP 品質分析 (Step 3)** — 各スライスのパケットロス・遅延を実測で確認
-   → スライス別に品質劣化を確認し、障害スライスを絞り込み
+- 直近の `avg(response_time_sec)`（または保存済みサーチ／シナリオが定める上限）が期待帯を**持続的に**超えた時刻を **検知時刻** として記録し、以降の相関の基準にする。
 
-2. **経路マッピング (Step 4)** — 正常スライスとの経路比較で障害ノードを特定
-   → パケットロスが出ているスライスのみに存在するルーターを特定
+---
 
-3. **Telemetry によるインタフェース確認 (Step 5)** — 被疑ルーターのインタフェースレベルでのパケットロス状況確認
-   → 絞り込まれたルーターに対してインタフェースレベルでのパケットロス状況を突き合わせ
+## Step 2 - アラート／エピソード型の相関
 
-4. **ルーター ios イベント分析 (Step 6)** — ルーター側の事象を時系列で確認
-   → 障害発生時刻に対して BFD 断・IS-IS 隣接断・SR-TE Policy DOWN のタイムスタンプを突き合わせる
+**ステータス:** `* Step 2 実行中: アラート／エピソード相関...`
 
-5. **WDM syslog イベント分析 (Step 7)** — WDM 側の事象を時系列で確認
-   → WDM のアラート、およびパフォーマンスメトリックを問題を検知したルーターと突き合わせ根本原因を特定
+**作業**
 
-6. 上記のアクションで取得した情報から取るべきアクションを提案
+1. **`list_episodes`** 等が **`ai_lab` の保存済みサーチとして存在すれば** `| savedsearch list_episodes` をユーザーの時間窓で実行。
+2. なければ **`index=alerts sourcetype=ai_lab_alert`**（および **`index=episode`** があれば併用）に `earliest`/`latest` を明示。
 
-では Step 3（TWAMP品質分析）から深掘りを開始します。
-```
+**読み方**
 
-上記を出力した後、ユーザーの確認なしに Step 3 以降を続けて実行してよい。 
+- **Interface counter mismatch** 系が **Critical** に上がる場合、このワークショップでは**データプレーン上の強い証拠**として扱う。
+- ここでは光学対ルータの**断定**は避け、Step 6-7 の IOS／WDM で裏付ける。
 
-### Step 3: TWAMP 品質分析
+---
 
-**冒頭に必ず表示する:**
-```
-▶ Step 3 実行中: TWAMP データで影響スライスのパケットロス・遅延を実測しています...
-```
+## Step 3 - TWAMP 品質（スライス／セッション）
 
-#### TWAMPフィールド解説
-PCA TWAMPデータから品質指標を分析する。主要フィールドは以下の通り。
- | フィールド | 意味 | 単位 |
- |-----------|------|------|
- | `Session Name` | TWAMPセッション名（例: R2-R9_TWAMP_Slice1002_ipv4_SF） | — |
- | `Interface` | 関連インターフェース（例: L3-R2-VCE1002） | — |
- | `ul_lostperc` | 上り方向パケットロス率 | pct（百分率） |
- | `dl_lostperc` | 下り方向パケットロス率 | pct |
- | `ul_lostpkts` | 上り方向ロストパケット数 | packets |
- | `dl_lostpkts` | 下り方向ロストパケット数 | packets |
- | `rt_dmean` | ラウンドトリップ遅延（平均） | ms |
- | `rt_jmean` | ラウンドトリップジッター（平均） | ms |
- | `ul_dmean` | 上り方向遅延（平均） | ms |
- | `dl_dmean` | 下り方向遅延（平均） | ms | 
- 
-#### 分析クエリ（SPLリファレンスの references/spl_queries.md も参照）
+**ステータス:** `* Step 3 実行中: TWAMP の損失・遅延・ジッター（スライス別）...`
+
+**作業（パターン - 列セットは環境に合わせて絞る）**
 
 ```spl
-# サンプルデータ確認（フィールド構造の把握）
-index=twamp sourcetype=pca_twamp_csv | head 3 | fields *
-
-# スライス別パケットロス・遅延のタイムライン（5分粒度）
-index=twamp sourcetype=pca_twamp_csv
-| rex field="Session Name" "(?<slice>Slice\d+)"
-| eval ul_loss_pct=round(ul_lostperc/10000, 2)
-| eval dl_loss_pct=round(dl_lostperc/10000, 2)
-| eval rt_delay=rt_dmean
-| timechart span=5m
-  avg(ul_loss_pct) as "Avg UL Loss %"
-  avg(dl_loss_pct) as "Avg DL Loss %"
-  avg(rt_delay) as "Avg RT Delay ms"
-  max(ul_loss_pct) as "Max UL Loss %" by slice limit=0
-  
-# パケットロスが発生しているイベントだけ抽出
-index=twamp sourcetype=pca_twamp_csv
-| where ul_lostperc > 0 OR dl_lostperc > 0
-| table _time "Session Name" Interface ul_lostpkts dl_lostpkts ul_lostperc dl_lostperc rt_dmean rt_jmean
-| sort _time
+index=twamp sourcetype=pca_twamp_csv earliest=-60m latest=now
+| head 5000
+| fields _time "Session Name" Interface ul_lostperc dl_lostperc ul_dmean dl_dmean rt_dmean rt_jmean
 ```
 
-#### 完了後の必須アウトプット
-過去 60 分のネットワークスライスごとのパケットロス、遅延、ジッターの状況をスライスごとにチャート表示する。
+**読み方**
 
+- **`ul_lostperc` / `dl_lostperc` は既に 0-100 の整数％** - **10 000 で割らない**。
+- スライス名は **`Session Name`** から `rex` で抽出（例: `Slice1002`）。
+- 悪化スライスを後続の **SR-TE**・**telemetry** と接続する。
 
-### Step 4: 経路マッピング
-**冒頭に必ず表示する:**
-```
-▶ Step 4 実行中: 異常が発生しているスライスと正常なスライスを比較し、問題のあるノードを特定します...
-```
+---
 
-```spl
-index=twamp sourcetype=pca_twamp_csv 
-| head 5
-| rename "Source Ip" as src_ip, "Destination Ip" as dest_ip, "Session Name" as session_name 
-| rex field=session_name "^(?<src_host>[^-]+)-(?<dest_host>[^_]+)_TWAMP_Slice(?<slice>[^_]+)" 
-| bin span=1h _time 
-| stats p95(rt_dp95) as delay p95(rt_jp95) as jitter avg(dl_lostperc) as dl_lostperc avg(ul_lostperc) as ul_lostperc by _time session_name src_host src_ip Interface dest_host dest_ip slice
-| eval dl_lostperc = ifnull(dl_lostperc,1000000) 
-| eval ul_lostperc = ifnull(ul_lostperc,1000000) 
-| stats avg(delay) as delay avg(jitter) as jitter p95(dl_lostperc) as dl_lostperc p95(ul_lostperc) as ul_lostperc by session_name src_host src_ip Interface dest_host dest_ip slice
-| eval delay = round(delay, 2), jitter = round(jitter, 2), dl_lostperc = round(dl_lostperc, 2), ul_lostperc = round(ul_lostperc, 2) 
-| fields session_name slice delay jitter dl_lostperc ul_lostperc src_ip dest_ip 
-| join type=left slice 
-    [ search index=telemetry sourcetype=cnc_srte_path_json
-    | fields _time host sr_policy_results{}.hops{} 
-    | rename sr_policy_results{}.hops{} as hops 
-    | eval src = mvindex(hops, 0), hop1 = mvindex(hops, 1), hop2 = mvindex(hops, 2), hop3 = mvindex(hops, 3), dest = mvindex(hops, 4) 
-    | stats count by _time host src hop1 hop2 hop3 dest 
-    | eval slice = substr(host, 9, 4) ] 
-| fields session_name slice dl_lostperc ul_lostperc delay jitter src hop* dest 
-| eval slice = "Vlan".slice
-| sort slice 
-| rename session_name as Session slice as Slice, ul_lostperc as "R2->R9 Packet Loss%", dl_lostperc as "R9->R2 Packet Loss%", delay as "Delay (ms)", jitter as "Jitter (us)", src as Reflector, hop* as Hop*, dest as Sender 
-| table Session Slice Reflector Hop* Sender "R9->R2 Packet Loss%" "R2->R9 Packet Loss%" "Delay (ms)" "Jitter (us)"
-```
-Packet Loss%、および Delay、Jitter が大きいスライスを特定し、異常スライス内にしかないネットワークノードを被疑箇所として絞り込む。
-障害箇所の特定に最も重要な情報源。 
-- PR2->R9 Packet Loss% / R9->R2 Packet Loss% — 方向別パケットロス 
-- Delay (ms) — 遅延 
-- Jitter (us) — ジッター 
-- Reflector / Hop1 / Hop2 / Hop3 / Sender — TWAMP の Sender と Reflector、およびその経路ルーター。特定のスライスだけにパケットロスが出ている場合、そのスライスの経路に含まれるノードが障害箇所。 
+## Step 4 - 経路マッピング（劣化スライスと正常スライス）
 
+**ステータス:** `* Step 4 実行中: 劣化スライスと正常スライスの経路比較...`
 
-#### 完了後の必須アウトプット
-各スライスを構成するノード情報をテーブル表示する。
+**作業**
 
+- TWAMP のセッション／スライス識別子と **`cnc_srte_path_json`**（hop、policy 結果）を **`index=telemetry`** で突合。
+- **劣化側の経路にだけ現れるノード**や、損失・遅延が乖離する hop を列挙する。
 
-### Step 5: Telemetry によるインタフェース確認
-**冒頭に必ず表示する:**
-```
-▶ Step 5 実行中: Telemetry データを使って障害が疑われるルーターのインタフェース詳細を確認します...
-```
+---
+
+## Step 5 - Telemetry インタフェース検証
+
+**ステータス:** `* Step 5 実行中: Telemetry による IF 損失／不整合...`
+
+**作業**
+
+- 推奨: `| savedsearch telemetry_if_counter`（同じ時間窓）。
+- **高ドロップ**の例（閾値はファシリテータ指示で調整可）:
 
 ```spl
 | savedsearch telemetry_if_counter
-| where r1_to_r2_drop_rate > 30
+| where r1_to_r2_drop_rate > 30 OR r2_to_r1_drop_rate > 30
 ```
-上記サーチ実行によりパケットロスが 30% 以上あるルータインタフェースが確認できる。
-router_1 の interface_1 が送信側、router_2 の interface_2 が受信側
 
-#### 完了後の必須アウトプット
-パケットロスが 30% 以上あるルータインタフェースをテーブル表示する。
+**読み方**
 
+- 保存済みサーチの**方向別**列を用い、TWAMP の方向・SR-TE の hop 方向と**矛盾なく**説明する。
 
-### Step 6: ルーター ios 分析
-**冒頭に必ず表示する:**
-```
-▶ Step 6 実行中: ルーター ios ログから発生した事象を確認します...
-```
-ios からネットワーク障害関連イベントを抽出する。 
-どのルーターでどのようなイベントが発生しているかを時系列で確認する。
+---
+
+## Step 6 - IOS イベント（制御系）
+
+**ステータス:** `* Step 6 実行中: IOS ログ（BFD、IS-IS、SR-TE Policy）...`
+
+**作業**
 
 ```spl
-# 全イベントを時系列で確認
-index=ios
-| table _time host _raw
+index=ios earliest=-60m latest=now
 | sort _time
-
-# SR-TE Policy状態変化を抽出
-index=ios (%OS-XTC-5-SR_POLICY_UPDOWN OR %PKT_INFRA-LINK-5-CHANGED OR %PLATFORM-DPA-2-RX_FAULT OR %ROUTING-ISIS-5-ADJCHANGE OR %L2-BFD-6-ADJACENCY_DELETE OR %L2-BFD-6-SESSION_REMOVED OR %L2-BFD-6-SESSION_STATE_DOWN)
 | table _time host _raw
-| sort _time
 ```
-取得した ios イベントを時系列で整理し、どのルーター・どのリンク・どのプロトコルで 異常が発生しているかを確認する。
-TWAMP データとタイムスタンプを突き合わせて 品質劣化と ios イベントの相関を分析する。
-障害により SRTE ポリシーがどう変更されたかを確認する。
 
-#### 完了後の必須アウトプット
-現在の SRTE ポリシーの状況を報告する。
+絞り込み例（環境の IOS パターンに合わせて拡張）:
 
-
-### Step 7: WDM syslog 分析 
-**冒頭に必ず表示する:**
+```spl
+index=ios earliest=-60m latest=now
+(_raw=*BFD* OR _raw=*IS-IS* OR _raw=*SR*POLICY* OR _raw=*ADJCHANGE*)
+| table _time host _raw
 ```
-▶ Step 7 実行中: WDM syslog からルータごとにトランスポンダーで発生した事象を確認します...
-```
-Splunk の保存済みサーチを使いルータに接続されたトランスポンダーで発生した事象を確認し、原因を特定する。
-利用可能な保存済みサーチ
-- wdm_LSBIASCUR_over_time_by_router (Laser Bias Current, Tx side)
-この値が高い場合、トランスポンダーの劣化が疑われる。
-- wdm_FEC_BEF_COR_ER_over_time_by_router (Forward Error Correction Before Corrected Error, Rx side)
-この値が高い場合、Tx 側のトランスポンダー、および光ファイバーの劣化が疑われる。
-- wdm_LOSTOPCUR_over_time_by_router (Lost Optical Power Current between Tx and Rx)
-lost_opcur の値が大きい場合、Tx 側のトランスポンダー、および光ファイバーの劣化が疑われる
-- wdm_BDTEMPCUR_over_time_by_router (Board Temperature Current)
-この値が高い場合、トランスポンダー装置のボード故障が疑われる
-- wdm_EDTMPCUR_over_time_by_router
-この値が高い場合、トランスポンダー装置の EDFA 故障が疑われる
 
-### 根本原因とアクションの提示、現在のネットワークサービスレベルの確認
-上記の保存済みサーチを利用し、Step 6 までで疑われたルーターに接続されている WDM トランスポンダーの状態を確認し、根本原因を推論する。
-推論結果に基づき取るべきアクションを提案する。
-また、最後に Step 1 の ThousandEyes によるサービスモニターの状態を確認し、SRTE ポリシーの切り替えにより現在ネットワークサービスは正常に復旧していることを確認する。</code></pre>
-<body></html>
+**読み方**
+
+- **DOWN／隣接断／ポリシー変化**の時刻を Step 1 の検知時刻・Step 3 の TWAMP 悪化と突合する。
+
+---
+
+## Step 7 - WDM（PM 保存済みサーチ ＋ syslog）
+
+**ステータス:** `* Step 7 実行中: WDM PM／syslog と被疑ルータ...`
+
+**作業 - 出荷済み名（`_by_router` を優先）**
+
+| 保存済みサーチ | 読み方のヒント |
+|----------------|----------------|
+| `wdm_LSBIASCUR_over_time_by_router` | レーザバイアス - **Tx 側**ストレス／経年（文脈）。 |
+| `wdm_FEC_BEF_COR_ER_over_time_by_router` | FEC 訂正前 - **Rx 側**の光学／トランスポンダ品質指標。 |
+| `wdm_LOSTOPCUR_over_time_by_router` | ロスト光電流 - **光路／Tx-Rx** 文脈（ワークショップ物語）。 |
+| `wdm_BDTEMPCUR_over_time_by_router` | 基板温度 - 熱／ハード異常。 |
+| `wdm_EDTMPCUR_over_time_by_router` | EDFA 系電流 - アンプ経路の物語。 |
+| `wdm_SUMOOPCUR_over_time_by_router` / `wdm_SUMIOPCUR_over_time_by_router` | 存在する場合は **Tx / Rx** 光パワー要約。 |
+
+併せて **`wdm_alert`** および関連 **syslog** で、同一 **host**・近傍 **時刻** の障害テキストを確認する。
+
+**読み方**
+
+- PM のエンドポイントは **`router_wdm_transponders.csv`** の A/Z に従い、**捏造の対応付けをしない**。
+
+---
+
+## Step 8 - 予測／フォーキャスト（任意・ML デモ向け）
+
+**ステータス:** `* Step 8 実行中: フォーキャスト（異常コンテキスト／ML デモ）...`
+
+**使うタイミング:** ファシリテータが予測ビューや異常の定量化、ML デモを求めているとき。または実測値と予測値を比較してメトリクスが本当に異常かを確認するとき。
+
+**作業 - 出荷済みフォーキャスト保存済みサーチ:**
+
+| 保存済みサーチ | アルゴリズム | 対象 |
+|---|---|---|
+| `forecast_cdtsm` | CDTSM | ThousandEyes レスポンスタイム（単一系列、7 日間学習） |
+| `forecast_predict` | LLP5 季節性 | ThousandEyes レスポンスタイム（単一系列、7 日間学習） |
+| `forecast_cdtsm_multi_series` | CDTSM | 全ルータのインタフェース別受信パケットレート（2 週間学習） |
+| `forecast_predict_multi_series` | LLP5 季節性 | 全ルータのインタフェース別受信パケットレート（2 週間学習） |
+
+すべて実測値＋予測値＋信頼区間（最新 60 ポイント）を返す。UX 視点には `forecast_cdtsm` / `forecast_predict`、トラフィック視点には `*_multi_series` を使う。
+
+**特定ルータに絞る場合:** パラメータ付き保存済みサーチ **`cnc_interface_ifInPktsRate_for_a_router`** に `router="R2"` 等を渡すと、そのルータのインタフェースのみに絞れる。
+
+**読み方**
+
+- 障害ウィンドウ内で実測値が予測区間から外れた幅を定量化し、アラート発報より前に ML が異常を捉えていたことをストーリーとして示す。
+
+---
+
+## クロージング - 仮説・推奨アクション・復旧確認
+
+1. **3 行要約:** (a) サービス面の最強証拠 (b) パケット／経路面 (c) L1 光学 vs ルータ面 - それぞれ**信頼度**（高／中／低）。
+2. **対処:** **推奨**にとどめる（エスカレーション項目、チケット観点、ラボ上の「SR-TE 迂回」物語など）。**本番への設定投入をしたかのような表現はしない**。
+3. **復旧確認:** Step 1 の ThousandEyes を**再実行**し、シナリオが復旧タイムラインを含む場合は**改善**を確認する。
+
+---
+
+## パッケージング（Git / `default/` 向け）
+
+**`agent_rules_jp.md` §5** および `.cursor` の Splunk アプリ規約に従う。**`savedsearches.conf`** と **`metadata`（`local.meta` / `default.meta`）** は **`default/` へマージ**し、**`default/` にしかない**スタンザやキーを消さない。**ダッシュボード Simple XML** は **ビューごとに 1 ファイル**；ユーザーの明示依頼時は **`local/data/ui/views/<名前>.xml` → `default/data/ui/views/<名前>.xml` の全文置換**でよい。
+
+---
+
+## 関連ファイル
+
+- `docs/project_ai_lab.md` - トポロジ、ソース、WDM 契約。
+- `default/savedsearches.conf` - 保存済みサーチ名の正。
+- `samples/twamp/pca_twamp_csv/README.md` - TWAMP ワイヤ単位。

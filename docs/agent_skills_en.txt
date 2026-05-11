@@ -1,4 +1,4 @@
-# 5G WDM backbone - failure detection, correlation, and recovery guidance
+﻿# 5G WDM backbone - failure detection, correlation, and recovery guidance
 
 ## Purpose
 
@@ -185,32 +185,6 @@ Also search **`wdm_alert`** / relevant **syslog** sourcetypes for **fault text**
 **Interpretation**
 
 - Tie PM endpoints to routers using **`router_wdm_transponders.csv`** and the workshop A/Z columns - do not invent cross-links.
-
----
-
-## Step 8 - Forecasting (optional, for ML/anomaly demo)
-
-**Status line:** `* Step 8 running: Forecasting (anomaly context / ML demo)...`
-
-**When to use:** facilitator asks for a prediction view, anomaly framing, or ML demo; or you need to compare actual vs expected to confirm a metric is truly anomalous.
-
-**Action — prefer these `ai_lab` forecasting saved searches:**
-
-| Saved search | Algorithm | Scope |
-|---|---|---|
-| `forecast_cdtsm` | CDTSM | ThousandEyes response time (single series, 7-day training) |
-| `forecast_predict` | LLP5 seasonal | ThousandEyes response time (single series, 7-day training) |
-| `forecast_cdtsm_multi_series` | CDTSM | Per-interface in-packet rate, all routers (2-week training) |
-| `forecast_predict_multi_series` | LLP5 seasonal | Per-interface in-packet rate, all routers (2-week training) |
-
-All return actual + prediction + confidence bounds (last 60 points). Use `forecast_cdtsm` / `forecast_predict` for the UX angle and `*_multi_series` for the traffic angle.
-
-**For a focused per-router view:** use the **parameterized** saved search `cnc_interface_ifInPktsRate_for_a_router` with argument `router="R2"` (or whichever router is under investigation) — narrows the chart to that router's interfaces only.
-
-**Interpretation**
-
-- Compare actual values with prediction bounds during the fault window to quantify how far out-of-band behavior was.
-- Present to attendees as "Splunk's ML flagging the anomaly before the alert fired."
 
 ---
 

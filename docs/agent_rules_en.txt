@@ -16,13 +16,11 @@ These rules govern how an agent uses Splunk for the **ai_lab** 5G WDM backbone w
 
 ## 2. Queries and saved searches
 
-1. **Saved-search-first:** for workshop verification and investigation, prefer **`| savedsearch <name>`** in app **`ai_lab`**. Inspect stanza titles in `default/savedsearches.conf` (and **`local/savedsearches.conf`** if the deployment overrides). All 32 current saved searches have a `description =` field — read it to confirm capability before calling.
+1. **Saved-search-first:** for workshop verification and investigation, prefer **`| savedsearch <name>`** in app **`ai_lab`**. Inspect stanza titles in `default/savedsearches.conf` (and **`local/savedsearches.conf`** if the deployment overrides).
 2. **Do not run saved searches from other apps** unless the user explicitly asks for a cross-app comparison.
 3. **Raw SPL** is acceptable when no saved search fits, or for narrow ad hoc checks; keep **`index=`** / **`sourcetype=`** explicit and aligned with shipped data contracts.
 4. **Episode / alert correlation:** prefer materialized workshop objects when present (e.g. **`index=episode`**). If a deployment defines **`list_episodes`** (or equivalent) in **`ai_lab`**, use it. Otherwise use **`index=alerts sourcetype=ai_lab_alert`** for scenario alert rows (see project docs for the current contract).
-5. **Forecasting searches:** the app ships four ML forecasting saved searches — `forecast_cdtsm` and `forecast_predict` for single-series ThousandEyes response time; `forecast_cdtsm_multi_series` and `forecast_predict_multi_series` for per-interface traffic across all routers. Use these for anomaly detection and workshop ML demos.
-6. **Parameterized searches:** `cnc_interface_ifInPktsRate_for_a_router` requires a `router` argument (e.g. `router="R2"`). Pass it via MCP `args` or CLI token substitution. Read the search's `description =` for the full parameter spec.
-7. **How to pick the right saved search using `description =`:** each saved search in `ai_lab` carries a `description =` key structured as:
+5. **How to pick the right saved search using `description =`:** each saved search in `ai_lab` should carry a `description =` key structured as:
    - **Capability first** — what the search returns (output fields, data source, index/sourcetype). This is the primary signal for search selection; read it to decide whether this search answers your question.
    - **"Use case examples:"** at the bottom — concrete investigation triggers (e.g. "confirm a reroute", "check packet loss per slice"). These are hints, not an exhaustive list; the search can be used in other valid contexts not listed.
    - **Do not treat "use case examples" as the only valid uses.** If the capability section matches your need, call the search even if no listed example matches exactly.
@@ -47,11 +45,15 @@ These rules govern how an agent uses Splunk for the **ai_lab** 5G WDM backbone w
 
 ---
 
-## 5. Workshop environment
+## 5. Repository and `local/` policy
 
-1. **Data is pre-loaded:** the workshop Splunk instance has all indexes, sourcetypes, saved searches, and lookups already populated. Do not attempt to load or modify data — use saved searches to query what is there.
-2. **Scenario state:** the facilitator controls fault scenarios via the `scenario_control` dashboard. Do not manually modify scenario configuration; ask the facilitator if you need the scenario activated or reset.
-3. **Scope:** confine queries and investigation to the **`ai_lab`** app indexes (`telemetry`, `twamp`, `thousandeyes`, `syslog`, `ios`, `alerts`). Do not query indexes from other apps unless the facilitator explicitly asks.
+1. **Packaging vs runtime:** Splunk resolves **`local/`** over **`default/`** for the same object name. Treat **`local/savedsearches.conf`** and **`local/data/ui/views/`** as deployment-owned unless the user asks to promote to **`default/`**.
+2. **Agents must not silently edit `local/`** for workshop state (scenarios, tokens, etc.); follow project rules for resets and tests.
+3. **Promote to `default/` for Git/AMI (critical):**
+   - **`savedsearches.conf`:** do **not** package by **replacing `default/savedsearches.conf` with only the contents of `local/savedsearches.conf`**. Splunk merges **`[stanza]`** definitions from both trees; a naive **`cp`** drops any stanza or key that exists **only** in **`default/`**. **Merge** `local` into the existing **`default/savedsearches.conf`** (same mental model as **`metadata/local.meta` → `metadata/default.meta`**): preserve default-only stanzas, apply local deltas per stanza, document intentional removals.
+   - **`metadata` (`local.meta` / `default.meta`):** use the project's **merge** discipline; do not replace **`default.meta`** with a raw copy of **`local.meta`** alone, or default-only ACL/metadata entries can disappear.
+   - **Dashboard Simple XML** (`local/data/ui/views/*.xml` → `default/data/ui/views/`): each view is **one file** (not a multi-stanza INI aggregate). On explicit user request, **full-file replace** per filename is the correct packaging path.
+4. **Automation caveat:** `scripts/reset_workshop_state.sh` may still **`cp`** `local/savedsearches.conf` over **`default/`**; after a reset-driven sync, verify **`default/savedsearches.conf`** still contains every stanza/key the repo must ship, or pre-merge / fix up before commit.
 
 ---
 

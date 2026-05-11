@@ -16,13 +16,11 @@
 
 ## 2. クエリと保存済みサーチ
 
-1. **保存済みサーチ優先:** ワークショップの検証・調査では **`ai_lab`** アプリの **`| savedsearch <名前>`** を優先する。スタンザ名は `default/savedsearches.conf` を参照し、環境で上書きされている場合は **`local/savedsearches.conf`** も確認する。現在出荷済みの **32 件すべて**に `description =` フィールドがある — 呼び出す前に確認する。
+1. **保存済みサーチ優先:** ワークショップの検証・調査では **`ai_lab`** アプリの **`| savedsearch <名前>`** を優先する。スタンザ名は `default/savedsearches.conf` を参照し、環境で上書きされている場合は **`local/savedsearches.conf`** も確認する。
 2. ユーザーが明示しない限り、**他アプリの保存済みサーチは実行しない**。
 3. 適切な保存済みサーチがない場合のみ **生の SPL** を使い、**`index=` / `sourcetype=`** をデータ契約に合わせて明示する。
 4. **エピソード / アラート相関:** マテリアライズ済みのワークショップ用オブジェクトがあれば優先（例: **`index=episode`**）。デプロイに **`list_episodes`** 等が **`ai_lab` 内で定義されていれば** それを使う。なければシナリオ用の **`index=alerts sourcetype=ai_lab_alert`** でアラート行を参照する（現行契約はプロジェクトドキュメント参照）。
-5. **予測（フォーキャスト）保存済みサーチ:** `forecast_cdtsm` / `forecast_predict`（ThousandEyes 単一系列）、`forecast_cdtsm_multi_series` / `forecast_predict_multi_series`（全ルータのインタフェース別トラフィック）が出荷済み。異常検知や ML デモに活用する。
-6. **パラメータ付き保存済みサーチ:** `cnc_interface_ifInPktsRate_for_a_router` は `router` 引数が必要（例: `router="R2"`）。MCP の `args` または CLI トークン置換で渡す。`description =` にパラメータ仕様が記載されている。
-7. **`description =` を使った保存済みサーチの選択方法:** `ai_lab` の各保存済みサーチの `description =` は次の構造で記述する：
+5. **`description =` を使った保存済みサーチの選択方法:** `ai_lab` の各保存済みサーチの `description =` は次の構造で記述する：
    - **ケイパビリティ（先頭）** — 返されるフィールド、データソース、index/sourcetype。これが検索選択の主なシグナル。この記述が自分の質問に答えられるか確認する。
    - **「ユースケース例:」（末尾）** — 具体的な調査トリガー（例:「迂回の確認」「スライス別パケットロスの確認」）。ヒントであり、網羅的なリストではない。記載されていないケースでも利用してよい。
    - **「ユースケース例」に列挙されていないから使えない、とは判断しない。** ケイパビリティが自分のニーズに合致していれば呼び出してよい。
@@ -47,11 +45,15 @@
 
 ---
 
-## 5. ワークショップ環境
+## 5. リポジトリと `local/` 方針
 
-1. **データは事前に準備済み:** ワークショップの Splunk インスタンスには、すべての index・sourcetype・保存済みサーチ・ルックアップが揃っている。データの投入や変更は不要。保存済みサーチでクエリするだけでよい。
-2. **シナリオ状態:** 障害シナリオはファシリテータが `scenario_control` ダッシュボードで制御する。シナリオ設定を直接変更しない。有効化やリセットが必要な場合はファシリテータに確認する。
-3. **スコープ:** クエリと調査は **`ai_lab`** アプリの index（`telemetry`、`twamp`、`thousandeyes`、`syslog`、`ios`、`alerts`）に限定する。ファシリテータの明示的な指示がない限り、他アプリの index は参照しない。
+1. **パッケージとランタイム:** 同名オブジェクトは **`local/`** が **`default/`** に優先する。**`local/savedsearches.conf`** や **`local/data/ui/views/`** はデプロイ／編集用とみなし、**`default/`** へのプロモートはユーザーの指示があったときに行う。
+2. **ワークショップ状態（シナリオ、トークン等）をエージェントが黙って `local/` に書き換えない**（リセット・テストはプロジェクト規約に従う）。
+3. **`default/` へのプロモート（Git／AMI 向け・重要）:**
+   - **`savedsearches.conf`:** **`local/savedsearches.conf` の内容だけで `default/savedsearches.conf` を丸ごと置き換えない。** Splunk は **`[スタンザ]`** を **`default/`** と **`local/`** の両方からマージする。単純な **`cp`** は **`default/` にしかない** スタンザやキーを消す。**`metadata/local.meta` → `default.meta` のマージ**と同じ考え方で、既存の **`default/savedsearches.conf`** に **`local`** の差分を **マージ**する（default 専用スタンザは残し、スタンザ単位で上書き・追加、意図的削除は明記）。
+   - **`metadata`（`local.meta` / `default.meta`）:** プロジェクトの **マージ手順**に従う。**`local.meta` だけで `default.meta` を上書き**しない（default 専用の ACL 等が消える）。
+   - **ダッシュボード Simple XML**（`local/data/ui/views/*.xml` → `default/data/ui/views/`）: ビューは **ファイル単位** であり、リポジトリ上の INI 多スタンザ集約ではない。ユーザーの明示依頼時は、ファイルごとの **全文置換（`cp`）** で **`default/`** に載せてよい。
+4. **自動化の注意:** `scripts/reset_workshop_state.sh` は現状 **`local/savedsearches.conf` を `default/` に `cp`** する場合がある。リセット後に **`default/savedsearches.conf`** にリポジトリ必須のスタンザ／キーが残っているか確認するか、コミット前に **マージ／手直し**する。
 
 ---
 
