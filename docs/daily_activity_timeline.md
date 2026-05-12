@@ -9,6 +9,17 @@ This report is generated from available saved conversation transcripts and group
 
 ## 2026-05-12 (Tue)
 
+- Session 2 around **11:45-12:49 JST**
+- Main activities:
+  - Implemented CDTSM anomaly detection (`forecast_cdtsm_anomaly_detection` saved search — R7 HundredGigE0/0/0/1, anomaly mode, 640-min window)
+  - Implemented CDTSM forecast visualization (`forecast_cdtsm_visualization` saved search — R2 HundredGigE0/0/0/0, holdback=64, forecast_k=128)
+  - Implemented Prophet-based prediction
+  - Ran AI agent test scenario tests
+  - Generated descriptions for the two new saved searches and merged to `default/savedsearches.conf` (34 stanzas)
+  - Updated journal and committed/pushed all changes
+- Resume anchor:
+  - **Continue AI agent scenario tests and deploy production.**
+
 - Session 1 around **01:00-07:49 JST**
 - Main activities:
   - Implemented time-series forecasting for the workshop: CDTSM and LLP5-based saved searches for both single-series ThousandEyes response time (`forecast_cdtsm`, `forecast_predict`) and multi-series per-interface traffic (`forecast_cdtsm_multi_series`, `forecast_predict_multi_series`)
