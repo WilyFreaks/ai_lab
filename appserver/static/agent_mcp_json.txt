@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "splunk-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://98.81.121.3:8089/services/mcp/",
+        "--header",
+        "Authorization: Bearer ${AUTH_TOKEN}"
+      ],
+      "env": {
+        "AUTH_TOKEN": "eyJraWQiOiJzcGx1bmsuc2VjcmV0IiwiYWxnIjoiSFM1MTIiLCJ2ZXIiOiJ2MiIsInR0eXAiOiJzdGF0aWMifQ.eyJpc3MiOiJhZG1pbiBmcm9tIHNob3ctbm8tY29uZmlnLWktMDY4ZWM1MjViNzhkYzUwOTEiLCJzdWIiOiJhZG1pbiIsImF1ZCI6Im1jcCIsImlkcCI6IlNwbHVuayIsImp0aSI6ImQzMjBiOWU5OWExNjUxMjBiMTc3ZTEwODU1YThhNDk2OTM2MTFiNzEyOTY4MDQ1OWU0MDZhZWYzZGViMjY2NzEiLCJpYXQiOjE3NzQ2MDEzODYsImV4cCI6MTgwNjEzNzM4NiwibmJyIjoxNzc0NjAxMzg2fQ.hZnS2RkWXQJNF4v1W-jBU-QBHoqMAVWbcyeXXeWGotAIrh5K5ZaRFe8b0fFD72BojXtWYjnzrTR_PhGuBi1j_g",
+        "NODE_TLS_REJECT_UNAUTHORIZED": "0"
+      }
+    }
+  }
+}

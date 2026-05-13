@@ -105,6 +105,9 @@
         <p style="margin:0 0 0.75em 0;color:#555;font-size:12px">Links open UTF-8 plain text (.txt mirrors of the Markdown) so attendees can select-all and paste into Cursor. Use &quot;Save As&quot; from the browser if you prefer a file.</p>
         <ul>
         <li>
+            <a href="/static/app/ai_lab/agent_mcp_json.txt" target="_blank">MCP Config (JSON)</a>
+          </li>
+        <li>
             <a href="/static/app/ai_lab/agent_rules_en.txt" target="_blank">Agent Rules (English)</a>
           </li>
         <li>
