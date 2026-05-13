@@ -7,6 +7,15 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-13 (Wed)
+
+- Session 1 around **10:00 JST**
+- Main activities:
+  - Fixed CDTSM full name in savedsearches.conf descriptions: "Dynamic" → "Deep Time Series Model"
+  - Synced default/savedsearches.conf from local (34 stanzas, all with descriptions)
+- Resume anchor:
+  - **Continue fixing small issues.**
+
 ## 2026-05-12 (Tue)
 
 - Session 2 around **11:45-12:49 JST**
