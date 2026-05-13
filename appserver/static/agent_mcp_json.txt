@@ -5,7 +5,7 @@
       "args": [
         "-y",
         "mcp-remote",
-        "https://98.81.121.3:8089/services/mcp/",
+        "https://<<YOUR_INSTANCE_URL>>:8089/services/mcp/",
         "--header",
         "Authorization: Bearer ${AUTH_TOKEN}"
       ],
