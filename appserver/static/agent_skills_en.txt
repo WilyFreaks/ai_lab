@@ -205,7 +205,9 @@ Also search **`wdm_alert`** / relevant **syslog** sourcetypes for **fault text**
 
 All return actual + prediction + confidence bounds (last 60 points). Use `forecast_cdtsm` / `forecast_predict` for the UX angle and `*_multi_series` for the traffic angle.
 
-**For a focused per-router view:** use the **parameterized** saved search `cnc_interface_ifInPktsRate_for_a_router` with argument `router="R2"` (or whichever router is under investigation) — narrows the chart to that router's interfaces only.
+**CDTSM model context (xc and xf):** CDTSM takes two resolution inputs — **xf** (fine context, up to 512 points at your data granularity) and **xc** (coarse context, up to 512 points at 60× the fine resolution). For 1-minute data: xc = 1-hour resolution; for 5-minute: xc = 5-hour. Recommended granularity: **1, 2, 3, or 4 minutes** (divides 1440 evenly for clean daily seasonality). Practical maximum training window: **~40 days**. Both contexts must align at the same end-point in time.
+
+**For a focused per-router view:** use the **parameterized** saved search `cnc_interface_ifInPktsRate_for_a_router` with argument `router="R2"` — narrows the chart to that router's interfaces only. **Note:** this search is currently disabled in the workshop environment; use `cnc_interface_ifInPktsRate` (all routers) as the alternative.
 
 **Interpretation**
 

@@ -7,9 +7,26 @@ type: project
 
 This report is generated from available saved conversation transcripts and grouped by day (JST, UTC+9).
 
+## 2026-05-14 (Thu)
+
+- Session 1 around **00:00-02:45 JST**
+- Main activities:
+  - Moved `~/.cursor/mcp.json` to `.cursor/mcp.json` (project-scoped MCP config)
+  - Updated all references from `~/.cursor/mcp.json` → `.cursor/mcp.json` in rules, hook, and docs
+  - Added `.cursor/mcp.json` and `scripts/__pycache__/` to `.gitignore`
+  - Staged and committed new `appserver/static/` files (`.bak` mirrors, `guess.jpg`, `agent_mcp_json.txt`)
+  - Added `agent_mcp_json.txt` as a workshop MCP config deliverable; added download link to `scenario_control` dashboard
+  - Synced `scenario_control.xml` local → default and committed
+  - Enriched `forecast_cdtsm` description with CDTSM xc/xf model input explanation and ~40-day practical training range guidance
+  - Fixed local/default `forecast_cdtsm` description sync (discovered existing stanza in `local/` at line 832; removed duplicate appended at bottom; verified btool parity with/without local)
+  - Synced `cnc_interface_ifInPktsRate_for_a_router disabled=1` into `default/savedsearches.conf` to match `local/`; verified btool parity
+  - Updated rules, hook, skills (+ mirrors), and project docs with session learnings: `agent_mcp_json.txt` deliverable, `disabled=1` sync discipline, btool parity test pattern, CDTSM xc/xf guidance, mcp.json location conventions
+- Resume anchor:
+  - **Commit and push pending changes (rules, hook, skills, project_ai_lab.md, default/savedsearches.conf); test agentic AI behavior.**
+
 ## 2026-05-13 (Wed)
 
-- Session 1 around **10:00 JST**
+- Session 1 around **10:00-11:00 JST**
 - Main activities:
   - Fixed CDTSM full name in savedsearches.conf descriptions: "Dynamic" → "Deep Time Series Model"
   - Synced default/savedsearches.conf from local (34 stanzas, all with descriptions)
@@ -534,11 +551,13 @@ The values below use observable timestamps and rough token estimation from trans
 
 ### Daily summary
 
-- 2026-05-12: ~0 minutes (1 session), ~3,000 estimated tokens
-- 2026-05-11: ~120 minutes (1 session), ~42,000 estimated tokens
+- 2026-05-14: ~165 minutes (1 session), ~35,000 estimated tokens
+- 2026-05-13: ~60 minutes (1 session), ~3,000 estimated tokens
+- 2026-05-12: ~473 minutes (2 sessions), ~45,000 estimated tokens
+- 2026-05-11: ~355 minutes (2 sessions), ~42,000 estimated tokens
 - 2026-05-10: ~593 minutes (2 sessions), ~60,000 estimated tokens
 - 2026-05-09: ~120 minutes (1 session), ~8,000 estimated tokens
-- 2026-05-08: ~249 minutes (2 sessions), ~76,000 estimated tokens
+- 2026-05-08: ~672 minutes (2 sessions), ~76,000 estimated tokens
 - 2026-05-07: ~815 minutes (3 sessions), ~82,000 estimated tokens
 - 2026-05-06: ~511 minutes (5 sessions), ~65,000 estimated tokens
 - 2026-05-05: ~752 minutes (4 sessions), ~99,000 estimated tokens
@@ -557,11 +576,13 @@ The values below use observable timestamps and rough token estimation from trans
 
 | Date (JST) | Observable Duration | Estimated Tokens |
 |------------|---------------------|------------------|
-| 2026-05-12 | ~0 minutes (1 session) | ~3,000 |
-| 2026-05-11 | ~120 minutes (1 session) | ~42,000 |
+| 2026-05-14 | ~165 minutes (1 session) | ~35,000 |
+| 2026-05-13 | ~60 minutes (1 session) | ~3,000 |
+| 2026-05-12 | ~473 minutes (2 sessions) | ~45,000 |
+| 2026-05-11 | ~355 minutes (2 sessions) | ~42,000 |
 | 2026-05-10 | ~593 minutes (2 sessions) | ~60,000 |
 | 2026-05-09 | ~120 minutes (1 session) | ~8,000 |
-| 2026-05-08 | ~249 minutes (2 sessions) | ~76,000 |
+| 2026-05-08 | ~672 minutes (2 sessions) | ~76,000 |
 | 2026-05-07 | ~815 minutes (3 sessions) | ~82,000 |
 | 2026-05-06 | ~511 minutes (5 sessions) | ~65,000 |
 | 2026-05-05 | ~752 minutes (4 sessions) | ~99,000 |

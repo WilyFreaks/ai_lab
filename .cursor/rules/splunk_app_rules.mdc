@@ -11,16 +11,19 @@ Always read:
 - docs/project_dashboard_design.md
 - docs/project_scenario_*.md
 
-Workshop attendee deliverables (`agent_rules_*` / `agent_skills_*`):
+Workshop attendee deliverables (`agent_rules_*` / `agent_skills_*` / `agent_mcp_json`):
 - `appserver/static/agent_rules_en.md` and `agent_skills_en.md` (plus `_jp.md` and `.txt` mirrors, and `docs/` copies) are **workshop-facing documents** that attendees download from the Splunk dashboard and import into their own Cursor instance as rules and skills.
+- `appserver/static/agent_mcp_json.txt` is the **MCP config template** for attendees — they download it from the dashboard ("MCP Config (JSON)" link in `scenario_control`) and save it as `.cursor/mcp.json` (or `.mcp.json`) in their own Cursor workspace. It contains the `splunk-mcp-server` entry pointing to the workshop host IP. Update the IP/token when provisioning a new AMI.
 - Purpose: teach the attendee's local Cursor agent how to use Splunk (MCP, saved-search-first, data contracts, investigation workflow) during the hands-on lab activity.
 - **Content rule (strict):** these files must contain ONLY workshop investigation guidance — Splunk access, saved-search usage, data contracts, investigation steps, tone. **No development content** (packaging, merge scripts, btool, reset procedures, `default/` promotion, Git/AMI). Development rules belong only in `.cursor/rules/splunk_app_rules.mdc` and `.cursor/hooks/`.
+- **Cursor MCP config locations:** `.cursor/mcp.json` (project-scoped, inside workspace) and `.mcp.json` (workspace root) are both supported by Cursor. The host's own MCP config lives at `.cursor/mcp.json` in this repo (gitignored-by-convention but tracked; token is local-machine-only). Attendees place their downloaded `agent_mcp_json.txt` as `.cursor/mcp.json` or `.mcp.json` in their own workspace.
 - **Mirror discipline:** whenever you edit any one of these files, sync ALL eight mirrors in the same operation:
   - `appserver/static/agent_rules_en.md` → `appserver/static/agent_rules_en.txt`, `docs/agent_rules_en.md`, `docs/agent_rules_en.txt`
   - `appserver/static/agent_rules_jp.md` → `appserver/static/agent_rules_jp.txt`, `docs/agent_rules_jp.md`, `docs/agent_rules_jp.txt`
   - `appserver/static/agent_skills_en.md` → `appserver/static/agent_skills_en.txt`, `docs/agent_skills_en.md`, `docs/agent_skills_en.txt`
   - `appserver/static/agent_skills_jp.md` → `appserver/static/agent_skills_jp.txt`, `docs/agent_skills_jp.md`, `docs/agent_skills_jp.txt`
   - Quick sync command: `cp appserver/static/agent_rules_en.md appserver/static/agent_rules_en.txt && cp appserver/static/agent_rules_en.md docs/agent_rules_en.md && cp appserver/static/agent_rules_en.md docs/agent_rules_en.txt` (repeat for jp, skills).
+  - `agent_mcp_json.txt` has **no mirrors** — it is a standalone template; update the IP and token directly in `appserver/static/agent_mcp_json.txt` when provisioning.
 
 Session resume ("where i am" / "where am i" / "resume my work"):
 - Always read `docs/daily_activity_timeline.md` as the first action when the user asks where they are or wants to resume the project.
@@ -153,6 +156,8 @@ Saved-search validation rules (Splunk test/verification):
 - Baseline quality entrypoint: `scripts/test_baseline.sh` → `scripts/test_backfill.sh`. TWAMP minute-bucket limits can be tuned with `TWAMP_MINUTE_BUCKET_MIN` / `TWAMP_MINUTE_BUCKET_MAX` if a deployment’s SPL window semantics differ. ThousandEyes abrupt-jump tolerance can be tuned with `TE_JUMP_OUTLIER_MIN` / `TE_JUMP_OUTLIER_MAX` (default `0..2`).
 - For live-generation verification, prefer a recent time window (for example `earliest=-5m latest=now`) so results prove active real-time generation rather than historical backfill only.
 - Saved-search sync policy: when asked to sync or package saved searches for Git/AMI, **merge** `local/savedsearches.conf` into **`default/savedsearches.conf`** (preserve stanzas and keys that exist only in `default/`, apply `local` per-stanza deltas). **Do not** treat a verbatim **`cp local/savedsearches.conf` → `default/savedsearches.conf`** as safe packaging: it is the same failure mode as replacing `default.meta` with only `local.meta`. Use the same discipline as **`metadata/local.meta` merged into `metadata/default.meta`**. If the user explicitly wants `local` to become the **entire** shipped file (they accept dropping default-only stanzas), say so and proceed only with that acknowledgment.
+- **`disabled = 1` sync discipline:** when a stanza in `local/savedsearches.conf` has `disabled = 1`, that key must also be set in the matching stanza in `default/savedsearches.conf`. Without this, packaging `default/` restores the search as enabled on any host that does not have the `local/` override.
+- **btool parity test (local/default):** after syncing a description or key, verify `local` + `default` produce the same output as `default`-only: `mv local/savedsearches.conf local/savedsearches.conf.tmp && splunk btool savedsearches list <stanza> --app=ai_lab 2>/dev/null | grep "^<key>" ; mv local/savedsearches.conf.tmp local/savedsearches.conf`. Both outputs must be identical.
 - **Scheduled alert searches** (workshop alerting) live in the same `savedsearches.conf` stanzas; output targets **`index=alerts`** (and optional downstream **`episode`** materialization). When promoting alert definitions to `default/`, use the **merge** policy above, not a blind full replace, unless the user explicitly accepts wholesale replacement.
 - Scenario alert contract (current): scheduled searches **`Interface Counter Mismatch`**, **`Packet Loss Threshold Exceeded`**, and **`CNC Service Health Status Degraded`** write **`index=alerts sourcetype=ai_lab_alert`**.
 - Scenario dashboard episode/timeline searches must use **`index=alerts sourcetype=ai_lab_alert`** (not legacy `index=alert` / `sourcetype=generic_single_line`).
