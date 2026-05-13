@@ -276,7 +276,7 @@ This report is generated from available saved conversation transcripts and group
 - Session 3 around **11:22-12:56 JST** in this chat
 - Main activities:
   - Updated `default/ai_lab_scenarios.conf` ThousandEyes parameters and validated live generator consumption
-  - Diagnosed baseline/backfill test auth failures and standardized token-only test execution using MCP token (`~/.cursor/mcp.json`)
+  - Diagnosed baseline/backfill test auth failures and standardized token-only test execution using MCP token (`.cursor/mcp.json`)
   - Implemented telemetry baseline smoothing in `backfill_log.py` and `live_log.py` to eliminate abrupt `ifOutPktsRate`/`ifInPktsRate` jumps
   - Implemented hour-boundary smoothing for `peak_rate_*` by minute interpolation, resolving abrupt ThousandEyes transitions across hours
   - Updated `cnc_srte_path_json` ingestion host extraction to use payload `vlan` (sample field rename `host` -> `vlan`, with `default/transforms.conf` aligned)

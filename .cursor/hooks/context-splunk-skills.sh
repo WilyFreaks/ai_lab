@@ -51,7 +51,7 @@ print("- Reset flow: stop backfill/live -> verify no orphan launcher/backfill/li
 print("- Mandatory gate after every reset: run bash scripts/test_smoke.sh before any generation or baseline/scenario tests")
 print("- Smoke/reset: treat ai_lab_logs as empty only when excluding sourcetypes ai_lab:launcher, ai_lab:spool_cleanup")
 print("- test_backfill.sh implements baseline quality + optional backfill/live ingest handoff checks; test_baseline.sh is a thin wrapper (exec)")
-print("- Preferred auth for scripted checks: token from ~/.cursor/mcp.json (mcpServers.splunk-mcp-server.env.AUTH_TOKEN)")
+print("- Preferred auth for scripted checks: token from .cursor/mcp.json (mcpServers.splunk-mcp-server.env.AUTH_TOKEN)")
 print("- Saved-search sync policy: MERGE local/savedsearches.conf into default/savedsearches.conf (stanza/key-aware, same model as local.meta -> default.meta); use scripts/merge_local_savedsearches_to_default.py + btool before/after validation (temporarily disable local/ to test default-only); revert default/ from backup on failure. Do NOT use full-copy cp.")
 print("- Scheduled alert stanzas currently expected: Interface Counter Mismatch, Packet Loss Threshold Exceeded, CNC Service Health Status Degraded (index=alerts sourcetype=ai_lab_alert)")
 print("- Telemetry ifIn/ifOut on opposite ends of a physical link share one daily_variation draw; backfill_log.py and live_log.py must stay in parity for helper code")

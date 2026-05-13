@@ -108,7 +108,7 @@ Durations and summaries:
 
 Splunk MCP server (`splunk-mcp-server`) usage rules:
 - Always prefer using the Splunk MCP server (`user-splunk-mcp-server`) for Splunk queries and index operations when it is available (green dot in Cursor Settings → MCP).
-- For all Splunk REST API or CLI calls that require authentication, **always use the Bearer token** from `~/.cursor/mcp.json` (`mcpServers.splunk-mcp-server.env.AUTH_TOKEN`). Never use username/password credentials.
+- For all Splunk REST API or CLI calls that require authentication, **always use the Bearer token** from `.cursor/mcp.json` (`mcpServers.splunk-mcp-server.env.AUTH_TOKEN`). Never use username/password credentials.
 - When the MCP server shows **"Error - Show Output"** (red dot), it is likely in a stale error state. Recovery steps in order:
   1. Toggle the server **off then on** in Cursor Settings → MCP (no full Cursor restart needed).
   2. If toggling does not help, a **full Cursor restart** clears cached MCP connection state — this is especially needed when the session has switched between a remote Cursor session and a local one, which can corrupt the MCP connection registry.
@@ -119,7 +119,7 @@ Splunk MCP server (`splunk-mcp-server`) usage rules:
 - For unattended runs, execute `./scripts/reset_workshop_state.sh --yes` (avoid interactive `Proceed? (yes/no)` waits).
 - Before running `reset_workshop_state.sh`, explicitly notify the user that the script will **copy** `local/savedsearches.conf` over `default/savedsearches.conf` (full replace), **copy** each `local/data/ui/views/*.xml` into `default/` (per-file replace is correct for dashboards), and **merge** `metadata/local.meta` into `metadata/default.meta` (when local metadata exists). Warn that the saved-searches **copy** can **drop `default/`-only stanzas** unless `local` is already a superset; agents packaging by hand should **merge** `local` into `default/savedsearches.conf` like metadata, not rely on blind replace. Then wait for user confirmation so they can cancel if needed.
 - Prefer token-based verification auth, not username/password.
-- Read the token from Cursor MCP config (`~/.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
+- Read the token from Cursor MCP config (`.cursor/mcp.json` -> `mcpServers.splunk-mcp-server.env.AUTH_TOKEN`).
 - Export token as `SPLUNK_TOKEN` (or rely on `AUTH_TOKEN`) before running verification.
 - Use `SPLUNK_AUTH` (`user:pass`) only as fallback when token auth is unavailable.
 - Reset execution order is mandatory: stop `backfill_log.py`/`live_log.py` -> confirm no orphan `launcher.py`/`backfill_log.py`/`live_log.py` remains -> stop Splunk -> clean spool -> remove indexes safely -> start Splunk.
