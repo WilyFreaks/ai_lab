@@ -1,0 +1,391 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Reset workshop runtime state WITHOUT merging local/savedsearches.conf into default/.
+# Use this variant on environments where the savedsearches merge fails (e.g. missing
+# merge helper, btool unavailable, or local saved searches are intentionally not
+# packaged on that host).
+#
+# Differences vs reset_workshop_state.sh:
+#   - Skips local/savedsearches.conf -> default/savedsearches.conf merge entirely
+#   - Still copies local dashboard XML into default
+#   - Still merges local.meta into default.meta
+#   - All destructive reset and verify steps are identical
+#
+# 0) sync local packaging into default (savedsearches merge SKIPPED):
+#    - dashboards: per-file full replace (local -> default)
+#    - metadata: merge local.meta into default.meta
+# 1) stop ai_lab generators (backfill/live) and confirm no orphan app generator python remains
+# 2) stop Splunk
+# 3) delete all files under app var/spool (monitored spool JSON, etc.)
+# 4) delete ai_lab index directories (derived from default/indexes.conf)
+# 5) delete local/ai_lab_scenarios.conf
+# 6) start Splunk
+
+APP_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SPLUNK_HOME="${SPLUNK_HOME:-/opt/splunk}"
+SPLUNK_BIN="$SPLUNK_HOME/bin/splunk"
+INDEX_CONF="$APP_ROOT/default/indexes.conf"
+LOCAL_SCENARIO_CONF="$APP_ROOT/local/ai_lab_scenarios.conf"
+LOCAL_VIEWS_DIR="$APP_ROOT/local/data/ui/views"
+DEFAULT_VIEWS_DIR="$APP_ROOT/default/data/ui/views"
+SPLUNK_DB="$SPLUNK_HOME/var/lib/splunk"
+SPOOL_ROOTS=(
+  "$APP_ROOT/var/spool/ai_lab"
+)
+SPLUNK_AUTH="${SPLUNK_AUTH:-}"
+SPLUNK_TOKEN="${SPLUNK_TOKEN:-${AUTH_TOKEN:-}}"
+
+ASSUME_YES="false"
+if [[ "${1:-}" == "--yes" ]]; then
+  ASSUME_YES="true"
+fi
+
+if [[ ! -x "$SPLUNK_BIN" ]]; then
+  echo "ERROR: Splunk CLI not found at: $SPLUNK_BIN"
+  exit 1
+fi
+
+if [[ ! -f "$INDEX_CONF" ]]; then
+  echo "ERROR: Index config not found: $INDEX_CONF"
+  exit 1
+fi
+
+if [[ -z "$SPLUNK_DB" || "$SPLUNK_DB" == "/" || "$SPLUNK_DB" == "." || "$SPLUNK_DB" == ".." ]]; then
+  echo "ERROR: Unsafe SPLUNK_DB value: '$SPLUNK_DB'"
+  exit 1
+fi
+
+if [[ ! -d "$SPLUNK_DB" ]]; then
+  echo "ERROR: SPLUNK_DB directory not found: $SPLUNK_DB"
+  exit 1
+fi
+
+APP_INDEXES=()
+while IFS= read -r idx; do
+  APP_INDEXES+=("$idx")
+done < <(awk '
+  /^\[/ && /\]$/ {
+    name=$0
+    gsub(/^\[/, "", name)
+    gsub(/\]$/, "", name)
+    if (name != "") print name
+  }
+' "$INDEX_CONF")
+
+if [[ "${#APP_INDEXES[@]}" -eq 0 ]]; then
+  echo "ERROR: No indexes found in $INDEX_CONF"
+  exit 1
+fi
+
+is_safe_index_name() {
+  local name="$1"
+  [[ "$name" =~ ^[A-Za-z0-9_:-]+$ ]] || return 1
+  [[ "$name" != "." && "$name" != ".." ]] || return 1
+  return 0
+}
+
+realpath_py() {
+  python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"
+}
+
+ensure_path_under_base() {
+  local target="$1"
+  local base="$2"
+  local target_real
+  local base_real
+  target_real="$(realpath_py "$target")"
+  base_real="$(realpath_py "$base")"
+  if [[ "$target_real" != "$base_real"/* ]]; then
+    return 1
+  fi
+  return 0
+}
+
+echo "Reset plan (NO savedsearches merge variant):"
+echo "- Sync dashboard XML local -> default"
+echo "- Merge local.meta into default.meta (if present)"
+echo "- SKIP savedsearches.conf merge (this variant does not touch default/savedsearches.conf)"
+echo "- Stop ai_lab generator processes (backfill/live)"
+echo "- Confirm no orphan ai_lab generator python remains (launcher/backfill/live)"
+echo "- Stop Splunk"
+echo "- Delete all files under app var/spool (workshop spool JSON, etc.):"
+for _sr in "${SPOOL_ROOTS[@]}"; do
+  printf '  - %s\n' "$_sr"
+done
+echo "- Delete index directories and .dat files under $SPLUNK_DB for:"
+printf '  - %s\n' "${APP_INDEXES[@]}"
+echo "- Delete $LOCAL_SCENARIO_CONF (if present)"
+echo "- Start Splunk"
+
+if [[ "$ASSUME_YES" != "true" ]]; then
+  read -r -p "Proceed? (yes/no): " REPLY
+  if [[ "$REPLY" != "yes" ]]; then
+    echo "Aborted."
+    exit 0
+  fi
+fi
+
+stop_ai_lab_generators() {
+  local names=(backfill_log live_log)
+  local pids=()
+  local seen=""
+
+  for name in "${names[@]}"; do
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      if [[ " $seen " == *" $pid "* ]]; then
+        continue
+      fi
+      pids+=("$pid")
+      seen="$seen $pid"
+    done < <(pgrep -f "$APP_ROOT/bin/$name.py" || true)
+  done
+
+  if [[ "${#pids[@]}" -eq 0 ]]; then
+    echo "No lingering backfill/live generator processes found."
+    return 0
+  fi
+
+  echo "Stopping lingering ai_lab generator processes: ${pids[*]}"
+  kill -TERM "${pids[@]}" 2>/dev/null || true
+
+  for _ in {1..10}; do
+    local alive=()
+    for pid in "${pids[@]}"; do
+      if kill -0 "$pid" 2>/dev/null; then
+        alive+=("$pid")
+      fi
+    done
+    if [[ "${#alive[@]}" -eq 0 ]]; then
+      echo "All backfill/live generator processes stopped."
+      return 0
+    fi
+    sleep 1
+  done
+
+  local still_alive=()
+  for pid in "${pids[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      still_alive+=("$pid")
+    fi
+  done
+  if [[ "${#still_alive[@]}" -gt 0 ]]; then
+    echo "Force-killing remaining backfill/live generator processes: ${still_alive[*]}"
+    kill -KILL "${still_alive[@]}" 2>/dev/null || true
+  fi
+}
+
+assert_no_orphan_ai_lab_python() {
+  local pids=()
+  local seen=""
+  local names=(launcher backfill_log live_log)
+
+  for name in "${names[@]}"; do
+    while IFS= read -r pid; do
+      [[ -n "$pid" ]] || continue
+      if [[ " $seen " == *" $pid "* ]]; then
+        continue
+      fi
+      pids+=("$pid")
+      seen="$seen $pid"
+    done < <(pgrep -f "$APP_ROOT/bin/$name.py" || true)
+  done
+
+  if [[ "${#pids[@]}" -gt 0 ]]; then
+    echo "ERROR: Orphan ai_lab generator python process(es) still running: ${pids[*]}"
+    echo "       Expected none for launcher/backfill/live before reset continues."
+    exit 1
+  fi
+  echo "Confirmed: no orphan ai_lab generator python processes."
+}
+
+sync_local_packaging_artifacts_no_merge() {
+  local synced_views=0
+  local local_view_files=()
+
+  echo "Syncing local packaging artifacts into default (savedsearches merge SKIPPED)..."
+
+  if [[ -d "$LOCAL_VIEWS_DIR" ]]; then
+    if ! ensure_path_under_base "$LOCAL_VIEWS_DIR" "$APP_ROOT"; then
+      echo "ERROR: Refusing to read dashboard dir outside app root: $LOCAL_VIEWS_DIR"
+      exit 1
+    fi
+    if ! ensure_path_under_base "$DEFAULT_VIEWS_DIR" "$APP_ROOT"; then
+      echo "ERROR: Refusing to write dashboard dir outside app root: $DEFAULT_VIEWS_DIR"
+      exit 1
+    fi
+
+    mkdir -p "$DEFAULT_VIEWS_DIR"
+    shopt -s nullglob
+    local_view_files=("$LOCAL_VIEWS_DIR"/*.xml)
+    shopt -u nullglob
+
+    if [[ "${#local_view_files[@]}" -eq 0 ]]; then
+      echo "  skip (no local dashboard XML): $LOCAL_VIEWS_DIR"
+    else
+      for src in "${local_view_files[@]}"; do
+        local name dst
+        name="$(basename "$src")"
+        dst="$DEFAULT_VIEWS_DIR/$name"
+        cp "$src" "$dst"
+        synced_views=$((synced_views + 1))
+      done
+      echo "  synced dashboard XML files: $synced_views"
+    fi
+  else
+    echo "  skip (not found): $LOCAL_VIEWS_DIR"
+  fi
+
+  # Merge Splunk UI metadata into default for Git/AMI parity. Since the savedsearches
+  # merge is skipped in this variant, the metadata merge still runs against whatever
+  # default/savedsearches.conf is currently on disk.
+  local merge_py="$APP_ROOT/scripts/merge_local_meta_to_default_meta.py"
+  if [[ -f "$merge_py" ]]; then
+    if ! ensure_path_under_base "$merge_py" "$APP_ROOT"; then
+      echo "ERROR: Refusing to run merge script outside app root: $merge_py"
+      exit 1
+    fi
+    python3 "$merge_py" --app-root "$APP_ROOT"
+  else
+    echo "  skip metadata merge (helper not found): $merge_py"
+  fi
+}
+
+sync_local_packaging_artifacts_no_merge
+
+echo "Stopping backfill/live generators..."
+stop_ai_lab_generators
+echo "Confirming no orphan ai_lab generator python remains..."
+assert_no_orphan_ai_lab_python
+
+echo "Stopping Splunk..."
+"$SPLUNK_BIN" stop
+
+echo "Removing all spool files under var/spool..."
+_seen_realpaths=()
+for SPOOL_ROOT in "${SPOOL_ROOTS[@]}"; do
+  if [[ ! -d "$SPOOL_ROOT" ]]; then
+    echo "  skip (not found): $SPOOL_ROOT"
+    continue
+  fi
+  if ! ensure_path_under_base "$SPOOL_ROOT" "$APP_ROOT"; then
+    echo "ERROR: Refusing to delete spool path outside app roots: $SPOOL_ROOT"
+    exit 1
+  fi
+  rp="$(realpath_py "$SPOOL_ROOT")"
+  dup="false"
+  for prev in "${_seen_realpaths[@]+"${_seen_realpaths[@]}"}"; do
+    if [[ "$prev" == "$rp" ]]; then
+      dup="true"
+      break
+    fi
+  done
+  if [[ "$dup" == "true" ]]; then
+    echo "  skip (same path as earlier): $SPOOL_ROOT"
+    continue
+  fi
+  _seen_realpaths+=("$rp")
+  fc="$(find "$SPOOL_ROOT" -type f 2>/dev/null | wc -l | tr -d '[:space:]')"
+  find "$SPOOL_ROOT" -type f -delete 2>/dev/null || true
+  for ((_i = 0; _i < 100; _i++)); do
+    n="$(find "$SPOOL_ROOT" -mindepth 1 -type d -empty 2>/dev/null | wc -l | tr -d '[:space:]')"
+    [[ "${n:-0}" -eq 0 ]] && break
+    find "$SPOOL_ROOT" -mindepth 1 -type d -empty -delete 2>/dev/null || break
+  done
+  echo "  removed ${fc:-0} file(s) under $SPOOL_ROOT (empty dirs pruned)"
+done
+
+echo "Removing index data directories and .dat files..."
+for idx in "${APP_INDEXES[@]}"; do
+  if ! is_safe_index_name "$idx"; then
+    echo "ERROR: Unsafe index name from indexes.conf: '$idx'"
+    exit 1
+  fi
+
+  idx_path="$SPLUNK_DB/$idx"
+  idx_dat_path="$SPLUNK_DB/$idx.dat"
+
+  if ! ensure_path_under_base "$idx_path" "$SPLUNK_DB"; then
+    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_path"
+    exit 1
+  fi
+  if ! ensure_path_under_base "$idx_dat_path" "$SPLUNK_DB"; then
+    echo "ERROR: Refusing to delete path outside SPLUNK_DB: $idx_dat_path"
+    exit 1
+  fi
+
+  if [[ -d "$idx_path" ]]; then
+    rm -rf "$idx_path"
+    echo "  removed: $idx_path"
+  else
+    echo "  skip (not found): $idx_path"
+  fi
+
+  if [[ -f "$idx_dat_path" ]]; then
+    rm -f "$idx_dat_path"
+    echo "  removed: $idx_dat_path"
+  else
+    echo "  skip (not found): $idx_dat_path"
+  fi
+done
+
+if [[ -f "$LOCAL_SCENARIO_CONF" ]]; then
+  if ! ensure_path_under_base "$LOCAL_SCENARIO_CONF" "$APP_ROOT"; then
+    echo "ERROR: Refusing to delete local scenario path outside app root: $LOCAL_SCENARIO_CONF"
+    exit 1
+  fi
+  rm -f "$LOCAL_SCENARIO_CONF"
+  echo "Removed: $LOCAL_SCENARIO_CONF"
+else
+  echo "Skip (not found): $LOCAL_SCENARIO_CONF"
+fi
+
+echo "Starting Splunk..."
+"$SPLUNK_BIN" start
+
+extract_count() {
+  awk '
+    /^[[:space:]]*[0-9]+[[:space:]]*$/ { val=$1 }
+    END {
+      if (val == "") exit 1
+      print val
+    }
+  '
+}
+
+echo "Verifying index data deletion with SPL..."
+if [[ -z "$SPLUNK_AUTH" && -z "$SPLUNK_TOKEN" ]]; then
+  echo "ERROR: SPLUNK_AUTH or SPLUNK_TOKEN is required for verification."
+  echo "       Examples:"
+  echo "         export SPLUNK_AUTH='admin:changeme'"
+  echo "         export SPLUNK_TOKEN='<mcp bearer token>'"
+  exit 1
+fi
+
+for idx in "${APP_INDEXES[@]}"; do
+  # Scripted inputs write to ai_lab_logs on Splunk startup (e.g. spool_cleanup heartbeat);
+  # exclude those sourcetypes so post-restart SPL matches "no workshop payloads yet".
+  query="index=$idx earliest=0 latest=now | stats count"
+  if [[ "$idx" == "ai_lab_logs" ]]; then
+    query='index=ai_lab_logs earliest=0 latest=now NOT sourcetype IN ("ai_lab:launcher","ai_lab:spool_cleanup") | stats count'
+  fi
+  if [[ -n "$SPLUNK_TOKEN" ]]; then
+    if ! count="$("$SPLUNK_BIN" search "$query" -token "$SPLUNK_TOKEN" | extract_count)"; then
+      echo "ERROR: Verification search failed for index '$idx'"
+      exit 1
+    fi
+  else
+    if ! count="$("$SPLUNK_BIN" search "$query" -auth "$SPLUNK_AUTH" | extract_count)"; then
+      echo "ERROR: Verification search failed for index '$idx'"
+      exit 1
+    fi
+  fi
+  if (( count != 0 )); then
+    echo "ERROR: Index '$idx' still has events: $count"
+    exit 1
+  fi
+  echo "  verified empty: $idx"
+done
+
+echo "Done."

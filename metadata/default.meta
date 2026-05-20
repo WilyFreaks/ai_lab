@@ -51,7 +51,7 @@ modtime = 1778525294.648743000
 
 [views/scenario_control]
 version = 9.4.2
-modtime = 1778417537.708039000
+modtime = 1778691569.261937000
 
 [savedsearches/wdm_FEC_BEF_COR_ER_over_time]
 access = read : [ * ], write : [ admin, power ]
@@ -143,7 +143,7 @@ modtime = 1778174090.009333000
 [savedsearches/cnc_srte_path]
 owner = nobody
 version = 9.4.2
-modtime = 1778174106.116577000
+modtime = 1778533845.325316000
 
 [savedsearches/telemetry_if_counter]
 owner = nobody
@@ -184,7 +184,7 @@ modtime = 1778376188.314590000
 
 [views/scenario_1_jp]
 version = 9.4.2
-modtime = 1778525321.053811000
+modtime = 1779082813.964884000
 
 [savedsearches/Packet%20Loss%20Threshold%20Exceeded]
 owner = nobody
@@ -214,7 +214,7 @@ modtime = 1778444241.454696000
 export = none
 owner = nobody
 version = 9.4.2
-modtime = 1778525268.943263000
+modtime = 1778633547.418572000
 
 [savedsearches/forecast_cdtsm]
 export = none
@@ -233,3 +233,21 @@ export = none
 owner = nobody
 version = 9.4.2
 modtime = 1778527931.523420000
+
+[savedsearches/cnc_interface_ifInPktsRate_for_a_router]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778694164.363660000
+
+[savedsearches/forecast_cdtsm_visualization]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778541782.345062000
+
+[savedsearches/forecast_cdtsm_anomaly_detection]
+export = none
+owner = nobody
+version = 9.4.2
+modtime = 1778555914.789643000
